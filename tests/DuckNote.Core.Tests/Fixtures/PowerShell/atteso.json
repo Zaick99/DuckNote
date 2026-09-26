@@ -1,0 +1,11 @@
+{
+  "Passes": 1,
+  "Password": "anatra-in-salotto",
+  "Nota": "UGVyw7IgbCdhbmF0cmEgw6ggZ2nDoCBxdWkg4oCUIDE5Mi4xNjguMS4xClNlY29uZGEgcmlnYSBjb24gYWNjZW50aTogw6DDqMOsw7LDuQ==",
+  "Salt": "AQIDBAUGBwgJCgsMDQ4PEA==",
+  "Iterations": 1000,
+  "Memory": 8192,
+  "Dek": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+  "Lanes": 1,
+  "Kek": "lhDMF4fTiY2wjWX3ei02o232MgW/A898svr5bKa0huBkqghNytvBXNgcbvuqs3bq3q7a+Zcqc+s8Ve/NXGdU/w=="
+}

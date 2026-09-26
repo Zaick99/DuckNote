@@ -1,0 +1,83 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Disinstalla DuckNote" Width="470" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        WindowStyle="None" AllowsTransparency="True" UseLayoutRounding="True"
+        FontFamily="SF Pro Text, Segoe UI Variable Text, Segoe UI" FontSize="13"
+        Background="Transparent">
+  <Border x:Name="URoot" CornerRadius="14" Background="{DynamicResource BgSidebarGlass}"
+          BorderBrush="{DynamicResource GlassEdge}" BorderThickness="1"
+          RenderTransformOrigin="0.5,0.45" Opacity="0">
+    <Border.RenderTransform>
+      <TransformGroup>
+        <ScaleTransform x:Name="UScale" ScaleX="0.96" ScaleY="0.96"/>
+        <TranslateTransform x:Name="UMove" Y="12"/>
+      </TransformGroup>
+    </Border.RenderTransform>
+    <StackPanel>
+      <Border x:Name="UTitleBar" Background="{DynamicResource BgToolbarGlass}" Height="44" CornerRadius="13,13,0,0">
+        <Grid>
+          <Button x:Name="UClose" Style="{DynamicResource TrafficBtn}" Background="{DynamicResource TLClose}"
+                  HorizontalAlignment="Left" VerticalAlignment="Center" Margin="14,0,0,0" ToolTip="Chiudi">
+            <Path Data="M 0,0 L 6,6 M 6,0 L 0,6" Stroke="#5A1416" StrokeThickness="1.2" Stretch="Uniform"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+          </Button>
+          <TextBlock Text="Disinstalla DuckNote" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"
+                     VerticalAlignment="Center" Foreground="{DynamicResource Label}"/>
+        </Grid>
+      </Border>
+
+      <StackPanel Margin="22,18,22,0">
+        <TextBlock Text="Viene cancellato tutto il contenuto di questa cartella:" TextWrapping="Wrap"
+                   Foreground="{DynamicResource Label}"/>
+        <TextBlock x:Name="UPath" FontFamily="SF Mono, Cascadia Mono, Consolas" FontSize="12" Margin="0,7,0,0"
+                   TextWrapping="Wrap" Foreground="{DynamicResource LabelSecondary}"/>
+
+        <Border CornerRadius="12" Background="{DynamicResource SheetScrim}" Padding="14,11" Margin="0,13,0,0"
+                BorderBrush="{DynamicResource GlassEdge}" BorderThickness="1">
+          <ScrollViewer x:Name="UListScroll" MaxHeight="150" VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="UList" FontFamily="SF Mono, Cascadia Mono, Consolas" FontSize="11.5"
+                       Foreground="{DynamicResource LabelSecondary}"/>
+          </ScrollViewer>
+        </Border>
+
+        <TextBlock x:Name="UWarn" TextWrapping="Wrap" Margin="0,13,0,0" FontSize="12"
+                   Foreground="{DynamicResource Red}"/>
+
+        <TextBlock Text="Scrivi DISINSTALLA per confermare" Margin="0,14,0,6" FontSize="12"
+                   Foreground="{DynamicResource LabelSecondary}"/>
+        <TextBox x:Name="UConfirm" Style="{DynamicResource Field}" Height="32"/>
+      </StackPanel>
+
+      <Border Background="{DynamicResource BgToolbarGlass}" Padding="18,12" Margin="0,18,0,0" CornerRadius="0,0,13,13">
+        <Grid>
+          <TextBlock x:Name="UNote" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Left"
+                     Foreground="{DynamicResource LabelTertiary}" Text="DuckNote si chiude subito dopo."/>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="UCancel" Style="{DynamicResource QuietBtn}" Content="Annulla" Margin="0,0,8,0"/>
+            <Button x:Name="UGo" Content="Cancella tutto" IsEnabled="False" Height="30" Padding="16,0"
+                    Cursor="Hand" FontWeight="SemiBold" Foreground="White">
+              <Button.Template>
+                <ControlTemplate TargetType="Button">
+                  <Border x:Name="b" CornerRadius="7" Background="{DynamicResource Red}"
+                          Padding="{TemplateBinding Padding}">
+                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter TargetName="b" Property="Opacity" Value="0.88"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                      <Setter TargetName="b" Property="Background" Value="{DynamicResource BgPressed}"/>
+                      <Setter Property="Foreground" Value="{DynamicResource LabelTertiary}"/>
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </Button.Template>
+            </Button>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </StackPanel>
+  </Border>
+</Window>

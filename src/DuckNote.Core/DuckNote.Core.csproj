@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>DuckNote.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
