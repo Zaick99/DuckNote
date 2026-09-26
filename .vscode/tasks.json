@@ -1,0 +1,36 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compila",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/src/DuckNote.App", "--nologo"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "prove",
+      "type": "shell",
+      "command": "dotnet",
+      "args": ["test", "${workspaceFolder}/DuckNote.sln", "--nologo"],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "pubblica portabile",
+      "type": "shell",
+      "command": "dotnet",
+      "args": [
+        "publish", "${workspaceFolder}/src/DuckNote.App",
+        "-c", "Release", "-r", "win-x64", "--self-contained", "true",
+        "-p:PublishSingleFile=true",
+        "-p:IncludeNativeLibrariesForSelfExtract=true",
+        "-p:EnableCompressionInSingleFile=true",
+        "-p:DebugType=none",
+        "-o", "${workspaceFolder}/_testversion/DuckNote-0.0.4/build"
+      ],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

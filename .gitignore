@@ -1,0 +1,29 @@
+# Build .NET
+bin/
+obj/
+publish/
+*.user
+*.pdb
+
+# Dati utente, se l'applicazione viene provata dentro questa cartella
+note.xaml
+note.xaml.bak
+settings.json
+lastscan.json
+oui.txt
+
+# Copie di lavoro e banchi di prova
+DuckNote.*.ps1
+*.tmp
+
+# _old/ NON e' escluso: e' l'unica copia dell'era PowerShell, e va versionata.
+# Le regole sotto valgono solo per la radice, o coprirebbero anche quella copia.
+/dist/
+/commenti-rimossi.txt
+
+# Versioni di prova pubblicate: rigenerabili con dotnet publish
+_testversion/
+
+# Nessun eseguibile nel repository: si rigenerano con dotnet publish.
+# La regola vale ovunque, non solo nella radice.
+*.exe

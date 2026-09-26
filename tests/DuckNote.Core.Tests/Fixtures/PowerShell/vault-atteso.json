@@ -1,0 +1,13 @@
+{
+  "Scansione": "W3siSVAiOiIxMC4wLjAuMSIsIlN0YXRvIjoiT25saW5lIiwiUmFuayI6MCwiQ2hpYXZlIjoiMTAuMC4wLjEifV0=",
+  "Memory": 8192,
+  "Privati": "eyJJZ25vcmVkSG9zdHMiOiIxMC4wLjAuOTksc3RhbXBhbnRlLmNhc2EubGFuIiwiTGFzdFJhbmdlIjoiMTAuMC4wLjAvMjcifQ==",
+  "Passes": 1,
+  "NotaPrec": "IyBWZXJzaW9uZSBwcmVjZWRlbnRlCnNvbG8gMTAuMC4wLjE=",
+  "Salt": "ZGVmZ2hpamtsbW5vcHFycw==",
+  "Iterations": 1000,
+  "Lanes": 1,
+  "Password": "anatra-nel-cassetto",
+  "Kek": "Npb0GEpLHd5+qNORw/mN3pBjM51jUZZZYs1qzE+R7GyFA9QfRwtFZeJ9rcuUR11cXgVH7HoSMollt3WkljuirQ==",
+  "Nota": "IyBSZXRlIGRpIGNhc2EKSWwgZ2F0ZXdheSBlJyAxMC4wLjAuMSwgcGVyw7IgaWwgTkFTIG5hcy5jYXNhLmxhbiBzcGFyaXNjZS4KLSBbIF0gY29udHJvbGxhcmUgMTAuMC4wLjUw"
+}

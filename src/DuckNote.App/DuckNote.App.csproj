@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>DuckNote.App</RootNamespace>
+    <AssemblyName>DuckNote</AssemblyName>
+    <ApplicationIcon>..\..\assets\duck.ico</ApplicationIcon>
+
+    <!--
+      WPF non regge la modalita' invariante: la cache dei font costruisce
+      CultureInfo("en") all'avvio e in quella modalita' non esiste, quindi la
+      finestra muore alla prima misura di testo. Le librerie la tengono accesa
+      per avere formattazioni deterministiche; qui va spenta.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Theme\tokens.json" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="..\..\assets\duck.png" Link="Assets\duck.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DuckNote.Core\DuckNote.Core.csproj" />
+    <ProjectReference Include="..\DuckNote.Scan\DuckNote.Scan.csproj" />
+  </ItemGroup>
+
+</Project>

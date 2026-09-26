@@ -1,0 +1,95 @@
+{
+  "NetBiosEncode": {
+    "*": "Q0tDQUNBQ0FDQUNBQ0FDQUNBQ0FDQUNBQ0FDQUNBQUE=",
+    "WORKSTATION": "RkhFUEZDRUxGREZFRUJGRUVKRVBFT0NBQ0FDQUNBQUE=",
+    "nas": "RU9FQkZEQ0FDQUNBQ0FDQUNBQ0FDQUNBQ0FDQUNBQUE=",
+    "NOMEMOLTOLUNGOCHESFORA": "RU9FUEVORUZFTkVQRU1GRUVQRU1GRkVPRUhFUEVEQUE="
+  },
+  "DnsLabels": {
+    "nas.casa.lan": "A25hcwRjYXNhA2xhbgA=",
+    "1.1.168.192.in-addr.arpa": "ATEBMQMxNjgDMTkyB2luLWFkZHIEYXJwYQA=",
+    "a": "AWEA",
+    "": "AA=="
+  },
+  "ArpaName": {
+    "192.168.1.1": "1.1.168.192.in-addr.arpa",
+    "10.0.0.255": "255.0.0.10.in-addr.arpa",
+    "non.un.ip": ""
+  },
+  "BerLen": {
+    "0": "AA==",
+    "1": "AQ==",
+    "127": "fw==",
+    "128": "gYA=",
+    "255": "gf8=",
+    "256": "ggEA",
+    "1000": "ggPo",
+    "65535": "gv//",
+    "70000": "gwERcA=="
+  },
+  "BerOid": {
+    "1.3.6.1.2.1.1.1.0": "KwYBAgEBAQA=",
+    "1.3.6.1.4.1.8072.3.2.10": "KwYBBAG/CAMCCg==",
+    "2.16.840.1.101.3.4.2.1": "YIZIAWUDBAIB"
+  },
+  "Clean": [
+    {
+      "Out": "riga con tab",
+      "In": "cmlnYQljb24JdGFi"
+    },
+    {
+      "Out": "molti spazi qui",
+      "In": "bW9sdGkgICAgc3BhemkgICBxdWk="
+    },
+    {
+      "Out": "connullodentro",
+      "In": "Y29uAG51bGxvAWRlbnRybw=="
+    },
+    {
+      "Out": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx...",
+      "In": "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4"
+    },
+    {
+      "Out": "",
+      "In": ""
+    },
+    {
+      "Out": "bordi",
+      "In": "ICBib3JkaSAg"
+    }
+  ],
+  "VendorFromMac": {
+    "B8:27:EB:11:22:33": "Raspberry Pi",
+    "00:0C:29:AA:BB:CC": "VMware",
+    "02:11:22:33:44:55": "MAC locale / randomizzato",
+    "01:00:5E:00:00:01": "Indirizzo multicast",
+    "FF:FF:FF:FF:FF:FF": "Indirizzo multicast",
+    "00:15:5D:01:02:03": "Microsoft Hyper-V",
+    "AABBCCDDEEFF": "MAC locale / randomizzato",
+    "12:34": ""
+  },
+  "VendorFromText": {
+    "MikroTik RouterOS 7.11": "MikroTik",
+    "Synology DiskStation DS920+": "Synology",
+    "Apache/2.4 (Ubuntu)": "",
+    "HP LaserJet 4200": "HP",
+    "FRITZ!Box 7590": "AVM",
+    "zte modem": "ZTE",
+    "niente di noto qui": ""
+  },
+  "SnmpGet": "MG4CAQEEBnB1YmxpY6BhAgMB4kACAQACAQAwVDAMBggrBgECAQEBAAUAMAwGCCsGAQIBAQIABQAwDAYIKwYBAgEBAwAFADAMBggrBgECAQEEAAUAMAwGCCsGAQIBAQUABQAwDAYIKwYBAgEBBgAFAA==",
+  "SnmpReply": "MIG3AgEBBAZwdWJsaWOigakCAwHiQAIBAAIBADCBmzApBggrBgECAQEBAAQdTGludXggZ3cgNS4xNS4wICMxIFNNUCB4ODZfNjQwFgYIKwYBAgEBAgAGCisGAQQBvwgDAgowEAYIKwYBAgEBAwBDBAFbjYAwGgYIKwYBAgEBBAAEDmFkbWluQGNhc2EubGFuMBMGCCsGAQIBAQUABAdnYXRld2F5MBMGCCsGAQIBAQYABAdBcm1hZGlv",
+  "SnmpParsed": {
+    "Contact": "admin@casa.lan",
+    "ObjectId": "1.3.6.1.4.1.8072.3.2.10",
+    "Uptime": "2g 15:16:12",
+    "Name": "gateway",
+    "Location": "Armadio",
+    "Descr": "Linux gw 5.15.0 #1 SMP x86_64"
+  },
+  "DnsPtrPacket": "q82BgAABAAEAAAAAATEBMQMxNjgDMTkyB2luLWFkZHIEYXJwYQAADAABwAwADAABAAAOEAARBnJvdXRlcgRjYXNhA2xhbgA=",
+  "DnsPtrAnswer": "router.casa.lan",
+  "DnsAPacket": "EjSBgAABAAEAAAAAA25hcwRjYXNhA2xhbgAAAQABwAwAAQABAAAOEAAEwKgBMg==",
+  "DnsAAnswer": "192.168.1.50",
+  "OuiCount": 758
+}

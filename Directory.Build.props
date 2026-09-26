@@ -1,0 +1,20 @@
+<Project>
+
+  <!--
+    Il framework sta qui e non nei singoli progetti: aggiornarlo e' una riga,
+    e nessun progetto puo' restare indietro per distrazione.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Product>DuckNote</Product>
+    <Company>DuckNote</Company>
+    <Version>0.0.4</Version>
+  </PropertyGroup>
+
+</Project>
