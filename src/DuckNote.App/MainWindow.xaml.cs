@@ -86,7 +86,20 @@ public partial class MainWindow : Window
 
         SideList.SelectionChanged += (_, _) =>
         {
-            if (_syncingSelection || SideList.SelectedItem is not Models.SideItem { IP.Length: > 0 } item)
+            if (_syncingSelection || SideList.SelectedItem is not Models.SideItem item)
+            {
+                return;
+            }
+
+            // Una voce della struttura non ha indirizzo: porta un paragrafo, e
+            // sceglierla significa andare a leggerlo.
+            if (item.Para is System.Windows.Documents.Paragraph heading)
+            {
+                JumpToHeading(heading);
+                return;
+            }
+
+            if (item.IP.Length == 0)
             {
                 return;
             }

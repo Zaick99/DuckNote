@@ -4,7 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using DuckNote.App.Theme;
 
 namespace DuckNote.App.Ducks;
@@ -16,14 +15,16 @@ public sealed class DuckPond(Canvas canvas)
 
     private readonly List<Duck> _ducks = [];
     private readonly Random _random = new();
-    private DispatcherTimer? _timer;
     private ImageBrush? _mask;
+    private bool _running;
+    private TimeSpan _lastFrame;
+
+    private const double FrameMilliseconds = 40;
 
     private sealed class Duck
     {
         public double X, Y, Size, VX, VY, Wobble, WobbleSpeed;
         public required Shape Shape;
-        public required ScaleTransform Scale;
         public required RotateTransform Rotate;
         public required TranslateTransform Move;
     }
@@ -53,24 +54,28 @@ public sealed class DuckPond(Canvas canvas)
             double angle = _random.NextDouble() * Math.PI * 2;
             double speed = 0.4 + (_random.NextDouble() * 0.7);
 
-            ScaleTransform scale = new() { CenterX = DuckWidth / 2, CenterY = DuckHeight / 2 };
-            RotateTransform rotate = new() { CenterX = DuckWidth / 2, CenterY = DuckHeight / 2 };
+            // Il rettangolo nasce GRANDE QUANTO SERVE, non 512x512 poi
+            // rimpicciolito: con una maschera addosso, il compositore paga la
+            // dimensione dichiarata, non quella che si vede. Ventidue rettangoli
+            // da mezzo megapixel ridisegnati a ogni fotogramma erano la causa
+            // dello scatto, misurata accendendo e spegnendo le papere.
+            RotateTransform rotate = new() { CenterX = size / 2, CenterY = size / 2 };
             TranslateTransform move = new();
 
             TransformGroup group = new();
-            group.Children.Add(scale);
             group.Children.Add(rotate);
             group.Children.Add(move);
 
             Shape shape = new Rectangle
             {
-                Width = DuckWidth,
-                Height = DuckHeight,
+                Width = size,
+                Height = size,
                 OpacityMask = _mask,
                 Fill = ink,
                 Opacity = opacity,
                 RenderTransform = group,
-                IsHitTestVisible = false
+                IsHitTestVisible = false,
+                CacheMode = new BitmapCache { EnableClearType = false, SnapsToDevicePixels = false }
             };
 
             canvas.Children.Add(shape);
@@ -84,7 +89,6 @@ public sealed class DuckPond(Canvas canvas)
                 Wobble = _random.NextDouble() * Math.PI * 2,
                 WobbleSpeed = 0.008 + (_random.NextDouble() * 0.008),
                 Shape = shape,
-                Scale = scale,
                 Rotate = rotate,
                 Move = move
             };
@@ -124,30 +128,66 @@ public sealed class DuckPond(Canvas canvas)
         return (x, y);
     }
 
+    /// <summary>
+    /// Il movimento e' agganciato al disegno, non a un timer.
+    /// </summary>
+    /// <remarks>
+    /// Un DispatcherTimer a 40 ms scatta quando gli pare, e i suoi istanti non
+    /// coincidono con quelli in cui WPF compone il fotogramma: alcune posizioni
+    /// vengono scritte subito dopo che il fotogramma e' partito e si vedono solo
+    /// al giro dopo, altre due volte. Da qui lo scatto, anche con la CPU
+    /// scarica. CompositionTarget.Rendering arriva una volta per fotogramma,
+    /// appena prima che venga disegnato.
+    /// </remarks>
     public void Start()
     {
-        if (_ducks.Count == 0)
+        if (_ducks.Count == 0 || _running)
         {
             return;
         }
 
-        _timer ??= CreateTimer();
-        _timer.Start();
+        _running = true;
+        _lastFrame = TimeSpan.Zero;
+        CompositionTarget.Rendering += OnFrame;
     }
 
-    public void Stop() => _timer?.Stop();
-
-    private DispatcherTimer CreateTimer()
+    public void Stop()
     {
-        DispatcherTimer timer = new(DispatcherPriority.Background)
+        if (!_running)
         {
-            Interval = TimeSpan.FromMilliseconds(40)
-        };
-        timer.Tick += (_, _) => Step();
-        return timer;
+            return;
+        }
+
+        _running = false;
+        CompositionTarget.Rendering -= OnFrame;
     }
 
-    private void Step()
+    private void OnFrame(object? sender, EventArgs e)
+    {
+        if (e is not RenderingEventArgs frame)
+        {
+            return;
+        }
+
+        // Il tempo trascorso DAVVERO fra due fotogrammi: su uno schermo a 144 Hz
+        // le papere andrebbero altrimenti due volte e mezza piu' in fretta che
+        // su uno a 60, perche' i fotogrammi sono piu' fitti.
+        TimeSpan now = frame.RenderingTime;
+        if (_lastFrame == TimeSpan.Zero)
+        {
+            _lastFrame = now;
+            return;
+        }
+
+        double elapsed = (now - _lastFrame).TotalMilliseconds;
+        _lastFrame = now;
+
+        // Dopo una pausa - finestra ridotta a icona, macchina sotto sforzo - il
+        // salto sarebbe enorme e le papere si teletrasporterebbero.
+        Step(Math.Min(elapsed, 50) / FrameMilliseconds);
+    }
+
+    private void Step(double pace)
     {
         double width = canvas.ActualWidth;
         double height = canvas.ActualHeight;
@@ -160,9 +200,9 @@ public sealed class DuckPond(Canvas canvas)
 
         foreach (Duck duck in _ducks)
         {
-            duck.Wobble += duck.WobbleSpeed;
-            duck.X += duck.VX;
-            duck.Y += duck.VY + (Math.Sin(duck.Wobble) * 0.25);
+            duck.Wobble += duck.WobbleSpeed * pace;
+            duck.X += duck.VX * pace;
+            duck.Y += (duck.VY + (Math.Sin(duck.Wobble) * 0.25)) * pace;
 
             Bounce(duck, width, height);
             Place(duck);
@@ -217,15 +257,23 @@ public sealed class DuckPond(Canvas canvas)
         if (duck.Y > height + half) { duck.Y = height + half; duck.VY = -Math.Abs(duck.VY); }
     }
 
+    /// <summary>
+    /// Posizione e rotazione passano per la TRASFORMAZIONE, mai per
+    /// Canvas.SetLeft.
+    /// </summary>
+    /// <remarks>
+    /// Canvas.Left e' una proprieta' di dipendenza che invalida la disposizione:
+    /// ventidue papere per fotogramma significano ventidue passaggi di layout
+    /// prima di ogni disegno, ed e' da li' che veniva lo scatto. Una
+    /// RenderTransform salta misura e disposizione e arriva diritta al
+    /// compositore. La scala non cambia mai dopo la nascita: si imposta in
+    /// Build e non si tocca piu'.
+    /// </remarks>
     private static void Place(Duck duck)
     {
-        double scale = duck.Size / DuckWidth;
-        duck.Scale.ScaleX = scale;
-        duck.Scale.ScaleY = scale;
         duck.Rotate.Angle = Math.Sin(duck.Wobble) * 5;
-
-        Canvas.SetLeft(duck.Shape, duck.X - (DuckWidth / 2));
-        Canvas.SetTop(duck.Shape, duck.Y - (DuckHeight / 2));
+        duck.Move.X = duck.X - (DuckWidth / 2);
+        duck.Move.Y = duck.Y - (DuckHeight / 2);
     }
 
     private static ImageBrush? LoadMask()

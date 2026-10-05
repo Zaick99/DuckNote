@@ -77,6 +77,10 @@ docked to the side of the window with everything the scan collected, in
 sections. It follows the window when it moves and switches side when it runs
 out of room. Clicking the same host again closes it.
 
+**Ducks.** They swim behind the editor, bump into each other and bounce off the
+edges, at whatever opacity you set in the settings — 4% by default, which is
+about as loud as a watermark. They stop while you type.
+
 **Locked, if you want it.** A password turns the note, its backup, the last
 scan and the excluded hosts into one encrypted container: Argon2id over 256 MiB
 for the key, AES-256 for the content, padding so the file size says nothing.
@@ -136,7 +140,8 @@ either all lowercase or all uppercase.
 | **Dettagli** | open the host card docked alongside |
 
 The sidebar switches between **Host** and **Struttura** (the note's headings),
-with a filter box over each.
+with a filter box over each. Picking a heading scrolls the note to its line —
+it travels there rather than jumping, so you can see where you came from.
 
 ---
 

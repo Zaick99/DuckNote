@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 
@@ -21,6 +22,44 @@ public static class Motion
 
     public static DoubleAnimation Slide(double from, double to, int milliseconds, IEasingFunction? ease = null) =>
         new(from, to, new Duration(TimeSpan.FromMilliseconds(milliseconds))) { EasingFunction = ease };
+
+    /// <summary>
+    /// Porta uno ScrollViewer a una posizione, scorrendo.
+    /// </summary>
+    /// <remarks>
+    /// VerticalOffset e' di sola lettura e non si anima: si anima questa
+    /// proprieta' allegata, che a ogni passo chiama ScrollToVerticalOffset.
+    /// </remarks>
+    public static readonly DependencyProperty OffsetProperty =
+        DependencyProperty.RegisterAttached(
+            "Offset",
+            typeof(double),
+            typeof(Motion),
+            new PropertyMetadata(0.0, OnOffsetChanged));
+
+    private static void OnOffsetChanged(DependencyObject target, DependencyPropertyChangedEventArgs e)
+    {
+        if (target is ScrollViewer view)
+        {
+            view.ScrollToVerticalOffset((double)e.NewValue);
+        }
+    }
+
+    public static void ScrollTo(ScrollViewer view, double offset, int milliseconds = 420)
+    {
+        double from = view.VerticalOffset;
+
+        // Un salto di pochi pixel non merita un'animazione: si vedrebbe solo
+        // il ritardo.
+        if (Math.Abs(offset - from) < 2)
+        {
+            return;
+        }
+
+        view.BeginAnimation(OffsetProperty, null);
+        view.SetValue(OffsetProperty, from);
+        view.BeginAnimation(OffsetProperty, Slide(from, offset, milliseconds, Ease("Quint")));
+    }
 
     public static void MovePill(TranslateTransform? slide, ScaleTransform? squash, double x, bool immediate = false)
     {
