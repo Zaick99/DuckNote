@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Text.RegularExpressions;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
 using DuckNote.App.Editor;
 using DuckNote.App.Models;
@@ -25,6 +26,35 @@ public partial class MainWindow
 
         SwitchSideMode(outline: false, immediate: true);
     }
+
+    /// <summary>
+    /// Porta la nota all'intestazione scelta, scorrendo invece di saltare: si
+    /// capisce da dove si veniva e dove si e' finiti.
+    /// </summary>
+    /// <remarks>
+    /// L'originale assegnava ScrollToVerticalOffset e basta. L'animazione ha
+    /// bisogno dello ScrollViewer interno del RichTextBox, che esiste solo dopo
+    /// che il template e' stato applicato.
+    /// </remarks>
+    private void JumpToHeading(Paragraph heading)
+    {
+        TabNote.IsChecked = true;
+
+        if (Editor.Template?.FindName("PART_ContentHost", Editor) is not ScrollViewer view)
+        {
+            return;
+        }
+
+        Editor.UpdateLayout();
+
+        Rect where = heading.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+        double target = Math.Max(0, view.VerticalOffset + where.Top - HeadingAir);
+
+        Motion.ScrollTo(view, target);
+        Editor.Focus();
+    }
+
+    private const double HeadingAir = 60;
 
     private void SwitchSideMode(bool outline, bool immediate = false)
     {

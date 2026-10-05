@@ -185,7 +185,7 @@
             <TranslateTransform x:Name="GLoaderT"/>
           </StackPanel.RenderTransform>
 
-        <Grid x:Name="GStage" Height="132" Margin="0,16,0,0">
+        <Grid x:Name="GStage" Height="176" Margin="0,16,0,0">
           <Path x:Name="GRing1" Width="116" Height="116" HorizontalAlignment="Center" VerticalAlignment="Center"
                 Data="M 58,6 A 52,52 0 1 1 6,58" Stroke="{DynamicResource Accent}" StrokeThickness="3"
                 StrokeStartLineCap="Round" StrokeEndLineCap="Round" RenderTransformOrigin="0.5,0.5" Opacity="0.5">
@@ -220,7 +220,7 @@
           </Grid>
         </Grid>
 
-        <TextBlock x:Name="GWork" FontSize="12" TextWrapping="Wrap" Margin="34,14,34,0" LineHeight="17"
+        <TextBlock x:Name="GWork" FontSize="12" TextWrapping="Wrap" Margin="34,18,34,0" LineHeight="17"
                    TextAlignment="Center" Foreground="{DynamicResource LabelSecondary}" Visibility="Collapsed"/>
         </StackPanel>
 
