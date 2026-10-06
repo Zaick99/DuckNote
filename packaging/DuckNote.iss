@@ -1,13 +1,13 @@
-﻿; Installer di DuckNote. Si compila con ISCC.exe di Inno Setup 6.
+; Installer di DuckNote. Si compila con ISCC.exe di Inno Setup 6.
 ;
-;   ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.5 /DSourceExe=dist\DuckNote.exe
+;   ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.6 /DSourceExe=dist\DuckNote.exe
 ;
 ; L'eseguibile che imbarca e' gia' autosufficiente: dentro c'e' il runtime .NET,
 ; WPF e l'applicazione. L'installer non aggiunge prerequisiti, aggiunge il posto
 ; dove vivere, i collegamenti e la voce per disinstallare.
 
 #ifndef AppVersion
-  #define AppVersion "0.0.5"
+  #define AppVersion "0.0.6"
 #endif
 
 #ifndef SourceExe
