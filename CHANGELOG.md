@@ -2,6 +2,18 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.6] - 2026-10-05
+
+### Removed
+
+- **The grid behind the note.** A tiled pattern of faint lines with an orange
+  one every 160 px, drawn under the editor since the PowerShell days. It read as
+  graph paper, which the note is not. The backdrop is now plain.
+
+  The two brushes it used — `GridMinor` and `GridMajor` — went with it, from the
+  window resources and from both palettes: a colour nothing paints with is a
+  colour someone has to wonder about later.
+
 ## [0.0.5] - 2026-10-05
 
 Three fixes on the animations, and the documentation the repository was missing.
