@@ -2,6 +2,42 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.7] - 2026-10-07
+
+### Added
+
+- **Tables.** The five table buttons did nothing at all. They now insert a
+  Markdown table and add or remove its rows and columns. Tables here are text,
+  not objects, so adding a column means rewriting every row of the block — and
+  knowing where the block starts and ends, which is wherever the unbroken run of
+  lines beginning with a pipe does.
+
+  Deleting the header row is refused: it and the dashes underneath are what hold
+  the table together, and removing them would leave rows that are no longer
+  anything.
+
+- **Code block** and **horizontal rule**, which were also unwired. The fence
+  goes on lines of its own — a code block does not open halfway through a line.
+
+- **The find button** opens and closes the search bar. The fields in it still do
+  not search; the button at least opens what it promises.
+
+### Changed
+
+- **Scanning the note's hosts no longer jumps to the network view.** Whoever
+  presses that button from the note wants the addresses there checked, not to be
+  taken somewhere else: the colours change under their eyes, in the text. The
+  network view still opens when the scan starts from there, where the result is
+  the table.
+
+### Verified
+
+Every button on the format bar was pressed in a harness and checked for an
+actual change to the note — in the context where it makes sense: clearing wants
+formatted text, redo wants something undone first, table commands want the caret
+inside a table. All 25 do something. The one that does not is the header-row
+delete, which refuses on purpose and says so in the status bar.
+
 ## [0.0.6] - 2026-10-05
 
 ### Removed

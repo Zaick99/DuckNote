@@ -4,9 +4,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using DuckNote.App.Editor;
 using DuckNote.App.Storage;
+using DuckNote.App.Theme;
 using DuckNote.App.Vault;
 
 namespace DuckNote.App;
@@ -141,6 +143,44 @@ public partial class MainWindow
         FmtClear.Click += (_, _) => _commands.ClearFormatting();
         FmtUndo.Click += (_, _) => Editor.Undo();
         FmtRedo.Click += (_, _) => Editor.Redo();
+
+        FmtCodeBlock.Click += (_, _) => _commands.WrapBlock("```");
+        FmtRule.Click += (_, _) => _commands.InsertLine("---");
+        FmtFind.Click += (_, _) => ToggleFindBar();
+
+        _tables = new TableCommands(Editor, _formatter);
+        _tables.Refused += message => StatusText.Text = message;
+
+        TblNew.Click += (_, _) => _tables.Insert();
+        TblRowAdd.Click += (_, _) => _tables.AddRow();
+        TblRowDel.Click += (_, _) => _tables.RemoveRow();
+        TblColAdd.Click += (_, _) => _tables.AddColumn();
+        TblColDel.Click += (_, _) => _tables.RemoveColumn();
+    }
+
+    private TableCommands? _tables;
+
+    /// <summary>
+    /// Mostra o nasconde la barra della ricerca. I campi dentro non cercano
+    /// ancora niente: il pulsante almeno apre quello che promette, invece di
+    /// non fare nulla.
+    /// </summary>
+    private void ToggleFindBar()
+    {
+        bool opening = FindBar.Visibility != Visibility.Visible;
+
+        if (opening)
+        {
+            FindBar.Visibility = Visibility.Visible;
+            FindBar.BeginAnimation(OpacityProperty, Motion.Slide(0, 1, 180, Motion.Ease()));
+            FindBox.Focus();
+            return;
+        }
+
+        DoubleAnimation fade = Motion.Slide(FindBar.Opacity, 0, 150, Motion.Ease(mode: EasingMode.EaseIn));
+        fade.Completed += (_, _) => FindBar.Visibility = Visibility.Collapsed;
+        FindBar.BeginAnimation(OpacityProperty, fade);
+        Editor.Focus();
     }
 
     private void RecolourHosts()

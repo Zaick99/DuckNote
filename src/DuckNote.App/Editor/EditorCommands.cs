@@ -86,6 +86,80 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         formatter.Format(paragraph);
     }
 
+    /// <summary>
+    /// Recinta il testo fra due righe di marcatori, su righe loro: un blocco di
+    /// codice non si apre e si chiude a meta' riga.
+    /// </summary>
+    public void WrapBlock(string fence)
+    {
+        Paragraph? here = formatter.CaretParagraph;
+        if (here is null)
+        {
+            return;
+        }
+
+        formatter.Suspended = true;
+        try
+        {
+            string inside = LiveFormatter.TextOf(here).Replace("\r", string.Empty).Replace("\n", string.Empty);
+
+            new TextRange(here.ContentStart, here.ContentEnd).Text = fence;
+
+            Paragraph body = new(new Run(inside));
+            Paragraph close = new(new Run(fence));
+
+            editor.Document.Blocks.InsertAfter(here, body);
+            editor.Document.Blocks.InsertAfter(body, close);
+            editor.CaretPosition = body.ContentEnd;
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        finally
+        {
+            formatter.Suspended = false;
+        }
+
+        formatter.FormatAll();
+    }
+
+    /// <summary>Una riga tutta sua, sotto quella corrente.</summary>
+    public void InsertLine(string text)
+    {
+        Paragraph? here = formatter.CaretParagraph;
+        if (here is null)
+        {
+            return;
+        }
+
+        formatter.Suspended = true;
+        try
+        {
+            if (LiveFormatter.TextOf(here).Trim().Length == 0)
+            {
+                new TextRange(here.ContentStart, here.ContentEnd).Text = text;
+                editor.CaretPosition = here.ContentEnd;
+            }
+            else
+            {
+                Paragraph added = new(new Run(text));
+                editor.Document.Blocks.InsertAfter(here, added);
+                editor.CaretPosition = added.ContentEnd;
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            return;
+        }
+        finally
+        {
+            formatter.Suspended = false;
+        }
+
+        formatter.FormatAll();
+    }
+
     public void ClearFormatting()
     {
         TextSelection selection = editor.Selection;

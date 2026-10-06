@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -347,7 +347,7 @@ public partial class MainWindow : Window
         RefreshSideList();
     }
 
-    private async void OnScanRange(object sender, RoutedEventArgs e) => await ScanAsync();
+    private async void OnScanRange(object sender, RoutedEventArgs e) => await ScanAsync(showNetwork: true);
 
     private async void OnRangeKeyDown(object sender, KeyEventArgs e)
     {
@@ -369,9 +369,21 @@ public partial class MainWindow : Window
         await ScanAsync(string.Join(',', hosts));
     }
 
-    private async Task ScanAsync(string? targets = null)
+    /// <summary>
+    /// Analizza, restando dove si e'.
+    /// </summary>
+    /// <remarks>
+    /// Chi preme il pulsante dalla nota vuole che gli indirizzi scritti li'
+    /// vengano controllati, non essere portato altrove: i colori cambiano sotto
+    /// i suoi occhi, nel testo. La vista Rete si apre solo se la scansione parte
+    /// da li', dove il risultato e' la tabella.
+    /// </remarks>
+    private async Task ScanAsync(string? targets = null, bool showNetwork = false)
     {
-        TabNet.IsChecked = true;
+        if (showNetwork)
+        {
+            TabNet.IsChecked = true;
+        }
 
         if (targets is null)
         {
