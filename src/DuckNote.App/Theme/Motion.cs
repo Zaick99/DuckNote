@@ -23,13 +23,6 @@ public static class Motion
     public static DoubleAnimation Slide(double from, double to, int milliseconds, IEasingFunction? ease = null) =>
         new(from, to, new Duration(TimeSpan.FromMilliseconds(milliseconds))) { EasingFunction = ease };
 
-    /// <summary>
-    /// Porta uno ScrollViewer a una posizione, scorrendo.
-    /// </summary>
-    /// <remarks>
-    /// VerticalOffset e' di sola lettura e non si anima: si anima questa
-    /// proprieta' allegata, che a ogni passo chiama ScrollToVerticalOffset.
-    /// </remarks>
     public static readonly DependencyProperty OffsetProperty =
         DependencyProperty.RegisterAttached(
             "Offset",
@@ -49,8 +42,6 @@ public static class Motion
     {
         double from = view.VerticalOffset;
 
-        // Un salto di pochi pixel non merita un'animazione: si vedrebbe solo
-        // il ritardo.
         if (Math.Abs(offset - from) < 2)
         {
             return;

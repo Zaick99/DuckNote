@@ -1,0 +1,95 @@
+===============================================================================
+_old -- L'ERA POWERSHELL DI DUCKNOTE
+Spostato qui il 2026-09-23, durante la migrazione a C#
+===============================================================================
+
+Niente di questo e' stato cancellato: e' fermo qui perche' non fa piu' parte
+della costruzione, ma serve ancora a qualcosa. Sotto, cosa e perche'.
+
+
+DuckNote.ps1                    482 KB
+    L'applicazione originale, 10.143 righe. Tre ruoli ancora attivi:
+
+    1. RIFERIMENTO per il porting. L'interfaccia WPF, l'editor Markdown e le
+       impostazioni non sono ancora stati portati: il comportamento da
+       riprodurre e' scritto qui dentro e da nessun'altra parte.
+
+    2. SORGENTE DELLE FIXTURE. I test differenziali in tests/ confrontano il C#
+       con byte prodotti da questo file (crittografia, contenitore, formati su
+       filo). Gli script che li rigenerano estraggono funzioni PER NUMERO DI
+       RIGA: se questo file cambia, gli intervalli vanno riallineati.
+
+    3. APPLICAZIONE VERA finche' la versione C# non e' completa.
+
+dist/DuckNote.exe               523 KB
+    L'eseguibile della versione PowerShell, funzionante. Si valida da solo
+    tramite l'hash dello script incorporato: non ha bisogno di build.ps1 per
+    girare. E' il DuckNote utilizzabile oggi.
+
+dist/SHA256SUMS.txt
+    Le tre somme pubblicate: sorgente senza BOM, sorgente come estratto
+    dall'eseguibile (con BOM, quindi diverso), ed eseguibile.
+
+build.ps1 + Launcher.cs
+    La catena che costruiva l'eseguibile: rimette il BOM allo script, calcola
+    gli hash, li inietta in Launcher.cs al posto di @@SCRIPT_SHA256@@, compila
+    con il csc.exe del .NET Framework, firma se c'e' un certificato.
+
+    In C# non serve piu' niente di tutto questo: non si estrae nulla, non c'e'
+    uno script da validare, e "dotnet publish" fa il lavoro. Restano solo per
+    poter rigenerare dist/DuckNote.exe se si mette mano a DuckNote.ps1 prima
+    che la WPF sia pronta.
+
+    NOTA: nel commit 0.0.1 di git c'e' una versione piu' VECCHIA di questi due
+    file. Quella qui presente include il controllo dell'hash aggiunto nella
+    0.0.3 e non e' versionata da nessuna parte.
+
+commenti-rimossi.txt             11,7 KB
+    I 96 commenti tolti dal sorgente e tenuti a parte. Non sono commenti di
+    servizio: sono il "perche'" delle scelte. Per esempio:
+
+        # Il MAC si verifica prima di toccare il testo cifrato:
+        #   niente oracoli di padding.
+        # Il contenitore nasce subito, anche vuoto: una chiave creata e mai
+        #   scritta su disco sparirebbe alla chiusura senza che nessuno lo dica.
+        # Se la cassaforte esiste ma e' chiusa, la nota non ha dove andare:
+        #   scriverla in chiaro accanto al contenitore sarebbe il modo piu'
+        #   rapido di vanificarlo.
+
+    La parte sulla crittografia e' gia' stata riportata nei commenti del C#.
+    La parte sull'INTERFACCIA no: la schermata della chiave, le animazioni, la
+    regola "mai testo in chiaro accanto al contenitore" sono descritte solo
+    qui. Serviranno quando si scrivera' la WPF.
+
+
+-------------------------------------------------------------------------------
+QUANDO SI PUO' BUTTARE
+-------------------------------------------------------------------------------
+
+build.ps1, Launcher.cs, dist/
+    Il giorno in cui l'applicazione C# sostituisce DuckNote.exe.
+
+commenti-rimossi.txt
+    A WPF finita, dopo aver riportato nel C# le motivazioni che riguardano
+    l'interfaccia.
+
+DuckNote.ps1
+    Mai, o comunque non prima che il porting sia completo E le fixture dei test
+    differenziali siano considerate definitive. E' l'unica descrizione completa
+    di come DuckNote si comporta.
+
+
+-------------------------------------------------------------------------------
+ATTENZIONE
+-------------------------------------------------------------------------------
+
+Il repository ha un solo commit ("DuckNote 0.0.1"). La 0.0.2, la 0.0.3 e la
+migrazione a C# esistono solo su disco: per questi file cancellare significa
+per sempre, non "recuperabile da git".
+
+Il .gitignore e' stato corretto perche' _old NON venga escluso: le regole
+dist/ e commenti-rimossi.txt ora valgono solo per la radice.
+
+Il resoconto completo della migrazione sta in ../MIGRAZIONE-CSHARP.txt
+
+===============================================================================

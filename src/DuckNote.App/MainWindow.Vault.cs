@@ -88,7 +88,7 @@ public partial class MainWindow
         StartIdleWatch();
         RebuildDucks();
         RefreshSideList();
-        _formatter.FormatAll();
+        _formatter.PaintAll();
 
         switch (window.Request)
         {
@@ -138,7 +138,7 @@ public partial class MainWindow
             return;
         }
 
-        if (_vault.Disable(NoteDocument.ToXaml(Editor)))
+        if (_vault.Disable(NoteXaml()))
         {
             UpdateLockButton();
             StatusText.Text = "Cifratura tolta: la nota e' di nuovo in chiaro.";
@@ -172,7 +172,7 @@ public partial class MainWindow
 
         try
         {
-            _vault.Create(key, gate.Outcome.Kdf!, gate.Outcome.Salt!, NoteDocument.ToXaml(Editor));
+            _vault.Create(key, gate.Outcome.Kdf!, gate.Outcome.Salt!, NoteXaml());
         }
         finally
         {

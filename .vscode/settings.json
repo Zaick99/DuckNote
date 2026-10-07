@@ -1,0 +1,16 @@
+{
+  "dotnet.defaultSolution": "DuckNote.sln",
+  "files.exclude": {
+    "**/bin": true,
+    "**/obj": true
+  },
+  "search.exclude": {
+    "**/bin": true,
+    "**/obj": true,
+    "_old": true,
+    "_archivio": true,
+    "dist": true
+  },
+  "files.encoding": "utf8",
+  "editor.rulers": [100]
+}

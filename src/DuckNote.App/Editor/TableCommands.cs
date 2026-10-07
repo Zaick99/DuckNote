@@ -4,28 +4,16 @@ using System.Windows.Documents;
 
 namespace DuckNote.App.Editor;
 
-/// <summary>
-/// Le tabelle della nota sono tabelle vere: un Table nel documento, con le sue
-/// righe e le sue celle. La nota si salva in XAML, quindi la griglia resta
-/// griglia anche dopo averla chiusa e riaperta.
-///
-/// Chi ha scritto tabelle quando erano solo righe di barre verticali le
-/// recupera: il pulsante della tabella nuova, premuto dentro un blocco
-/// Markdown, converte quel blocco invece di aggiungerne un altro.
-/// </summary>
 public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, EditorBrushes brushes)
 {
     private const string Placeholder = "Colonna";
 
-    // Le celle disegnano il bordo destro e quello sotto, la tabella il sinistro
-    // e quello sopra: insieme fanno una griglia di una linea sola, mai doppia.
     private static readonly Thickness CellBorder = new(0, 0, 1, 1);
     private static readonly Thickness TableEdge = new(1, 1, 0, 0);
     private static readonly Thickness CellPadding = new(8, 4, 8, 4);
 
     public event Action<string>? Refused;
 
-    /// <summary>Una tabella nuova: intestazione di due colonne e una riga da riempire.</summary>
     public void Insert()
     {
         if (formatter.CaretParagraph is not { } here)
@@ -57,7 +45,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
                 editor.Document.Blocks.Remove(here);
             }
 
-            // Una tabella in fondo al documento non lascerebbe dove scrivere dopo.
             if (table.NextBlock is null)
             {
                 editor.Document.Blocks.InsertAfter(table, new Paragraph { Margin = new Thickness(0) });
@@ -66,7 +53,7 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
             landing = Opening(table);
         });
 
-        formatter.FormatAll();
+        formatter.PaintAll();
         Land(landing);
     }
 
@@ -100,8 +87,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
 
         int at = spot.Group.Rows.IndexOf(spot.Row);
 
-        // L'intestazione tiene in piedi la tabella: toglierla lascerebbe righe
-        // che non sono piu' le colonne di niente.
         if (at == 0)
         {
             Refused?.Invoke("L'intestazione non si toglie: elimina la tabella.");
@@ -142,7 +127,7 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
             }
         });
 
-        formatter.FormatAll();
+        formatter.PaintAll();
     }
 
     public void RemoveColumn()
@@ -175,8 +160,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
         });
     }
 
-    // --- come nasce una tabella --------------------------------------------
-
     private Table Fresh()
     {
         Table table = Shell(columns: 2);
@@ -187,11 +170,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
         return table;
     }
 
-    /// <summary>
-    /// Il blocco Markdown diventa una tabella. La riga dei trattini non diventa
-    /// una riga: nel testo divideva l'intestazione dal corpo, e qui quel
-    /// mestiere lo fa l'intestazione stessa.
-    /// </summary>
     private Table Converted(List<Paragraph> written)
     {
         string[][] rows =
@@ -251,10 +229,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
         return row;
     }
 
-    /// <summary>
-    /// Il grassetto dell'intestazione sta sulla cella, non sul testo: il
-    /// formattatore vivo riscrive gli inline a ogni battuta, la cella no.
-    /// </summary>
     private TableCell Cell(string text, bool header)
     {
         Paragraph content = new() { Margin = new Thickness(0) };
@@ -274,8 +248,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
         };
     }
 
-    // --- dove sta il cursore ------------------------------------------------
-
     private Spot? Inside()
     {
         if (editor.CaretPosition?.Paragraph is not { Parent: TableCell cell })
@@ -293,7 +265,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
 
     private sealed record Spot(Table Table, TableRowGroup Group, TableRow Row, TableCell Cell);
 
-    /// <summary>La prima cella in cui si scrive: il corpo se c'e', l'intestazione se no.</summary>
     private static Paragraph? Opening(Table table)
     {
         TableRowGroup group = table.RowGroups[0];
@@ -332,12 +303,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
         }
     }
 
-    // --- il Markdown da convertire -----------------------------------------
-
-    /// <summary>
-    /// Le righe Markdown attorno al cursore: una sequenza ininterrotta di righe
-    /// che cominciano per barra. Niente barre, niente blocco da convertire.
-    /// </summary>
     private static List<Paragraph>? Written(Paragraph here)
     {
         if (!IsRow(here))
@@ -363,7 +328,6 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
     private static bool IsRow(Paragraph paragraph) =>
         LiveFormatter.TextOf(paragraph).TrimStart().StartsWith('|');
 
-    /// <summary>Il contenuto fra le barre, senza le due vuote agli estremi.</summary>
     private static string[] Cells(string line)
     {
         string inner = line.Trim().Trim('|');

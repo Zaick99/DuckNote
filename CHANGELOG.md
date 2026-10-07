@@ -2,6 +2,174 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.9] - 2026-10-07
+
+**The note stops being its own source.** Markdown goes in and formatting comes
+out; the note holds pages with names you choose; and the structure is a tree you
+can fold.
+
+It is where the tables already went in 0.0.8, and it works for the same reason:
+the note is saved as XAML, so styles, borders and backgrounds survive being
+closed and reopened. A paragraph's `Tag` does not — measured — so the look of a
+line **is** its state, and nothing has to be kept in sync.
+
+### The markers are gone
+
+Write `**così**` and you get **così**: the asterisks said how to read it and
+their job is done. Up to 0.0.8 they stayed in the text, dimmed, and the note was
+its own source. Now the document holds the formatting and Markdown is the way
+in.
+
+- **A code block is one block.** It was three paragraphs — a fence, the text, a
+  fence. Now it is a single paragraph whose lines are separated by internal line
+  breaks, shaded and monospaced, with no fence in sight. Enter inside it adds a
+  line to the block instead of breaking it in two; the button pressed again
+  dissolves it back into ordinary lines.
+- **A separator is a line.** No dashes left at all — the cut is the paragraph's
+  own border.
+- **A bullet is a bullet** (`●`), a checkbox is a checkbox (`☐` / `☑`), a
+  heading is just bigger. The markers that produced them are consumed.
+- **The buttons set styles, not syntax.** Bold on three lines puts bold on three
+  lines; there is no `**` that has to open and close inside a line, so nothing
+  refuses a multi-line selection. Underline and strikethrough now coexist.
+- **Enter knows where it is**: a line in a code block, the next item of a list,
+  the end of the list on an empty item, an ordinary line after a heading.
+- **`2 * 3 * 4` keeps its asterisks.** A marker with a space against it from the
+  inside is not a marker — without that rule, turning markers into styles would
+  eat arithmetic and never give it back.
+- **Addresses are coloured without redrawing the line.** The old way rebuilt a
+  paragraph from its text on every keystroke, which is exactly what would now
+  destroy its formatting. Address runs are found and split in place, keeping
+  whatever they were wearing: an address inside bold text stays bold.
+- **Old notes convert themselves on first open**, once. The note as it was stays
+  in `note.xaml.bak`, which saving always writes first, and tables are not
+  flattened by the conversion.
+
+### Pages
+
+One note was one document; now it is a collection of them.
+
+- **A page is named by the `#` heading it opens with.** A page starting with
+  `# Spesa` is called Spesa. The `+` button in the sidebar makes a page;
+  right-click renames it, and the name is written into a field on its own row in
+  the structure — a dialog for three words would be more work for whoever writes
+  and whoever reads the code. From then on the name you typed wins, even if the
+  heading changes under it.
+- **Right-click removes a page**, except the last: a note without pages is not a
+  note.
+- **All pages live in one block of bytes**: a zip with one entry per page, and an
+  index holding their order and their names, one line each. The vault keeps the
+  note as a single blob, so the pages had to fit inside it — and a zip is a
+  format that already exists, opens with any archive tool, and needed no parser
+  of its own. An index line without a name still loads: that page simply has
+  none.
+- **A note from before becomes the first page**, rewritten in the new shape on
+  first open.
+- **Addresses are collected from every page**, not only the open one, so the host
+  list and the network table cover the whole note.
+
+### The structure is a tree
+
+Pages are the roots, and under each one are **its `##` sections** — nothing
+else. The first level is already the page's name and does not repeat under
+itself; the third is detail inside a section, and in the structure it would only
+be noise. Two levels, read at a glance.
+
+- **Lines show what leads where.** Not indentation, not one guide: proper tree
+  lines. Each row draws its own piece — a vertical for every ancestor that still
+  has siblings below, an elbow into its own entry, the tail under the elbow when
+  someone follows, and the start of the trunk towards its children — and from
+  one row to the next they meet. A page has no elbow, because it hangs from
+  nothing, but it does lower the trunk towards its headings.
+- **Opening and closing are animated.** A row that appears slides in from the
+  left and fades up; closing a branch fades its rows out before they go. The
+  transform lives inside the row's template, not in a setter on the style: a
+  setter would hand one transform to every row, and animating one would animate
+  all of them.
+- **The toggles tell pages from headings.** A page's is filled and larger, in
+  the accent colour; a heading's is a thin chevron. Opening a page and opening a
+  heading are not the same act and should not look like it. Both are as wide as
+  a finger now, not as wide as a character.
+- **The rows are tighter.** Out went the coloured dot, which meant host state
+  and nothing here, and the second line of small print under every page. A page
+  row is 25 px and reads as a section title; a heading row is 18 and reads
+  smaller but still reads.
+- **The open page carries one accent dot**, and a count appears only when a
+  search found the word in a page's body.
+- **Pressing a page takes you back to the top of it**, onto its title, even when
+  it was already the open one — which is the whole point of pressing it again.
+  Pressing a row that is already selected raises no selection event, so the
+  press itself is watched; the fold toggle and the rename field are left out of
+  that, since pressing them does not mean wanting to go anywhere.
+- **Searching looks everywhere.** The filter matches a page's name, its
+  headings, and the text inside it. Searching is for finding, not for filtering
+  names.
+
+### Also
+
+- **The `H1`, `H2` and `H3` buttons scale like the headings they make** — 15,
+  12.5 and 10.5 — and sit on one baseline. Centred one by one, three different
+  sizes read as crooked; the toolbar button template now takes its content
+  alignment from outside instead of hardcoding centre.
+
+### Fixed
+
+- **A converted note was converted again at every open.** The check read the
+  text alone, and on a numbered list the preview is `1. voce` — character for
+  character the Markdown marker. It now also asks what the line already is: a
+  line already dressed has no markers left to consume.
+
+### Verified
+
+Measured end to end on a note written in the old format and opened by the real
+executable, with `DUCKNOTE_HOME` pointed at a scratch folder:
+
+| | before | after |
+|---|---|---|
+| markers in the visible text | `**`×2 `~~`×2 `==`×2 `` ` ``×8 `](`×1 `# `×2 | none |
+| preview glyphs | none | ● ☐ ☑ |
+| paragraphs with a background (code blocks) | 0 | 1 |
+| internal line breaks | 0 | 1 |
+| tables | 1 | 1 |
+| note on disk | 4582 bytes of raw XAML | a 1571-byte archive |
+
+Second open converts nothing. That second open is what found the re-conversion
+bug — and the probe that found it also showed that three earlier runs had not
+been failing at all: the first-start vault prompt is modal, and killing the
+process while it waits means the note is never loaded. Worth writing down,
+because it looked exactly like a broken save.
+
+Three harnesses drive the rest without opening a window. **Formatting:** eleven
+kinds of markup read back marker-free, every line kind identified by its look,
+the XAML round-trip preserving text and look together, input rules applying on
+close and leaving unclosed markers and arithmetic alone, all seven style buttons
+and all six line buttons across a three-line selection, Enter in each of its
+four situations, an address inside bold text keeping its weight. **Pages:**
+names chosen, guessed and cleaned of control characters; three pages saved and
+reread with their order, ids, names, text and formatting intact; a single old
+note turned into one page; bytes that are neither, refused without taking
+anything down; the last page refusing to be removed. **Tree:** a page named by
+the `#` it opens with, only its `##` sections listed — a `###` and a second `#`
+both absent, and no section ever holding children — the right rail width and row
+height per kind, the toggle only where there are children and its place held
+where there are none, pages and sections carrying different toggles, the open
+page marked, folding a page taking what is shown from 5 rows to 3, the connector
+tail present on a row with siblings below and absent on the last of a row, a
+page without sections drawing no lines at all, and searching by section, by
+name, by body text with its count, by nothing, and ignoring case.
+
+Each harness was checked against sabotaged code before being trusted: markers
+kept gave 8 failures, fence detection disabled 12, nesting flattened 3, the page
+name dropped from the index 3, the connector tail removed 1, and every heading
+level let back into the structure 8.
+
+That last one passed at first, and the check was wrong rather than the code: it
+looked for a vertical anywhere in the row and found the one going down to the
+children. Made exact, it failed for a second reason — the harness formatted
+`19,5` with a comma while the geometry is written `19.5` with a point, which is
+exactly why the geometry is formatted culture-invariant and not with the
+ambient culture.
+
 ## [0.0.8] - 2026-10-07
 
 ### Fixed

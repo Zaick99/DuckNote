@@ -52,7 +52,7 @@ public static class ArpProbe
             return string.Empty;
         }
 
-#pragma warning disable CS0618 // Address serve proprio come uint per SendARP
+#pragma warning disable CS0618
         uint destination = (uint)parsed.Address;
 #pragma warning restore CS0618
         if (destination == 0)

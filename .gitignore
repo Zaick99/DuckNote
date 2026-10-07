@@ -5,12 +5,14 @@ publish/
 *.user
 *.pdb
 
-# Dati utente, se l'applicazione viene provata dentro questa cartella
-note.xaml
-note.xaml.bak
-settings.json
-lastscan.json
-oui.txt
+# Dati utente, se l'applicazione viene provata dentro questa cartella. Ancorati
+# alla radice: e' li' che l'applicazione scrive, e senza la barra "settings.json"
+# si porterebbe via anche quello di .vscode.
+/note.xaml
+/note.xaml.bak
+/settings.json
+/lastscan.json
+/oui.txt
 
 # Copie di lavoro e banchi di prova
 DuckNote.*.ps1
@@ -21,7 +23,12 @@ DuckNote.*.ps1
 /dist/
 /commenti-rimossi.txt
 
-# Versioni di prova pubblicate: rigenerabili con dotnet publish
+# Carte di lavoro che restano qui ma non si pubblicano: il documento della
+# migrazione, l'audit della copertura, il changelog dell'era PowerShell, lo
+# strumento da riga di comando e il fascio con la vecchia storia git.
+/_archivio/
+
+# Versioni di prova: l'eseguibile si rigenera con dotnet publish, e va in dist/
 _testversion/
 
 # Nessun eseguibile nel repository: si rigenerano con dotnet publish.
