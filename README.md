@@ -47,7 +47,7 @@ original one — but have no code behind them yet:
 - table filter and search, and the status dropdown
 - CSV export, and sending scan results into the note as a table
 - find and replace
-- tables in the editor, and zoom
+- zoom
 - right-click context menus
 
 Everything else in this page is implemented and works. The missing pieces are
@@ -58,9 +58,23 @@ wired into the interface and waiting for their code.
 ## What it does
 
 **Markdown notes, formatted as you type.** Headings, bold, italic, underline,
-strikethrough, highlight, inline and fenced code, lists, quotes, checkboxes.
-The markers stay in the text — the file remains readable — but they are
-rendered live.
+strikethrough, highlight, inline and fenced code, lists, quotes, checkboxes,
+links, separators. The markers stay in the text — the file remains readable —
+but they are rendered live, and every marker is dimmed so the text stands out
+from the syntax. A separator draws a real line, a fenced block shades its body,
+and `[testo](indirizzo)` reads as a link.
+
+**Every button works on the selection.** Select three lines, press any button,
+and all three change. Markers wrap each line on its own — `**` does not cross a
+line ending — and the line prefix stays outside them: `- **voce**`. A prefix
+replaces the one already there, the numbered list counts, and the code fence
+lands around what you selected.
+
+**Real tables.** The table buttons build a grid, not rows of pipe characters:
+a header with its own background, one-pixel borders, cells you tab through.
+Rows and columns are added and removed around the caret. Markdown written when
+tables were only text is recovered — put the caret in such a block, press the
+table button, and it becomes a real table.
 
 **Network scanner.** Ping, TTL and operating-system guess, reverse DNS,
 NetBIOS, mDNS, SSDP/UPnP, SNMP v2c, MAC and vendor (IEEE OUI database), open

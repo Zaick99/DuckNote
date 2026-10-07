@@ -2,6 +2,110 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.8] - 2026-10-07
+
+### Fixed
+
+- **Live formatting stopped after the first line.** `FormatAll` walked the
+  document with a lazy enumerator and redrew as it went — and redrawing a line
+  changes the document, which kills the enumerator. The exception was caught by
+  an empty `catch` wrapped around the whole loop, so everything past line one
+  was left unformatted and nothing said so.
+
+  This is why a table looked like rows of text: the command built the table and
+  asked for a redraw that never happened. The list is now taken before anything
+  is touched, and a line that refuses no longer stops the others.
+
+- **Every formatting button now applies to the whole selection.** Bold, italic,
+  underline, strikethrough, highlight, inline code and link used to refuse —
+  *"select text inside a single line"*. Headings, quote, bullet, numbered and
+  checkbox ignored the selection entirely and changed only the caret's line.
+  Clear refused too.
+
+  Markers wrap each line on its own: `**` does not cross a line ending, so a
+  bold opened on one line and closed on another would not be bold. The line
+  prefix stays outside the markers — `- **voce**`, not `**- voce**` — because a
+  prefix inside markers stops being a prefix.
+
+- **A prefix now replaces the one already there.** The strip pattern knew only
+  `#` and `>`, so pressing bullet on a numbered line produced `- 1. testo`. One
+  pattern now covers headings, quotes, bullets, numbers and checkboxes.
+
+- **A table is now a table.** The buttons inserted three lines of pipe
+  characters and left them as text: the note showed `| Colonna | Colonna |`,
+  not a grid. They now build a real `Table` in the document — a header row with
+  its own background and weight, one-pixel borders that never double up,
+  padded cells.
+
+  This was possible all along and nobody had used it: the note is saved as
+  XAML, so a table survives being closed and reopened exactly like bold does.
+  Two brushes for it, `TableLine` and `TableHeader`, had been sitting in
+  `EditorBrushes` unused since the port.
+
+### Changed
+
+- **A separator line looks like a separator.** It used to render as three grey
+  minus signs. The cut is now drawn by the paragraph's own border, edge to
+  edge, with the dashes still in the text — small and dim, like every other
+  marker this note shows rather than hides.
+- **A code block shades its body**, not just its two fence lines: inside the
+  fence the text is monospaced on the code background, and no Markdown is
+  looked for — a `*` in code is a `*`.
+- **`[testo](indirizzo)` renders as a link.** The link button has always
+  produced that shape and the view had no idea what it was, so it showed as
+  plain text. The label now reads as a link and the address stays visible and
+  dim.
+- **List and number markers are dimmed** like every other marker. They were the
+  only ones still the colour of the text.
+- **The numbered list counts.** Pressing it on five lines gave five `1. `;
+  they are now numbered 1 to 5. Blank lines inside a selection are left alone —
+  a list has no item made of nothing.
+- **The code fence surrounds the selection**, instead of taking the caret's
+  line and pushing it inside a new block.
+- **Rows and columns move around the caret**, not at the end of the block: the
+  new row goes under the one you are in, the new column beside the one you are
+  in, and what you remove is what you are in. Deleting the header is still
+  refused — it and nothing else names the columns.
+- **Markdown already written is recovered, not abandoned.** With the caret in a
+  block of pipe lines, the table button converts that block instead of adding
+  another table: cells keep their text, and the row of dashes does not become a
+  row — in the text it separated the header from the body, and now the header
+  does that itself.
+- **A table cannot be born inside a table.** With the caret in a cell the
+  button refuses and says so, rather than nesting a grid in a cell.
+
+### Verified
+
+Two harnesses build the real editor, press the buttons and read the document
+back.
+
+**Tables:** a new table has two columns and two rows with its header shaded and
+bordered, it survives the XAML round-trip with its text and its background,
+add/remove row and column land on the right counts, deleting the header is
+refused with a reason, and a three-line Markdown block becomes a three-row
+table with `Host`/`Stato` as its header and the dashes gone.
+
+**Formatting:** all seven marker buttons pressed on a three-line selection wrap
+all three and unwrap them when pressed again; all five prefix buttons do the
+same; a prefix replaces the one already there across five differently prefixed
+lines; the numbered list counts 1, 2, 3; a selection dragged to the start of the
+following line does not take it; after a command the selection is still on the
+lines it touched, so the next button finds them; the code fence lands around the
+selection and shades the body; the separator draws a border and loses it when
+the line stops being a separator; and every style is read back off the document
+— size, weight, slant, decorations, backgrounds, monospace, marker colour.
+
+Both harnesses were checked against sabotaged code before being trusted: with
+`Fresh()` building three columns the table harness failed on three counts, and
+with `Change` touching only the first row the formatting harness failed on
+thirty-five, naming each.
+
+### Known
+
+`An_open_port_is_found_and_named` still fails intermittently when both test
+projects run at once, and passes on its own — the socket flake documented in
+0.0.4, untouched by this release.
+
 ## [0.0.7] - 2026-10-07
 
 ### Added

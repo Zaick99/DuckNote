@@ -25,12 +25,19 @@ public static class NoteDocument
     {
         FlowDocument document = Empty(foreground);
 
+        bool inCode = false;
+
         foreach (string line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
             Paragraph paragraph = new() { Margin = new Thickness(0) };
             document.Blocks.Add(paragraph);
-            renderer.Render(paragraph, line);
+            renderer.Render(paragraph, line, inCode);
             paragraph.Tag = LiveFormatter.TextOf(paragraph);
+
+            if (LineParser.IsFence(line))
+            {
+                inCode = !inCode;
+            }
         }
 
         if (document.Blocks.Count == 0)

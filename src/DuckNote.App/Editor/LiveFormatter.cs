@@ -5,6 +5,13 @@ namespace DuckNote.App.Editor;
 
 public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
 {
+    /// <summary>
+    /// Quante righe si risale per sapere se si sta dentro un blocco di codice.
+    /// Oltre, si assume di starne fuori: contare fino in cima a ogni battuta
+    /// costerebbe piu' di quanto valga la risposta.
+    /// </summary>
+    private const int Lookback = 400;
+
     private readonly HashSet<Paragraph> _dirty = [];
 
     public bool IsFormatting { get; private set; }
@@ -66,17 +73,7 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         IsFormatting = true;
         try
         {
-            editor.BeginChange();
-            try
-            {
-                paragraph.Inlines.Clear();
-                renderer.Render(paragraph, text);
-                paragraph.Tag = TextOf(paragraph);
-            }
-            finally
-            {
-                editor.EndChange();
-            }
+            Draw(paragraph, text, InsideCode(paragraph));
 
             if (caret >= 0)
             {
@@ -99,27 +96,30 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
             return;
         }
 
+        // L'elenco si fissa prima di toccare niente: ridisegnare una riga
+        // cambia il documento, e l'enumeratore delle righe non sopravvive al
+        // primo cambiamento.
+        Paragraph[] rows = [.. AllParagraphs()];
+
         IsFormatting = true;
         try
         {
-            foreach (Paragraph paragraph in AllParagraphs())
+            // Le righe passano in ordine: il recinto del codice si tiene a
+            // mente invece di risalirlo ogni volta.
+            bool inCode = false;
+
+            foreach (Paragraph row in rows)
             {
-                string text = TextOf(paragraph);
-                editor.BeginChange();
-                try
+                string text = TextOf(row);
+                bool fence = LineParser.IsFence(text);
+
+                Draw(row, text, inCode);
+
+                if (fence)
                 {
-                    paragraph.Inlines.Clear();
-                    renderer.Render(paragraph, text);
-                    paragraph.Tag = TextOf(paragraph);
-                }
-                finally
-                {
-                    editor.EndChange();
+                    inCode = !inCode;
                 }
             }
-        }
-        catch (InvalidOperationException)
-        {
         }
         finally
         {
@@ -127,7 +127,55 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         }
     }
 
+    /// <summary>
+    /// Ridisegna una riga. Una riga che si rifiuta non ferma le altre: senza
+    /// questo, un solo pointer scaduto lasciava tutto il resto del documento
+    /// senza formattazione.
+    /// </summary>
+    private void Draw(Paragraph row, string text, bool inCode)
+    {
+        try
+        {
+            editor.BeginChange();
+            try
+            {
+                row.Inlines.Clear();
+                renderer.Render(row, text, inCode);
+                row.Tag = TextOf(row);
+            }
+            finally
+            {
+                editor.EndChange();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
     public IEnumerable<Paragraph> AllParagraphs() => Walk(editor.Document?.Blocks);
+
+    /// <summary>
+    /// Se la riga sta dentro un recinto di codice: si risale contando i
+    /// marcatori, e un numero dispari vuol dire che si e' dentro.
+    /// </summary>
+    private static bool InsideCode(Paragraph paragraph)
+    {
+        int fences = 0;
+        int looked = 0;
+
+        for (Block? above = paragraph.PreviousBlock; above is Paragraph line && looked < Lookback; above = above.PreviousBlock)
+        {
+            if (LineParser.IsFence(TextOf(line)))
+            {
+                fences++;
+            }
+
+            looked++;
+        }
+
+        return fences % 2 == 1;
+    }
 
     private static IEnumerable<Paragraph> Walk(IEnumerable<Block>? blocks)
     {
