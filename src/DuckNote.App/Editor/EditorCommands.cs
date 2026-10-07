@@ -1,189 +1,164 @@
-using System.Text.RegularExpressions;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Media;
 
 namespace DuckNote.App.Editor;
 
-/// <summary>
-/// I comandi della barra di formattazione. Lavorano sulle righe toccate dalla
-/// selezione: se sono tre, cambiano tutte e tre, qualunque sia il pulsante.
-/// </summary>
-public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter formatter)
+public enum Mark
+{
+    Bold,
+    Italic,
+    Underline,
+    Strike,
+    Highlight,
+    Code,
+    Link
+}
+
+public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, MarkdownRenderer renderer, CodeBlocks blocks)
 {
     public event Action<string>? Refused;
 
-    // --- marcatori attorno al testo ----------------------------------------
-
-    public void Wrap(string open, string? close = null)
+    public void Toggle(Mark mark)
     {
-        close ??= open;
-        TextSelection selection = editor.Selection;
-
-        if (selection.IsEmpty)
+        if (editor.Selection.IsEmpty)
         {
-            Open(open, close);
+            Refused?.Invoke("Seleziona il testo da formattare.");
             return;
         }
 
-        if (ReferenceEquals(selection.Start.Paragraph, selection.End.Paragraph))
+        switch (mark)
         {
-            Dress(selection, open, close);
+            case Mark.Bold:
+                Flip(TextElement.FontWeightProperty, FontWeights.Bold, FontWeights.Normal);
+                break;
+
+            case Mark.Italic:
+                Flip(TextElement.FontStyleProperty, FontStyles.Italic, FontStyles.Normal);
+                break;
+
+            case Mark.Underline:
+                Decorate(TextDecorations.Underline[0]);
+                break;
+
+            case Mark.Strike:
+                Decorate(TextDecorations.Strikethrough[0]);
+                break;
+
+            case Mark.Highlight:
+                Paint(renderer.Palette.MarkBackground, renderer.Palette.MarkForeground);
+                break;
+
+            case Mark.Code:
+                Letters();
+                break;
+
+            case Mark.Link:
+                Address();
+                break;
+        }
+    }
+
+    private void Flip(DependencyProperty property, object on, object off)
+    {
+        object current = editor.Selection.GetPropertyValue(property);
+
+        editor.Selection.ApplyPropertyValue(property, Equals(current, on) ? off : on);
+    }
+
+    private void Decorate(TextDecoration wanted)
+    {
+        TextDecorationCollection now = editor.Selection.GetPropertyValue(Inline.TextDecorationsProperty) as TextDecorationCollection ?? [];
+        bool already = now.Any(decoration => decoration.Location == wanted.Location);
+
+        TextDecorationCollection next = new(now.Where(decoration => decoration.Location != wanted.Location));
+        if (!already)
+        {
+            next.Add(wanted);
+        }
+
+        editor.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty, next);
+    }
+
+    private void Paint(Brush background, Brush foreground)
+    {
+        bool already = ReferenceEquals(editor.Selection.GetPropertyValue(TextElement.BackgroundProperty), background);
+
+        editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty, already ? null : background);
+        editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, already ? renderer.Palette.Text : foreground);
+    }
+
+    private void Letters()
+    {
+        bool already = ReferenceEquals(editor.Selection.GetPropertyValue(TextElement.BackgroundProperty), renderer.Palette.CodeBackground);
+
+        if (already)
+        {
+            editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty, null);
+            editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, renderer.Palette.Text);
+            editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(NoteDocument.UiFonts));
             return;
         }
 
-        Lines(Rows(), open, close);
+        editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty, renderer.Palette.CodeBackground);
+        editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, renderer.Palette.CodeForeground);
+        editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(MarkdownRenderer.MonoFonts));
     }
 
-    /// <summary>Senza selezione i marcatori nascono vuoti, col cursore in mezzo.</summary>
-    private void Open(string open, string close)
+    private void Address()
     {
-        formatter.Suspended = true;
-        try
-        {
-            editor.Selection.Text = open + close;
+        string selected = editor.Selection.Text.Trim();
 
-            if (editor.CaretPosition.GetPositionAtOffset(-close.Length) is { } inside)
-            {
-                editor.CaretPosition = inside;
-            }
-        }
-        catch (InvalidOperationException)
+        if (!selected.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            && !selected.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            && !selected.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
         {
-        }
-        finally
-        {
-            formatter.Suspended = false;
-        }
-
-        Redraw();
-    }
-
-    /// <summary>Dentro una riga sola si veste il pezzo selezionato, non la riga.</summary>
-    private void Dress(TextSelection selection, string open, string close)
-    {
-        formatter.Suspended = true;
-        try
-        {
-            string text = selection.Text;
-            selection.Text = Wrapped(text.Trim(), open, close) ? Undressed(text.Trim(), open, close) : open + text + close;
-        }
-        catch (InvalidOperationException)
-        {
-        }
-        finally
-        {
-            formatter.Suspended = false;
-        }
-
-        Redraw();
-    }
-
-    /// <summary>
-    /// Su piu' righe ogni riga si veste da sola: un marcatore Markdown non
-    /// attraversa un fine riga, e un grassetto aperto su una riga e chiuso su
-    /// un'altra non sarebbe grassetto. Il prefisso resta fuori dai marcatori,
-    /// altrimenti smetterebbe di essere un prefisso.
-    /// </summary>
-    private void Lines(List<Paragraph> rows, string open, string close)
-    {
-        string[] bodies = [.. rows.Select(row => Split(row).Body).Where(body => body.Length > 0)];
-
-        if (bodies.Length == 0)
-        {
-            Refused?.Invoke("Le righe selezionate sono vuote.");
+            Refused?.Invoke("Seleziona un indirizzo, oppure scrivi [testo](indirizzo).");
             return;
         }
 
-        bool undress = bodies.All(body => Wrapped(body, open, close));
-
-        Change(rows, row =>
-        {
-            (string prefix, string body) = Split(row);
-
-            return body.Length == 0 ? null : prefix + (undress ? Undressed(body, open, close) : open + body + close);
-        });
+        editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, renderer.Palette.Link);
+        editor.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty, TextDecorations.Underline);
     }
 
-    private static bool Wrapped(string text, string open, string close) =>
-        text.Length > open.Length + close.Length
-        && text.StartsWith(open, StringComparison.Ordinal)
-        && text.EndsWith(close, StringComparison.Ordinal);
-
-    private static string Undressed(string text, string open, string close) =>
-        text.Substring(open.Length, text.Length - open.Length - close.Length);
-
-    // --- prefissi di riga ---------------------------------------------------
-
-    /// <summary>
-    /// Titoli, citazioni, elenchi e spunte. Il prefisso che c'e' viene tolto
-    /// prima di metterne un altro: un elenco premuto su una riga numerata deve
-    /// dare un elenco, non `- 1. testo`.
-    /// </summary>
-    public void SetLinePrefix(string prefix, bool toggle = true)
+    public void SetLook(Look look)
     {
-        List<Paragraph> rows = Rows();
-        if (rows.Count == 0)
+        Paragraph[] rows = Rows();
+        if (rows.Length == 0)
         {
             return;
         }
 
-        bool counted = Numbered().IsMatch(prefix);
-        bool single = rows.Count == 1;
-        bool strip = toggle && rows.All(row => Wears(row, prefix, counted));
-
+        bool strip = rows.All(row => Looks.Is(row, look));
+        bool single = rows.Length == 1;
         int number = 0;
 
         Change(rows, row =>
         {
-            string body = Split(row).Body;
-
-            // Una riga vuota in mezzo a una selezione resta vuota: un elenco
-            // non ha una voce fatta di niente.
-            if (body.Length == 0 && !single)
-            {
-                return null;
-            }
-
             if (strip)
             {
-                return body;
+                renderer.Undress(row);
+                return;
+            }
+
+            if (!single && LiveFormatter.TextOf(row).Trim().Length == 0)
+            {
+                return;
             }
 
             number++;
-
-            return (counted ? $"{number}. " : prefix) + body;
+            renderer.Dress(row, look, number);
         });
     }
 
-    private static bool Wears(Paragraph row, string prefix, bool counted)
+    public void ToggleCode()
     {
-        string worn = Split(row).Prefix;
-
-        return counted ? Numbered().IsMatch(worn) : worn == prefix;
-    }
-
-    // --- recinti e righe a se' ---------------------------------------------
-
-    /// <summary>
-    /// Recinta le righe selezionate fra due marcatori, su righe loro: un blocco
-    /// di codice non si apre a meta' riga, e quello che si e' selezionato e'
-    /// esattamente quello che va dentro.
-    /// </summary>
-    public void WrapBlock(string fence)
-    {
-        List<Paragraph> rows = Rows();
-        if (rows.Count == 0)
+        Paragraph[] rows = Rows();
+        if (rows.Length == 0)
         {
             return;
         }
-
-        if (Siblings(rows[0]) is not { } where || Siblings(rows[^1]) is null)
-        {
-            Refused?.Invoke("Un blocco di codice non entra qui.");
-            return;
-        }
-
-        Paragraph body = rows[^1];
 
         formatter.Suspended = true;
         try
@@ -191,8 +166,20 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
             editor.BeginChange();
             try
             {
-                where.InsertBefore(rows[0], new Paragraph(new Run(fence)));
-                where.InsertAfter(body, new Paragraph(new Run(fence)));
+                if (rows.Length == 1 && Looks.Is(rows[0], Look.Code))
+                {
+                    if (blocks.Unfold(rows[0]) is { } first)
+                    {
+                        editor.CaretPosition = first.ContentStart;
+                    }
+
+                    return;
+                }
+
+                if (blocks.Fold(rows) is { } block)
+                {
+                    editor.CaretPosition = block.ContentEnd;
+                }
             }
             finally
             {
@@ -201,28 +188,22 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         }
         catch (InvalidOperationException)
         {
-            return;
         }
         finally
         {
             formatter.Suspended = false;
         }
-
-        formatter.FormatAll();
-        editor.CaretPosition = body.ContentEnd;
     }
 
-    /// <summary>Una riga tutta sua, sotto l'ultima selezionata.</summary>
-    public void InsertLine(string text)
+    public void InsertRule()
     {
-        List<Paragraph> rows = Rows();
-        if (rows.Count == 0)
+        Paragraph[] rows = Rows();
+        if (rows.Length == 0 || Siblings(rows[^1]) is not { } where)
         {
             return;
         }
 
         Paragraph last = rows[^1];
-        Paragraph landing = last;
 
         formatter.Suspended = true;
         try
@@ -230,14 +211,89 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
             editor.BeginChange();
             try
             {
-                if (rows.Count == 1 && LiveFormatter.TextOf(last).Trim().Length == 0)
+                Paragraph rule = new();
+                renderer.Dress(rule, Look.Rule);
+                where.InsertAfter(last, rule);
+
+                Paragraph after = new();
+                where.InsertAfter(rule, after);
+                editor.CaretPosition = after.ContentStart;
+            }
+            finally
+            {
+                editor.EndChange();
+            }
+        }
+        catch (InvalidOperationException)
+        {
+        }
+        finally
+        {
+            formatter.Suspended = false;
+        }
+    }
+
+    public bool NewLine()
+    {
+        if (formatter.CaretParagraph is not { } row || Siblings(row) is not { } where)
+        {
+            return false;
+        }
+
+        if (editor.CaretPosition is not { } caret || Rest(caret, row).Length > 0)
+        {
+            return false;
+        }
+
+        Look look = Looks.Of(row);
+        if (look == Look.Text)
+        {
+            return false;
+        }
+
+        bool listed = look is Look.Bullet or Look.Number or Look.Todo;
+
+        if (listed && LiveFormatter.TextOf(row).TrimEnd('\r', '\n').Length <= Looks.MarkLength(row))
+        {
+            renderer.Undress(row);
+            return true;
+        }
+
+        Paragraph next = new();
+        where.InsertAfter(row, next);
+
+        if (listed)
+        {
+            renderer.Dress(next, look, Looks.Counter(row) + 1);
+        }
+
+        editor.CaretPosition = next.ContentEnd;
+
+        return true;
+    }
+
+    public void ClearFormatting()
+    {
+        Paragraph[] rows = Rows();
+        if (rows.Length == 0)
+        {
+            return;
+        }
+
+        formatter.Suspended = true;
+        try
+        {
+            editor.BeginChange();
+            try
+            {
+                if (!editor.Selection.IsEmpty)
                 {
-                    new TextRange(last.ContentStart, last.ContentEnd).Text = text;
+                    editor.Selection.ClearAllProperties();
                 }
-                else if (Siblings(last) is { } where)
+
+                foreach (Paragraph row in rows)
                 {
-                    landing = new Paragraph(new Run(text));
-                    where.InsertAfter(last, landing);
+                    renderer.Undress(row);
                 }
             }
             finally
@@ -247,73 +303,16 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         }
         catch (InvalidOperationException)
         {
-            return;
         }
         finally
         {
             formatter.Suspended = false;
         }
 
-        formatter.FormatAll();
-        editor.CaretPosition = landing.ContentEnd;
+        formatter.PaintAll();
     }
 
-    // --- ripulire ----------------------------------------------------------
-
-    public void ClearFormatting()
-    {
-        TextSelection selection = editor.Selection;
-
-        if (!selection.IsEmpty && ReferenceEquals(selection.Start.Paragraph, selection.End.Paragraph))
-        {
-            formatter.Suspended = true;
-            try
-            {
-                selection.Text = Bare(selection.Text);
-            }
-            catch (InvalidOperationException)
-            {
-            }
-            finally
-            {
-                formatter.Suspended = false;
-            }
-
-            Redraw();
-            return;
-        }
-
-        List<Paragraph> rows = Rows();
-        if (rows.Count == 0)
-        {
-            return;
-        }
-
-        Change(rows, row => Bare(LiveFormatter.TextOf(row).Replace("\r", string.Empty).Replace("\n", string.Empty)));
-    }
-
-    /// <summary>Il testo senza i suoi marcatori, prefisso di riga compreso.</summary>
-    private static string Bare(string text)
-    {
-        text = BoldMarks().Replace(text, "$1");
-        text = UnderMarks().Replace(text, "$1");
-        text = StrikeMarks().Replace(text, "$1");
-        text = MarkMarks().Replace(text, "$1");
-        text = ItalicMarks().Replace(text, "$1");
-        text = CodeMarks().Replace(text, "$1");
-        text = LinkMarks().Replace(text, "$1");
-
-        return LinePrefixes().Replace(text, string.Empty);
-    }
-
-    // --- le righe su cui si lavora -----------------------------------------
-
-    /// <summary>
-    /// Le righe toccate dalla selezione, o quella del cursore se selezione non
-    /// c'e'. Una selezione che finisce dove comincia la riga dopo non la
-    /// comprende: chi trascina fino a capo riga non intendeva prenderla.
-    /// </summary>
-    private List<Paragraph> Rows()
+    private Paragraph[] Rows()
     {
         TextSelection selection = editor.Selection;
 
@@ -327,12 +326,10 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
             return [];
         }
 
-        List<Paragraph> all = [.. formatter.AllParagraphs()];
-        int from = all.IndexOf(first);
-        int to = all.IndexOf(last);
+        Paragraph[] all = formatter.Rows();
+        int from = Array.IndexOf(all, first);
+        int to = Array.IndexOf(all, last);
 
-        // Dell'ultima riga non e' selezionato niente: chi ha trascinato fino a
-        // capo riga non intendeva prendere anche quella.
         if (to > from && Selected(last, selection).Length == 0)
         {
             to--;
@@ -341,7 +338,18 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         return from < 0 || to < from ? [] : all[from..(to + 1)];
     }
 
-    /// <summary>Quanto della riga cade dentro la selezione.</summary>
+    private static string Rest(TextPointer caret, Paragraph row)
+    {
+        try
+        {
+            return new TextRange(caret, row.ContentEnd).Text.Trim('\r', '\n');
+        }
+        catch (InvalidOperationException)
+        {
+            return string.Empty;
+        }
+    }
+
     private static string Selected(Paragraph row, TextSelection selection)
     {
         if (selection.End.CompareTo(row.ContentStart) <= 0)
@@ -359,12 +367,7 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         }
     }
 
-    /// <summary>
-    /// Riscrive le righe in un colpo solo e rimette la selezione dove era: chi
-    /// ha selezionato tre righe e premuto grassetto vuole poterci premere
-    /// ancora.
-    /// </summary>
-    private void Change(List<Paragraph> rows, Func<Paragraph, string?> replacement)
+    private void Change(Paragraph[] rows, Action<Paragraph> change)
     {
         formatter.Suspended = true;
         try
@@ -374,10 +377,7 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
             {
                 foreach (Paragraph row in rows)
                 {
-                    if (replacement(row) is { } text)
-                    {
-                        new TextRange(row.ContentStart, row.ContentEnd).Text = text;
-                    }
+                    change(row);
                 }
             }
             finally
@@ -394,14 +394,7 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
             formatter.Suspended = false;
         }
 
-        foreach (Paragraph row in rows)
-        {
-            row.Tag = null;
-        }
-
-        formatter.FormatAll();
-
-        if (rows.Count == 1)
+        if (rows.Length == 1)
         {
             editor.CaretPosition = rows[0].ContentEnd;
             return;
@@ -410,16 +403,6 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         editor.Selection.Select(rows[0].ContentStart, rows[^1].ContentEnd);
     }
 
-    /// <summary>Il prefisso di riga e quello che viene dopo.</summary>
-    private static (string Prefix, string Body) Split(Paragraph row)
-    {
-        string text = LiveFormatter.TextOf(row).Replace("\r", string.Empty).Replace("\n", string.Empty);
-        Match parts = Prefixed().Match(text);
-
-        return (parts.Groups[1].Value, parts.Groups[2].Value);
-    }
-
-    /// <summary>La collezione a cui la riga appartiene: documento, cella, voce d'elenco.</summary>
     private static BlockCollection? Siblings(Paragraph row) => row.Parent switch
     {
         FlowDocument document => document.Blocks,
@@ -428,45 +411,4 @@ public sealed partial class EditorCommands(RichTextBox editor, LiveFormatter for
         Section section => section.Blocks,
         _ => null
     };
-
-    private void Redraw()
-    {
-        if (formatter.CaretParagraph is not { } paragraph)
-        {
-            return;
-        }
-
-        paragraph.Tag = null;
-        formatter.Format(paragraph);
-    }
-
-    [GeneratedRegex(@"^(\s*(?:#{1,6}[ \t]+|>+[ \t]?|[-*+][ \t]+\[[ xX]\][ \t]?|[-*+][ \t]+|\d+[.)][ \t]+))?(.*)$")]
-    private static partial Regex Prefixed();
-
-    [GeneratedRegex(@"^\d+[.)]\s+$")]
-    private static partial Regex Numbered();
-
-    [GeneratedRegex(@"\*\*([^\*]+)\*\*")]
-    private static partial Regex BoldMarks();
-
-    [GeneratedRegex("__([^_]+)__")]
-    private static partial Regex UnderMarks();
-
-    [GeneratedRegex("~~([^~]+)~~")]
-    private static partial Regex StrikeMarks();
-
-    [GeneratedRegex("==([^=]+)==")]
-    private static partial Regex MarkMarks();
-
-    [GeneratedRegex(@"\*([^\*]+)\*")]
-    private static partial Regex ItalicMarks();
-
-    [GeneratedRegex("`([^`]+)`")]
-    private static partial Regex CodeMarks();
-
-    [GeneratedRegex(@"\[([^\]]*)\]\([^)]*\)")]
-    private static partial Regex LinkMarks();
-
-    [GeneratedRegex(@"(?m)^(\s*(?:#{1,6}[ \t]+|>+[ \t]?|[-*+][ \t]+\[[ xX]\][ \t]?|[-*+][ \t]+|\d+[.)][ \t]+))")]
-    private static partial Regex LinePrefixes();
 }

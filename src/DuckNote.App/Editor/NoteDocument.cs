@@ -24,20 +24,37 @@ public static class NoteDocument
     public static FlowDocument FromText(string text, MarkdownRenderer renderer, Brush foreground)
     {
         FlowDocument document = Empty(foreground);
-
+        List<string> fenced = [];
         bool inCode = false;
 
         foreach (string line in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
         {
-            Paragraph paragraph = new() { Margin = new Thickness(0) };
-            document.Blocks.Add(paragraph);
-            renderer.Render(paragraph, line, inCode);
-            paragraph.Tag = LiveFormatter.TextOf(paragraph);
-
             if (LineParser.IsFence(line))
             {
+                if (inCode)
+                {
+                    document.Blocks.Add(renderer.CodeBlock(fenced));
+                    fenced.Clear();
+                }
+
                 inCode = !inCode;
+                continue;
             }
+
+            if (inCode)
+            {
+                fenced.Add(line);
+                continue;
+            }
+
+            Paragraph paragraph = new() { Margin = new Thickness(0) };
+            document.Blocks.Add(paragraph);
+            renderer.Render(paragraph, line);
+        }
+
+        if (fenced.Count > 0)
+        {
+            document.Blocks.Add(renderer.CodeBlock(fenced));
         }
 
         if (document.Blocks.Count == 0)
@@ -48,9 +65,11 @@ public static class NoteDocument
         return document;
     }
 
-    public static byte[] ToXaml(RichTextBox editor)
+    public static byte[] ToXaml(RichTextBox editor) => ToXaml(editor.Document);
+
+    public static byte[] ToXaml(FlowDocument document)
     {
-        TextRange range = new(editor.Document.ContentStart, editor.Document.ContentEnd);
+        TextRange range = new(document.ContentStart, document.ContentEnd);
         using MemoryStream stream = new();
         range.Save(stream, DataFormats.Xaml);
         return stream.ToArray();

@@ -1,22 +1,20 @@
-﻿using System.Windows.Controls;
+using System.Text.RegularExpressions;
+using System.Windows.Controls;
 using System.Windows.Documents;
 
 namespace DuckNote.App.Editor;
 
-public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
+public sealed partial class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer, HostPaint hosts)
 {
-    /// <summary>
-    /// Quante righe si risale per sapere se si sta dentro un blocco di codice.
-    /// Oltre, si assume di starne fuori: contare fino in cima a ogni battuta
-    /// costerebbe piu' di quanto valga la risposta.
-    /// </summary>
-    private const int Lookback = 400;
-
     private readonly HashSet<Paragraph> _dirty = [];
 
     public bool IsFormatting { get; private set; }
 
     public bool Suspended { get; set; }
+
+    public InputRules? Rules { get; set; }
+
+    public Paragraph? CaretParagraph => editor.CaretPosition?.Paragraph;
 
     public void MarkDirty(Paragraph? paragraph)
     {
@@ -26,59 +24,39 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         }
     }
 
-    public Paragraph? CaretParagraph => editor.CaretPosition?.Paragraph;
-
     public void Flush()
     {
-        if (Suspended || !renderer.LiveFormatting)
+        if (Suspended)
         {
             _dirty.Clear();
-            return;
-        }
-
-        if (!editor.Selection.IsEmpty)
-        {
             return;
         }
 
         Paragraph[] pending = [.. _dirty];
         _dirty.Clear();
 
-        foreach (Paragraph paragraph in pending)
+        foreach (Paragraph row in pending)
         {
-            Format(paragraph);
+            Format(row);
         }
     }
 
-    public void Format(Paragraph? paragraph)
+    public void Format(Paragraph? row)
     {
-        if (paragraph is null || Suspended || !renderer.LiveFormatting || paragraph.Parent is null)
+        if (row is null || Suspended || row.Parent is null)
         {
             return;
         }
 
-        if (!editor.Selection.IsEmpty)
-        {
-            return;
-        }
-
-        string text = TextOf(paragraph);
-
-        if (paragraph.Tag is string drawn && drawn == text)
-        {
-            return;
-        }
-
-        int caret = CaretOffsetIn(paragraph);
         IsFormatting = true;
         try
         {
-            Draw(paragraph, text, InsideCode(paragraph));
-
-            if (caret >= 0)
+            if (renderer.LiveFormatting)
             {
-                RestoreCaret(paragraph, caret);
+                Rules?.Apply(row);
             }
+
+            hosts.Paint(row);
         }
         catch (InvalidOperationException)
         {
@@ -89,36 +67,14 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         }
     }
 
-    public void FormatAll()
+    public void PaintAll()
     {
-        if (editor.Document is null)
-        {
-            return;
-        }
-
-        // L'elenco si fissa prima di toccare niente: ridisegnare una riga
-        // cambia il documento, e l'enumeratore delle righe non sopravvive al
-        // primo cambiamento.
-        Paragraph[] rows = [.. AllParagraphs()];
-
         IsFormatting = true;
         try
         {
-            // Le righe passano in ordine: il recinto del codice si tiene a
-            // mente invece di risalirlo ogni volta.
-            bool inCode = false;
-
-            foreach (Paragraph row in rows)
+            foreach (Paragraph row in Rows())
             {
-                string text = TextOf(row);
-                bool fence = LineParser.IsFence(text);
-
-                Draw(row, text, inCode);
-
-                if (fence)
-                {
-                    inCode = !inCode;
-                }
+                hosts.Paint(row);
             }
         }
         finally
@@ -127,21 +83,120 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         }
     }
 
-    /// <summary>
-    /// Ridisegna una riga. Una riga che si rifiuta non ferma le altre: senza
-    /// questo, un solo pointer scaduto lasciava tutto il resto del documento
-    /// senza formattazione.
-    /// </summary>
-    private void Draw(Paragraph row, string text, bool inCode)
+    public void RecolourAll()
+    {
+        foreach (Paragraph row in Rows())
+        {
+            hosts.Recolour(row);
+        }
+    }
+
+    public void Import()
+    {
+        Paragraph[] rows = Rows();
+
+        IsFormatting = true;
+        try
+        {
+            bool inCode = false;
+            List<Paragraph> fenced = [];
+
+            foreach (Paragraph row in rows)
+            {
+                string line = Line(row);
+
+                if (LineParser.IsFence(line))
+                {
+                    inCode = !inCode;
+                    continue;
+                }
+
+                if (inCode)
+                {
+                    fenced.Add(row);
+                    continue;
+                }
+
+                Draw(row, line);
+            }
+
+            Fold(rows, fenced);
+        }
+        finally
+        {
+            IsFormatting = false;
+        }
+
+        PaintAll();
+    }
+
+    public bool NeedsImport() => Rows().Any(Unconverted);
+
+    private static bool Unconverted(Paragraph row) =>
+        Looks.Of(row) == Look.Text && Markers().IsMatch(Line(row));
+
+    private void Fold(Paragraph[] rows, List<Paragraph> fenced)
+    {
+        CodeBlocks blocks = new(editor, renderer);
+
+        foreach (Paragraph[] run in Runs(rows, fenced))
+        {
+            blocks.Fold(run);
+        }
+
+        foreach (Paragraph row in rows)
+        {
+            if (row.Parent is not null && LineParser.IsFence(Line(row)))
+            {
+                Remove(row);
+            }
+        }
+    }
+
+    private static List<Paragraph[]> Runs(Paragraph[] rows, List<Paragraph> fenced)
+    {
+        List<Paragraph[]> groups = [];
+        List<Paragraph> current = [];
+
+        foreach (Paragraph row in rows)
+        {
+            if (fenced.Contains(row) && (current.Count == 0 || ReferenceEquals(row.Parent, current[0].Parent)))
+            {
+                current.Add(row);
+                continue;
+            }
+
+            if (current.Count > 0)
+            {
+                groups.Add([.. current]);
+                current.Clear();
+            }
+        }
+
+        if (current.Count > 0)
+        {
+            groups.Add([.. current]);
+        }
+
+        return groups;
+    }
+
+    private void Remove(Paragraph row)
+    {
+        if (row.Parent is FlowDocument document)
+        {
+            document.Blocks.Remove(row);
+        }
+    }
+
+    private void Draw(Paragraph row, string line)
     {
         try
         {
             editor.BeginChange();
             try
             {
-                row.Inlines.Clear();
-                renderer.Render(row, text, inCode);
-                row.Tag = TextOf(row);
+                renderer.Render(row, line);
             }
             finally
             {
@@ -153,29 +208,11 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         }
     }
 
-    public IEnumerable<Paragraph> AllParagraphs() => Walk(editor.Document?.Blocks);
+    public Paragraph[] Rows() => RowsOf(editor.Document);
 
-    /// <summary>
-    /// Se la riga sta dentro un recinto di codice: si risale contando i
-    /// marcatori, e un numero dispari vuol dire che si e' dentro.
-    /// </summary>
-    private static bool InsideCode(Paragraph paragraph)
-    {
-        int fences = 0;
-        int looked = 0;
+    public IEnumerable<Paragraph> AllParagraphs() => Rows();
 
-        for (Block? above = paragraph.PreviousBlock; above is Paragraph line && looked < Lookback; above = above.PreviousBlock)
-        {
-            if (LineParser.IsFence(TextOf(line)))
-            {
-                fences++;
-            }
-
-            looked++;
-        }
-
-        return fences % 2 == 1;
-    }
+    public static Paragraph[] RowsOf(FlowDocument? document) => [.. Walk(document?.Blocks)];
 
     private static IEnumerable<Paragraph> Walk(IEnumerable<Block>? blocks)
     {
@@ -243,42 +280,9 @@ public sealed class LiveFormatter(RichTextBox editor, MarkdownRenderer renderer)
         }
     }
 
-    private int CaretOffsetIn(Paragraph paragraph)
-    {
-        TextPointer? caret = editor.CaretPosition;
-        if (caret is null || !ReferenceEquals(caret.Paragraph, paragraph))
-        {
-            return -1;
-        }
+    private static string Line(Paragraph row) =>
+        TextOf(row).Replace("\r", string.Empty).Replace("\n", string.Empty);
 
-        try
-        {
-            return new TextRange(paragraph.ContentStart, caret).Text.Length;
-        }
-        catch (InvalidOperationException)
-        {
-            return -1;
-        }
-    }
-
-    private void RestoreCaret(Paragraph paragraph, int offset)
-    {
-        TextPointer? position = paragraph.ContentStart;
-        int remaining = offset;
-
-        while (position is not null && remaining > 0 && position.CompareTo(paragraph.ContentEnd) < 0)
-        {
-            if (position.GetPointerContext(LogicalDirection.Forward) != TextPointerContext.Text)
-            {
-                position = position.GetNextContextPosition(LogicalDirection.Forward);
-                continue;
-            }
-
-            int step = Math.Min(position.GetTextInRun(LogicalDirection.Forward).Length, remaining);
-            position = position.GetPositionAtOffset(step);
-            remaining -= step;
-        }
-
-        editor.CaretPosition = position ?? paragraph.ContentEnd;
-    }
+    [GeneratedRegex(@"\*\*[^\*]+\*\*|__[^_]+__|~~[^~]+~~|==[^=]+==|`[^`]+`|\[[^\]]*\]\([^)]*\)|^#{1,3}\s|^>\s|^(?:-{3,}|\*{3,}|_{3,})\s*$|^(?:```|~~~)|^[-*+]\s|^\d+[.)]\s")]
+    private static partial Regex Markers();
 }

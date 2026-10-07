@@ -57,18 +57,26 @@ wired into the interface and waiting for their code.
 
 ## What it does
 
-**Markdown notes, formatted as you type.** Headings, bold, italic, underline,
-strikethrough, highlight, inline and fenced code, lists, quotes, checkboxes,
-links, separators. The markers stay in the text — the file remains readable —
-but they are rendered live, and every marker is dimmed so the text stands out
-from the syntax. A separator draws a real line, a fenced block shades its body,
-and `[testo](indirizzo)` reads as a link.
+**Markdown goes in, formatting comes out — the markers do not stay.** Write
+`**così**` and you get **così**: the asterisks have said how to read it and
+their job is done. Headings, bold, italic, underline, strikethrough, highlight,
+inline code, code blocks, lists, numbered lists, quotes, checkboxes, links,
+separators. A separator is a line, not three dashes. A code block is one block,
+not a fence above and a fence below. A bullet is a bullet, not a hyphen.
+
+Markdown is how you write, not what you read. It is applied when a marker
+closes, and `2 * 3 * 4` keeps its asterisks — a marker with a space against it
+from the inside is not a marker.
 
 **Every button works on the selection.** Select three lines, press any button,
-and all three change. Markers wrap each line on its own — `**` does not cross a
-line ending — and the line prefix stays outside them: `- **voce**`. A prefix
-replaces the one already there, the numbered list counts, and the code fence
-lands around what you selected.
+and all three change: a style sits on the text, so there is no syntax that has
+to open and close inside one line. Underline and strikethrough can coexist. A
+line's look replaces the one it had, the numbered list counts, and the code
+block takes exactly what you selected.
+
+**Enter knows where it is.** Inside a code block it adds a line to the block;
+on a list item it starts the next one; on an empty item it ends the list; after
+a heading it goes back to writing normally.
 
 **Real tables.** The table buttons build a grid, not rows of pipe characters:
 a header with its own background, one-pixel borders, cells you tab through.
@@ -125,9 +133,10 @@ release binary is published with the release.
 
 ### Note view — **Note**
 
-You write as you would in a Markdown file, and addresses go wherever they land:
-**IPv4, IPv6 and domain names are collected from the whole text**, mid-sentence
-included, as many per line as you like.
+You write as you would in a Markdown file — and what you get is the result, not
+the source. Addresses go wherever they land: **IPv4, IPv6 and domain names are
+collected from the whole text**, mid-sentence included, as many per line as you
+like.
 
 ```
 The gateway is 192.168.1.1, and behind it the NAS nas.home.lan that keeps vanishing.
@@ -153,9 +162,34 @@ either all lowercase or all uppercase.
 | **Ferma** | stop the running scan |
 | **Dettagli** | open the host card docked alongside |
 
-The sidebar switches between **Host** and **Struttura** (the note's headings),
-with a filter box over each. Picking a heading scrolls the note to its line —
-it travels there rather than jumping, so you can see where you came from.
+The sidebar switches between **Host** and **Struttura**, with a filter box over
+each. Picking a heading scrolls the note to its line — it travels there rather
+than jumping, so you can see where you came from.
+
+**Struttura is a tree of pages.** A page is named by the first `#` heading it
+opens with, and under it are **its `##` sections** — nothing else: the first
+level is already the page's name and the third is detail inside a section, which
+in the structure would only be noise. Two levels, read at a glance.
+
+Tree lines show what leads where: a vertical for every branch that continues
+below, an elbow into each entry. Folding is animated both ways, and what you
+fold stays folded while you keep typing.
+
+A page reads as a section title with a filled toggle; a section is smaller and
+tighter, with a thin chevron — opening a page and opening a section are not the
+same act and do not look like it. The open page carries an accent dot, and a
+count appears only when a search found the word inside a page's body.
+
+**Pressing a page takes you back to the top of it**, onto its title, even when
+it was already the open one. Pressing a section takes you to its line.
+
+**A page can be named by hand.** The `+` button makes one; right-click renames —
+the name is written in a field on its own row, no dialog — and from then on it
+wins even if the heading changes. Right-click also removes a page, except the
+last.
+
+**The filter searches every page** — names, headings, and the text inside: a
+page whose body contains the word stays in the list and says how many times.
 
 ---
 
@@ -234,7 +268,7 @@ stick next to the executable.
 
 | File | Contents |
 |---|---|
-| `note.xaml` | the note, when encryption is off |
+| `note.xaml` | the note, when encryption is off: a zip with one entry per page and an index holding their order and their names — despite the name, which earlier versions gave it when the note was one document |
 | `note.xaml.bak` | the previous version, refreshed at most every 15 minutes |
 | `settings.json` | the settings |
 | `lastscan.json` | the last scan, so states are found again on reopening |
@@ -274,10 +308,19 @@ src/DuckNote.Scan    the scan engine and the wire protocols, no UI
 src/DuckNote.App     the WPF application
 tests/               126 tests, including compatibility with PowerShell fixtures
 packaging/           the Inno Setup script that builds the installer
+_old/                the PowerShell original: 10,143 lines, its launcher and
+                     its build script — the only copy of what came before
+dist/                build output, not in the repository: the portable
+                     executable, the installer, and the notes that ship with it
 ```
 
 `DuckNote.Core` and `DuckNote.Scan` have no reference to WPF: they run headless,
 which is what makes the tests possible.
+
+One folder holds everything — source, history and the build you hand to
+someone. `dist/` is written by `dotnet publish` and regenerates from scratch, so
+it is not versioned; there is never a second copy of a release somewhere else to
+open by mistake.
 
 ---
 

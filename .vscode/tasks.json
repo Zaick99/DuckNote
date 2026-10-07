@@ -28,7 +28,7 @@
         "-p:IncludeNativeLibrariesForSelfExtract=true",
         "-p:EnableCompressionInSingleFile=true",
         "-p:DebugType=none",
-        "-o", "${workspaceFolder}/_testversion/DuckNote-0.0.4/build"
+        "-o", "${workspaceFolder}/dist"
       ],
       "problemMatcher": "$msCompile"
     }

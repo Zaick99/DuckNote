@@ -175,6 +175,8 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
       <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="Height" Value="28"/>
       <Setter Property="MinWidth" Value="28"/>
       <Setter Property="Padding" Value="7,0"/>
@@ -186,7 +188,8 @@
           <ControlTemplate TargetType="Button">
             <Border x:Name="b" CornerRadius="{StaticResource RControl}" Background="{TemplateBinding Background}"
                     Padding="{TemplateBinding Padding}">
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
             </Border>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
@@ -416,6 +419,121 @@
               <Trigger Property="IsEnabled" Value="False">
                 <Setter TargetName="body" Property="Opacity" Value="0.4"/>
               </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <DataTemplate x:Key="HostRow">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0"
+                 Fill="{Binding Dot}"/>
+        <StackPanel Grid.Column="1">
+          <TextBlock Text="{Binding Title}" FontSize="12" TextTrimming="CharacterEllipsis"/>
+          <TextBlock Text="{Binding Subtitle}" FontSize="10" Opacity="0.62"
+                     TextTrimming="CharacterEllipsis" Visibility="{Binding SubVis}"/>
+        </StackPanel>
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate x:Key="BranchRow">
+      <Grid Height="{Binding RowHeight}" Background="Transparent">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <Path Grid.Column="0" Width="{Binding RailWidth}" Data="{Binding Rails}"
+              Stroke="{DynamicResource Separator}" StrokeThickness="1"
+              SnapsToDevicePixels="True" VerticalAlignment="Stretch"/>
+
+        <TextBlock x:Name="toggle" Grid.Column="1" Text="{Binding Toggle}" Visibility="{Binding ToggleVis}"
+                   Width="15" FontSize="10" Opacity="0.75" Cursor="Hand"
+                   VerticalAlignment="Center" TextAlignment="Center"
+                   Background="Transparent" Padding="0,3"
+                   MouseLeftButtonDown="OnBranchToggle"/>
+
+        <TextBlock x:Name="label" Grid.Column="2" Text="{Binding Title}" Visibility="{Binding LabelVis}"
+                   FontSize="11" VerticalAlignment="Center" Margin="2,0,0,0"
+                   TextTrimming="CharacterEllipsis"/>
+
+        <TextBox x:Name="rename" Grid.Column="2" Text="{Binding Title, Mode=OneWay}"
+                 Visibility="{Binding EditVis}" Style="{StaticResource Field}"
+                 Height="21" FontSize="11.5" Margin="2,0,0,0" Padding="5,0"
+                 KeyDown="OnPageRenameKey" LostFocus="OnPageRenameDone"/>
+
+        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+          <Border Visibility="{Binding BadgeVis}" Margin="4,0,0,0" Padding="5,0"
+                  CornerRadius="{StaticResource RControl}" Background="{DynamicResource BgPressed}">
+            <TextBlock Text="{Binding Badge}" FontSize="9.5" Foreground="{DynamicResource LabelTertiary}"/>
+          </Border>
+          <Rectangle Visibility="{Binding HereVis}" Width="6" Height="6" RadiusX="3" RadiusY="3"
+                     Margin="5,0,2,0" Fill="{DynamicResource AccentFill}"/>
+        </StackPanel>
+      </Grid>
+
+      <DataTemplate.Triggers>
+        <DataTrigger Binding="{Binding IsPage}" Value="True">
+          <Setter TargetName="label" Property="FontSize" Value="12.5"/>
+          <Setter TargetName="label" Property="FontWeight" Value="SemiBold"/>
+          <Setter TargetName="toggle" Property="FontSize" Value="12"/>
+          <Setter TargetName="toggle" Property="Width" Value="18"/>
+          <Setter TargetName="toggle" Property="Opacity" Value="1"/>
+          <Setter TargetName="toggle" Property="Foreground" Value="{DynamicResource AccentDark}"/>
+        </DataTrigger>
+      </DataTemplate.Triggers>
+    </DataTemplate>
+
+    <Style x:Key="BranchItem" TargetType="ListBoxItem">
+      <Setter Property="Padding" Value="7,0"/>
+      <Setter Property="Margin" Value="6,0"/>
+      <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ListBoxItem">
+            <Grid x:Name="row">
+              <Grid.RenderTransform>
+                <TranslateTransform x:Name="slide"/>
+              </Grid.RenderTransform>
+              <Border x:Name="b" CornerRadius="{StaticResource RRow}" Background="Transparent"
+                      BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                <ContentPresenter/>
+              </Border>
+              <Rectangle x:Name="bar" Width="3" RadiusX="1.5" RadiusY="1.5" Margin="0,4"
+                         HorizontalAlignment="Left" Fill="{DynamicResource AccentFill}" Opacity="0"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource BgHover}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+              </Trigger>
+              <Trigger Property="IsSelected" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoft}"/>
+                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource AccentBorder}"/>
+                <Setter TargetName="bar" Property="Opacity" Value="1"/>
+                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+              </Trigger>
+              <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="row" Storyboard.TargetProperty="Opacity"
+                                     From="0" To="1" Duration="0:0:0.17"/>
+                    <DoubleAnimation Storyboard.TargetName="slide" Storyboard.TargetProperty="X"
+                                     From="-8" To="0" Duration="0:0:0.24">
+                      <DoubleAnimation.EasingFunction>
+                        <CubicEase EasingMode="EaseOut"/>
+                      </DoubleAnimation.EasingFunction>
+                    </DoubleAnimation>
+                  </Storyboard>
+                </BeginStoryboard>
+              </EventTrigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -924,27 +1042,23 @@
                   <MenuItem x:Name="HostMenuIgnored" Header="Ignorati"/>
                 </ContextMenu>
               </ListBox.ContextMenu>
-              <ListBox.ItemTemplate>
-                <DataTemplate>
-                  <Grid>
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="Auto"/>
-                      <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Ellipse Grid.Column="0" Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0"
-                             Fill="{Binding Dot}"/>
-                    <StackPanel Grid.Column="1">
-                      <TextBlock Text="{Binding Title}" FontSize="12" TextTrimming="CharacterEllipsis"/>
-                      <TextBlock Text="{Binding Subtitle}" FontSize="10" Opacity="0.62"
-                                 TextTrimming="CharacterEllipsis" Visibility="{Binding SubVis}"/>
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
             </ListBox>
-            <Border Grid.Row="2" BorderBrush="{DynamicResource Separator}" BorderThickness="0,1,0,0" Padding="12,8">
-              <TextBlock x:Name="SideFoot" FontSize="10" Foreground="{DynamicResource LabelTertiary}"
-                         Text="Nessun host"/>
+            <Border Grid.Row="2" BorderBrush="{DynamicResource Separator}" BorderThickness="0,1,0,0" Padding="12,3,6,3">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="SideFoot" Grid.Column="0" VerticalAlignment="Center"
+                           FontSize="10" Foreground="{DynamicResource LabelTertiary}"
+                           TextTrimming="CharacterEllipsis" Text="Nessun host"/>
+                <Button x:Name="PageNew" Grid.Column="1" Style="{StaticResource Toolbtn}"
+                        Visibility="Collapsed" ToolTip="Una pagina nuova">
+                  <Path Data="M9,3.5 V14.5 M3.5,9 H14.5" Stroke="{DynamicResource AccentFill}"
+                        StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                        Width="15" Height="15" Stretch="Uniform"/>
+                </Button>
+              </Grid>
             </Border>
           </Grid>
         </Border>
@@ -976,9 +1090,12 @@
                         StrokeThickness="1.4" Width="16" Height="15" Stretch="Uniform" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                 </Button>
                 <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
-                <Button x:Name="FmtH1" Style="{StaticResource Toolbtn}" Content="H1" FontWeight="Bold" FontSize="12" ToolTip="Titolo"/>
-                <Button x:Name="FmtH2" Style="{StaticResource Toolbtn}" Content="H2" FontWeight="Bold" FontSize="11" ToolTip="Sottotitolo"/>
-                <Button x:Name="FmtH3" Style="{StaticResource Toolbtn}" Content="H3" FontWeight="Bold" FontSize="10" ToolTip="Intestazione"/>
+                <Button x:Name="FmtH1" Style="{StaticResource Toolbtn}" Content="H1" FontWeight="Bold"
+                        FontSize="15" VerticalContentAlignment="Bottom" Padding="6,0,6,5" ToolTip="Titolo"/>
+                <Button x:Name="FmtH2" Style="{StaticResource Toolbtn}" Content="H2" FontWeight="Bold"
+                        FontSize="12.5" VerticalContentAlignment="Bottom" Padding="6,0,6,5" ToolTip="Sottotitolo"/>
+                <Button x:Name="FmtH3" Style="{StaticResource Toolbtn}" Content="H3" FontWeight="Bold"
+                        FontSize="10.5" VerticalContentAlignment="Bottom" Padding="6,0,6,5" ToolTip="Intestazione"/>
                 <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
                 <Button x:Name="FmtBold"   Style="{StaticResource Toolbtn}" Content="B" FontWeight="Bold" ToolTip="Grassetto (Ctrl+B)"/>
                 <Button x:Name="FmtItalic" Style="{StaticResource Toolbtn}" Content="I" FontStyle="Italic" ToolTip="Corsivo (Ctrl+I)"/>
@@ -1389,4 +1506,3 @@
     </Grid>
   </Border>
 </Window>
-

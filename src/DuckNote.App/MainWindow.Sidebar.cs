@@ -1,8 +1,11 @@
-﻿using System.Collections.ObjectModel;
-using System.Text.RegularExpressions;
+using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using DuckNote.App.Editor;
 using DuckNote.App.Models;
 using DuckNote.App.Theme;
@@ -12,31 +15,29 @@ namespace DuckNote.App;
 public partial class MainWindow
 {
     private readonly ObservableCollection<SideItem> _sideItems = [];
+    private readonly ObservableCollection<SideNode> _sideNodes = [];
+
+    private readonly Dictionary<string, bool> _openBranches = [];
+
     private bool _outlineMode;
+
+    private ContextMenu _pageMenu = null!;
 
     private void SetUpSidebar()
     {
-        SideList.ItemsSource = _sideItems;
-
         SideModeHost.Checked += (_, _) => SwitchSideMode(outline: false);
         SideModeOutline.Checked += (_, _) => SwitchSideMode(outline: true);
         SideSearch.TextChanged += (_, _) => RefreshSideList();
 
         SideSegHost.SizeChanged += (_, _) => MoveSideSegPill(_outlineMode ? 1 : 0, immediate: true);
 
+        PageNew.Click += (_, _) => AddPage();
+        _pageMenu = PageMenu();
+
         SwitchSideMode(outline: false, immediate: true);
     }
 
-    /// <summary>
-    /// Porta la nota all'intestazione scelta, scorrendo invece di saltare: si
-    /// capisce da dove si veniva e dove si e' finiti.
-    /// </summary>
-    /// <remarks>
-    /// L'originale assegnava ScrollToVerticalOffset e basta. L'animazione ha
-    /// bisogno dello ScrollViewer interno del RichTextBox, che esiste solo dopo
-    /// che il template e' stato applicato.
-    /// </remarks>
-    private void JumpToHeading(Paragraph heading)
+    private void JumpTo(Paragraph row)
     {
         TabNote.IsChecked = true;
 
@@ -47,8 +48,8 @@ public partial class MainWindow
 
         Editor.UpdateLayout();
 
-        Rect where = heading.ContentStart.GetCharacterRect(LogicalDirection.Forward);
-        double target = Math.Max(0, view.VerticalOffset + where.Top - HeadingAir);
+        Rect spot = row.ContentStart.GetCharacterRect(LogicalDirection.Forward);
+        double target = Math.Max(0, view.VerticalOffset + spot.Top - HeadingAir);
 
         Motion.ScrollTo(view, target);
         Editor.Focus();
@@ -59,7 +60,14 @@ public partial class MainWindow
     private void SwitchSideMode(bool outline, bool immediate = false)
     {
         _outlineMode = outline;
-        SideSearchHint.Text = outline ? "Filtra intestazioni" : "Filtra host";
+
+        SideSearchHint.Text = outline ? "Cerca in tutte le pagine" : "Filtra host";
+        SideList.ItemTemplate = (DataTemplate)FindResource(outline ? "BranchRow" : "HostRow");
+        SideList.ItemContainerStyle = (Style)FindResource(outline ? "BranchItem" : "SideItem");
+        SideList.ItemsSource = outline ? _sideNodes : _sideItems;
+        SideList.ContextMenu = outline ? _pageMenu : HostMenu;
+        PageNew.Visibility = outline ? Visibility.Visible : Visibility.Collapsed;
+
         MoveSideSegPill(outline ? 1 : 0, immediate);
         RefreshSideList();
 
@@ -81,14 +89,292 @@ public partial class MainWindow
 
     private void RefreshSideList()
     {
-        if (_formatter is null)
+        if (_formatter is null || _book is null)
         {
             return;
         }
 
-        List<SideItem> wanted = _outlineMode ? BuildOutline() : BuildHosts();
+        if (_outlineMode)
+        {
+            List<SideNode> shown = Outline.Flat(
+                Outline.Build(_book, _page, SideSearch.Text, _openBranches));
+
+            SyncNodes(shown);
+            UpdateSideFoot(shown.Count);
+            return;
+        }
+
+        List<SideItem> wanted = BuildHosts();
         SyncSideItems(wanted);
         UpdateSideFoot(wanted.Count);
+    }
+
+    private ContextMenu PageMenu()
+    {
+        MenuItem fresh = new() { Header = "Nuova pagina" };
+        fresh.Click += (_, _) => AddPage();
+
+        MenuItem rename = new() { Header = "Rinomina pagina" };
+        rename.Click += (_, _) => RenamePage();
+
+        MenuItem drop = new() { Header = "Elimina pagina" };
+        drop.Click += (_, _) => DropPage();
+
+        ContextMenu menu = new();
+        menu.Items.Add(fresh);
+        menu.Items.Add(rename);
+        menu.Items.Add(drop);
+
+        return menu;
+    }
+
+    private void OnBranchToggle(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: SideNode node })
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        if (!node.IsOpen)
+        {
+            _openBranches[node.Key] = true;
+            RefreshSideList();
+            return;
+        }
+
+        Fold(node);
+    }
+
+    private void Fold(SideNode node)
+    {
+        ListBoxItem[] rows =
+        [
+            .. Outline.Flat(node.Children)
+                .Select(child => SideList.ItemContainerGenerator.ContainerFromItem(child))
+                .OfType<ListBoxItem>()
+        ];
+
+        if (rows.Length == 0)
+        {
+            Shut(node);
+            return;
+        }
+
+        int left = rows.Length;
+
+        foreach (ListBoxItem row in rows)
+        {
+            DoubleAnimation fade = Motion.Slide(1, 0, 130, Motion.Ease(mode: EasingMode.EaseIn));
+
+            fade.Completed += (_, _) =>
+            {
+                row.BeginAnimation(OpacityProperty, null);
+
+                if (--left == 0)
+                {
+                    Shut(node);
+                }
+            };
+
+            row.BeginAnimation(OpacityProperty, fade);
+        }
+    }
+
+    private void Shut(SideNode node)
+    {
+        _openBranches[node.Key] = false;
+        RefreshSideList();
+    }
+
+    private void OpenBranch(SideNode node)
+    {
+        if (_book.ById(node.PageId) is not { } page)
+        {
+            return;
+        }
+
+        if (!ReferenceEquals(page, _page))
+        {
+            ShowPage(page);
+        }
+
+        Paragraph? where = node.Heading is { Parent: not null } heading
+            ? heading
+            : LiveFormatter.RowsOf(page.Document).FirstOrDefault();
+
+        if (where is null)
+        {
+            TabNote.IsChecked = true;
+            Editor.Focus();
+            return;
+        }
+
+        if (node.IsPage)
+        {
+            Editor.CaretPosition = where.ContentStart;
+        }
+
+        JumpTo(where);
+    }
+
+    private void AddPage()
+    {
+        NotePage page = _book.Add(_editorBrushes.Text);
+
+        _noteDirty = true;
+        SideModeOutline.IsChecked = true;
+        ShowPage(page);
+        SaveNote();
+
+        StatusText.Text = $"Pagina nuova: scrivi un titolo con # e si chiamera' cosi'. {_book.Count} pagine.";
+        Editor.Focus();
+    }
+
+    private void RenamePage()
+    {
+        if (SideList.SelectedItem is not SideNode node || !node.IsPage)
+        {
+            StatusText.Text = "Scegli una pagina nella struttura, poi rinominala.";
+            return;
+        }
+
+        foreach (SideNode other in _sideNodes)
+        {
+            other.EditVis = "Collapsed";
+            other.LabelVis = "Visible";
+        }
+
+        node.EditVis = "Visible";
+        node.LabelVis = "Collapsed";
+        _renaming = node;
+
+        Dispatcher.BeginInvoke(() => Field(node)?.Focus(), DispatcherPriority.Input);
+    }
+
+    private SideNode? _renaming;
+
+    private void OnPageRenameKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            Keep(sender as TextBox);
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Escape)
+        {
+            Forget();
+            e.Handled = true;
+        }
+    }
+
+    private void OnPageRenameDone(object sender, RoutedEventArgs e) => Keep(sender as TextBox);
+
+    private void Keep(TextBox? field)
+    {
+        if (_renaming is null || field is null || _book.ById(_renaming.PageId) is not { } page)
+        {
+            Forget();
+            return;
+        }
+
+        string wanted = NotePage.Clean(field.Text);
+
+        if (wanted != page.Name)
+        {
+            page.Name = wanted;
+            _noteDirty = true;
+            SaveNote();
+            StatusText.Text = wanted.Length > 0
+                ? $"Pagina rinominata: {wanted}."
+                : "Nome tolto: la pagina si presenta col suo primo titolo.";
+        }
+
+        Forget();
+    }
+
+    private void Forget()
+    {
+        if (_renaming is { } node)
+        {
+            node.EditVis = "Collapsed";
+            node.LabelVis = "Visible";
+        }
+
+        _renaming = null;
+        RefreshSideList();
+    }
+
+    private TextBox? Field(SideNode node)
+    {
+        if (SideList.ItemContainerGenerator.ContainerFromItem(node) is not ListBoxItem row)
+        {
+            return null;
+        }
+
+        row.ApplyTemplate();
+
+        return Hunt<TextBox>(row);
+    }
+
+    private static T? Hunt<T>(DependencyObject where) where T : DependencyObject
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(where); i++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(where, i);
+
+            if (child is T found)
+            {
+                return found;
+            }
+
+            if (Hunt<T>(child) is { } deeper)
+            {
+                return deeper;
+            }
+        }
+
+        return null;
+    }
+
+    private void DropPage()
+    {
+        NotePage? page = SideList.SelectedItem is SideNode node ? _book.ById(node.PageId) : _page;
+
+        if (page is null)
+        {
+            return;
+        }
+
+        if (_book.Count == 1)
+        {
+            StatusText.Text = "L'ultima pagina non si toglie.";
+            return;
+        }
+
+        string title = page.Title;
+
+        if (!_book.Remove(page))
+        {
+            return;
+        }
+
+        _noteDirty = true;
+
+        if (ReferenceEquals(page, _page))
+        {
+            ShowPage(_book.Pages[0]);
+        }
+        else
+        {
+            RefreshSideList();
+        }
+
+        SaveNote();
+        StatusText.Text = $"Pagina '{title}' eliminata. Resta in note.xaml.bak fino al prossimo salvataggio.";
     }
 
     private List<SideItem> BuildHosts()
@@ -113,7 +399,7 @@ public partial class MainWindow
             }
 
             string subtitle = row.Hostname.Length > 0 ? row.Hostname : row.NetBiosName;
-            if (!Matches(filter, $"{row.IP} {subtitle}"))
+            if (!Outline.Matches(filter, $"{row.IP} {subtitle}"))
             {
                 continue;
             }
@@ -123,7 +409,7 @@ public partial class MainWindow
 
         foreach (string host in NoteHosts())
         {
-            if (!seen.Add(host) || !Matches(filter, host))
+            if (!seen.Add(host) || !Outline.Matches(filter, host))
             {
                 continue;
             }
@@ -135,30 +421,46 @@ public partial class MainWindow
         return items;
     }
 
-    private List<SideItem> BuildOutline()
+    private void SyncNodes(List<SideNode> wanted)
     {
-        string filter = SideSearch.Text.Trim();
-        List<SideItem> items = [];
+        HashSet<string> keys = [.. wanted.Select(node => node.Key)];
 
-        foreach ((int level, string text, Paragraph paragraph) in EditorOutline())
+        for (int i = _sideNodes.Count - 1; i >= 0; i--)
         {
-            if (!Matches(filter, text))
+            if (!keys.Contains(_sideNodes[i].Key))
             {
+                _sideNodes.RemoveAt(i);
+            }
+        }
+
+        for (int i = 0; i < wanted.Count; i++)
+        {
+            SideNode fresh = wanted[i];
+
+            if (i >= _sideNodes.Count || _sideNodes[i].Key != fresh.Key)
+            {
+                _sideNodes.Insert(i, fresh);
                 continue;
             }
 
-            string indent = new(' ', 3 * (level - 1));
-            string dot = level switch
-            {
-                1 => ThemeTokens.Colour(_theme, "Accent"),
-                2 => ThemeTokens.Colour(_theme, "LabelSecondary"),
-                _ => ThemeTokens.Colour(_theme, "LabelQuaternary")
-            };
-
-            items.Add(Item($"o:{items.Count}", indent + text, dot, string.Empty, string.Empty, paragraph));
+            SideNode kept = _sideNodes[i];
+            kept.Title = fresh.Title;
+            kept.Toggle = fresh.Toggle;
+            kept.ToggleVis = fresh.ToggleVis;
+            kept.Badge = fresh.Badge;
+            kept.BadgeVis = fresh.BadgeVis;
+            kept.HereVis = fresh.HereVis;
+            kept.Rails = fresh.Rails;
+            kept.RailWidth = fresh.RailWidth;
+            kept.RowHeight = fresh.RowHeight;
+            kept.Heading = fresh.Heading;
+            kept.IsOpen = fresh.IsOpen;
         }
 
-        return items;
+        while (_sideNodes.Count > wanted.Count)
+        {
+            _sideNodes.RemoveAt(_sideNodes.Count - 1);
+        }
     }
 
     private void SyncSideItems(List<SideItem> wanted)
@@ -202,9 +504,10 @@ public partial class MainWindow
     {
         if (_outlineMode)
         {
-            SideFoot.Text = count == 0
-                ? "Nessuna intestazione (usa # Titolo)"
-                : count == 1 ? "1 intestazione" : $"{count} intestazioni";
+            int pages = _book?.Count ?? 0;
+            string many = pages == 1 ? "1 pagina" : $"{pages} pagine";
+
+            SideFoot.Text = count == 0 ? $"{many}, niente che corrisponda" : many;
             return;
         }
 
@@ -224,9 +527,6 @@ public partial class MainWindow
             IP = ip,
             Para = paragraph
         };
-
-    private static bool Matches(string filter, string text) =>
-        filter.Length == 0 || Regex.IsMatch(text, Regex.Escape(filter), RegexOptions.IgnoreCase);
 
     private string DotHex(int rank) => rank switch
     {

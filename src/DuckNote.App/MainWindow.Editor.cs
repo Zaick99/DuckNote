@@ -21,17 +21,27 @@ public partial class MainWindow
     private MarkdownRenderer _renderer = null!;
     private LiveFormatter _formatter = null!;
     private EditorCommands _commands = null!;
+    private CodeBlocks _blocks = null!;
 
     private DispatcherTimer? _formatTimer;
     private DispatcherTimer? _saveTimer;
     private bool _noteDirty;
     private bool _fresh;
 
+    private NoteBook _book = null!;
+    private NotePage _page = null!;
+
+    private bool _swapping;
+
     private void SetUpEditor()
     {
         _renderer = new MarkdownRenderer(_editorBrushes, () => _hostStates);
-        _formatter = new LiveFormatter(Editor, _renderer);
-        _commands = new EditorCommands(Editor, _formatter);
+        _blocks = new CodeBlocks(Editor, _renderer);
+        _formatter = new LiveFormatter(Editor, _renderer, new HostPaint(_editorBrushes, () => _hostStates))
+        {
+            Rules = new InputRules(Editor, _renderer, _blocks, _editorBrushes)
+        };
+        _commands = new EditorCommands(Editor, _formatter, _renderer, _blocks);
         _commands.Refused += message => StatusText.Text = message;
 
         _editorBrushes.Sync(_theme);
@@ -39,6 +49,7 @@ public partial class MainWindow
 
         Editor.TextChanged += OnEditorTextChanged;
         Editor.PreviewMouseLeftButtonDown += OnEditorClick;
+        Editor.PreviewKeyDown += OnEditorKey;
 
         _formatTimer = new DispatcherTimer(DispatcherPriority.Background)
         {
@@ -68,7 +79,7 @@ public partial class MainWindow
 
     private void OnEditorTextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_formatter.IsFormatting)
+        if (_formatter.IsFormatting || _swapping)
         {
             return;
         }
@@ -81,6 +92,16 @@ public partial class MainWindow
         _saveTimer?.Start();
     }
 
+    private void OnEditorKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Return || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        e.Handled = _blocks.Break() || _commands.NewLine();
+    }
+
     private void OnEditorClick(object sender, MouseButtonEventArgs e)
     {
         if (Editor.GetPositionFromPoint(e.GetPosition(Editor), snapToText: false) is not { } point)
@@ -88,64 +109,53 @@ public partial class MainWindow
             return;
         }
 
-        if (point.Parent is not Run { Tag: "todo" } || point.Paragraph is not { } paragraph)
+        if (point.Paragraph is not { } row || !Looks.Is(row, Look.Todo))
         {
             return;
         }
 
-        string text = LiveFormatter.TextOf(paragraph).Replace("\r", string.Empty).Replace("\n", string.Empty);
-        ParsedLine parsed = LineParser.Parse(text);
-        if (parsed.Kind != LineKind.Todo)
+        if (point.Parent is not Run first || !ReferenceEquals(first, row.Inlines.FirstInline))
         {
             return;
         }
-
-        string pad = parsed.Indent > 0 ? new string(' ', parsed.Indent) : string.Empty;
-        string flipped = pad + (parsed.Done ? "- [ ] " : "- [x] ") + parsed.Body;
 
         _formatter.Suspended = true;
         try
         {
-            new TextRange(paragraph.ContentStart, paragraph.ContentEnd).Text = flipped;
-        }
-        catch (InvalidOperationException)
-        {
-            return;
+            _renderer.Check(row, !Looks.IsDone(row));
         }
         finally
         {
             _formatter.Suspended = false;
         }
 
-        paragraph.Tag = null;
-        _formatter.Format(paragraph);
         e.Handled = true;
     }
 
     private void WireFormatBar()
     {
-        FmtBold.Click += (_, _) => _commands.Wrap("**");
-        FmtItalic.Click += (_, _) => _commands.Wrap("*");
-        FmtUnder.Click += (_, _) => _commands.Wrap("__");
-        FmtStrike.Click += (_, _) => _commands.Wrap("~~");
-        FmtMark.Click += (_, _) => _commands.Wrap("==");
-        FmtCode.Click += (_, _) => _commands.Wrap("`");
-        FmtLink.Click += (_, _) => _commands.Wrap("[", "]()");
+        FmtBold.Click += (_, _) => _commands.Toggle(Mark.Bold);
+        FmtItalic.Click += (_, _) => _commands.Toggle(Mark.Italic);
+        FmtUnder.Click += (_, _) => _commands.Toggle(Mark.Underline);
+        FmtStrike.Click += (_, _) => _commands.Toggle(Mark.Strike);
+        FmtMark.Click += (_, _) => _commands.Toggle(Mark.Highlight);
+        FmtCode.Click += (_, _) => _commands.Toggle(Mark.Code);
+        FmtLink.Click += (_, _) => _commands.Toggle(Mark.Link);
 
-        FmtH1.Click += (_, _) => _commands.SetLinePrefix("# ");
-        FmtH2.Click += (_, _) => _commands.SetLinePrefix("## ");
-        FmtH3.Click += (_, _) => _commands.SetLinePrefix("### ");
-        FmtQuote.Click += (_, _) => _commands.SetLinePrefix("> ");
-        FmtBullet.Click += (_, _) => _commands.SetLinePrefix("- ");
-        FmtNumber.Click += (_, _) => _commands.SetLinePrefix("1. ");
-        FmtTodo.Click += (_, _) => _commands.SetLinePrefix("- [ ] ");
+        FmtH1.Click += (_, _) => _commands.SetLook(Look.Heading1);
+        FmtH2.Click += (_, _) => _commands.SetLook(Look.Heading2);
+        FmtH3.Click += (_, _) => _commands.SetLook(Look.Heading3);
+        FmtQuote.Click += (_, _) => _commands.SetLook(Look.Quote);
+        FmtBullet.Click += (_, _) => _commands.SetLook(Look.Bullet);
+        FmtNumber.Click += (_, _) => _commands.SetLook(Look.Number);
+        FmtTodo.Click += (_, _) => _commands.SetLook(Look.Todo);
 
         FmtClear.Click += (_, _) => _commands.ClearFormatting();
         FmtUndo.Click += (_, _) => Editor.Undo();
         FmtRedo.Click += (_, _) => Editor.Redo();
 
-        FmtCodeBlock.Click += (_, _) => _commands.WrapBlock("```");
-        FmtRule.Click += (_, _) => _commands.InsertLine("---");
+        FmtCodeBlock.Click += (_, _) => _commands.ToggleCode();
+        FmtRule.Click += (_, _) => _commands.InsertRule();
         FmtFind.Click += (_, _) => ToggleFindBar();
 
         _tables = new TableCommands(Editor, _formatter, _editorBrushes);
@@ -160,11 +170,6 @@ public partial class MainWindow
 
     private TableCommands? _tables;
 
-    /// <summary>
-    /// Mostra o nasconde la barra della ricerca. I campi dentro non cercano
-    /// ancora niente: il pulsante almeno apre quello che promette, invece di
-    /// non fare nulla.
-    /// </summary>
     private void ToggleFindBar()
     {
         bool opening = FindBar.Visibility != Visibility.Visible;
@@ -183,53 +188,23 @@ public partial class MainWindow
         Editor.Focus();
     }
 
-    private void RecolourHosts()
-    {
-        if (_formatter is null)
-        {
-            return;
-        }
-
-        foreach (Paragraph paragraph in _formatter.AllParagraphs())
-        {
-            foreach (Inline inline in paragraph.Inlines)
-            {
-                if (inline is Run { Tag: string tag } run && tag.StartsWith("host:", StringComparison.Ordinal))
-                {
-                    run.Foreground = _editorBrushes.ForHost(tag[5..], _hostStates);
-                }
-            }
-        }
-    }
-
-    private List<(int Level, string Text, Paragraph Paragraph)> EditorOutline()
-    {
-        List<(int, string, Paragraph)> headings = [];
-
-        foreach (Paragraph paragraph in _formatter.AllParagraphs())
-        {
-            Match heading = HeadingLine().Match(LiveFormatter.TextOf(paragraph));
-            if (heading.Success)
-            {
-                headings.Add((heading.Groups[1].Value.Length, heading.Groups[2].Value.Trim(), paragraph));
-            }
-        }
-
-        return headings;
-    }
+    private void RecolourHosts() => _formatter?.RecolourAll();
 
     private IReadOnlyList<string> NoteHosts()
     {
         List<string> hosts = [];
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
 
-        foreach (Paragraph paragraph in _formatter.AllParagraphs())
+        foreach (NotePage page in _book.Pages)
         {
-            foreach (HostToken token in HostTokens.Find(LiveFormatter.TextOf(paragraph)))
+            foreach (Paragraph row in LiveFormatter.RowsOf(page.Document))
             {
-                if (seen.Add(token.Value))
+                foreach (HostToken token in HostTokens.Find(LiveFormatter.TextOf(row)))
                 {
-                    hosts.Add(token.Value);
+                    if (seen.Add(token.Value))
+                    {
+                        hosts.Add(token.Value);
+                    }
                 }
             }
         }
@@ -246,6 +221,8 @@ public partial class MainWindow
 
     private void LoadNote()
     {
+        bool single = false;
+
         _formatter.Suspended = true;
         try
         {
@@ -253,19 +230,19 @@ public partial class MainWindow
 
             if (_vault.IsDamaged)
             {
-                Editor.Document = NoteDocument.FromText(Unreadable(), _renderer, _editorBrushes.Text);
+                _book = NoteBook.Of(NoteDocument.FromText(Unreadable(), _renderer, _editorBrushes.Text));
                 Editor.IsReadOnly = true;
                 StatusText.Text = "Contenitore danneggiato: salvataggio sospeso.";
             }
             else if (stored is { Length: > 0 }
-                && NoteDocument.FromXaml(stored, _editorBrushes.Text) is { } saved)
+                && NoteBook.Load(stored, _editorBrushes.Text, out single) is { } saved)
             {
-                Editor.Document = saved;
+                _book = saved;
                 StatusText.Text = _vault.IsOpen ? "Nota aperta dalla cassaforte." : "Nota aperta.";
             }
             else
             {
-                Editor.Document = NoteDocument.FromText(Welcome(), _renderer, _editorBrushes.Text);
+                _book = NoteBook.Of(NoteDocument.FromText(Welcome(), _renderer, _editorBrushes.Text));
                 StatusText.Text = "Nota nuova.";
 
                 _fresh = true;
@@ -273,7 +250,7 @@ public partial class MainWindow
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            Editor.Document = NoteDocument.FromText(Welcome(), _renderer, _editorBrushes.Text);
+            _book = NoteBook.Of(NoteDocument.FromText(Welcome(), _renderer, _editorBrushes.Text));
             StatusText.Text = "Nota non leggibile: ne apro una nuova.";
         }
         finally
@@ -281,17 +258,71 @@ public partial class MainWindow
             _formatter.Suspended = false;
         }
 
-        _formatter.FormatAll();
-        UpdateWordCount();
+        bool converted = ConvertPages();
+        ShowPage(_book.Pages[0]);
 
-        _noteDirty = _fresh;
-        if (_fresh)
+        if (converted)
+        {
+            StatusText.Text = "Nota convertita: i marcatori sono diventati formattazione.";
+        }
+
+        _noteDirty = _fresh || converted || single;
+
+        if (_noteDirty)
         {
             SaveNote();
         }
     }
 
-    private byte[] NoteXaml() => NoteDocument.ToXaml(Editor);
+    private bool ConvertPages()
+    {
+        bool any = false;
+
+        foreach (NotePage page in _book.Pages)
+        {
+            _swapping = true;
+            try
+            {
+                Editor.Document = page.Document;
+            }
+            finally
+            {
+                _swapping = false;
+            }
+
+            if (_formatter.NeedsImport())
+            {
+                _formatter.Import();
+                any = true;
+                continue;
+            }
+
+            _formatter.PaintAll();
+        }
+
+        return any;
+    }
+
+    private void ShowPage(NotePage page)
+    {
+        _page = page;
+
+        _swapping = true;
+        try
+        {
+            Editor.Document = page.Document;
+        }
+        finally
+        {
+            _swapping = false;
+        }
+
+        Editor.CaretPosition = page.Document.ContentStart;
+        UpdateWordCount();
+        RefreshSideList();
+    }
+
+    private byte[] NoteXaml() => _book.Save();
 
     private byte[]? ReadPlainNote()
     {
@@ -320,7 +351,7 @@ public partial class MainWindow
             }
 
             _vault.RotatePreviousNote();
-            _vault.Note = NoteDocument.ToXaml(Editor);
+            _vault.Note = NoteXaml();
             _vault.Save();
             _noteDirty = false;
             return;
@@ -335,7 +366,7 @@ public partial class MainWindow
                 File.Copy(AppPaths.Note, AppPaths.NoteBackup, overwrite: true);
             }
 
-            File.WriteAllBytes(AppPaths.Note, NoteDocument.ToXaml(Editor));
+            File.WriteAllBytes(AppPaths.Note, NoteXaml());
             _noteDirty = false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)

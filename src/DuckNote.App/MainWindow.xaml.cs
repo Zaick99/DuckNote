@@ -86,20 +86,18 @@ public partial class MainWindow : Window
 
         SideList.SelectionChanged += (_, _) =>
         {
-            if (_syncingSelection || SideList.SelectedItem is not Models.SideItem item)
+            if (_syncingSelection)
             {
                 return;
             }
 
-            // Una voce della struttura non ha indirizzo: porta un paragrafo, e
-            // sceglierla significa andare a leggerlo.
-            if (item.Para is System.Windows.Documents.Paragraph heading)
+            if (SideList.SelectedItem is Models.SideNode branch)
             {
-                JumpToHeading(heading);
+                OpenBranch(branch);
                 return;
             }
 
-            if (item.IP.Length == 0)
+            if (SideList.SelectedItem is not Models.SideItem item || item.IP.Length == 0)
             {
                 return;
             }
@@ -125,7 +123,13 @@ public partial class MainWindow : Window
         };
 
         NetGrid.PreviewMouseLeftButtonDown += (_, e) => ToggleIfSame(RowUnder(e.OriginalSource as DependencyObject));
-        SideList.PreviewMouseLeftButtonDown += (_, e) => ToggleIfSame(ItemUnder(e.OriginalSource as DependencyObject));
+        SideList.PreviewMouseLeftButtonDown += (_, e) =>
+        {
+            DependencyObject? source = e.OriginalSource as DependencyObject;
+
+            ToggleIfSame(ItemUnder(source));
+            ReopenIfSame(BranchUnder(source));
+        };
 
         BtnInspect.Click += (_, _) =>
         {
@@ -142,6 +146,24 @@ public partial class MainWindow : Window
 
     private static string? RowUnder(DependencyObject? source) =>
         (Ancestor<DataGridRow>(source))?.Item is Models.ScanRow row ? row.IP : null;
+
+    private void ReopenIfSame(Models.SideNode? branch)
+    {
+        if (branch is not null && ReferenceEquals(SideList.SelectedItem, branch))
+        {
+            OpenBranch(branch);
+        }
+    }
+
+    private static Models.SideNode? BranchUnder(DependencyObject? source)
+    {
+        if (source is FrameworkElement { Name: "toggle" or "rename" })
+        {
+            return null;
+        }
+
+        return Ancestor<ListBoxItem>(source)?.DataContext as Models.SideNode;
+    }
 
     private static string? ItemUnder(DependencyObject? source) =>
         (Ancestor<ListBoxItem>(source))?.DataContext is Models.SideItem { IP.Length: > 0 } item ? item.IP : null;
@@ -369,15 +391,6 @@ public partial class MainWindow : Window
         await ScanAsync(string.Join(',', hosts));
     }
 
-    /// <summary>
-    /// Analizza, restando dove si e'.
-    /// </summary>
-    /// <remarks>
-    /// Chi preme il pulsante dalla nota vuole che gli indirizzi scritti li'
-    /// vengano controllati, non essere portato altrove: i colori cambiano sotto
-    /// i suoi occhi, nel testo. La vista Rete si apre solo se la scansione parte
-    /// da li', dove il risultato e' la tabella.
-    /// </remarks>
     private async Task ScanAsync(string? targets = null, bool showNetwork = false)
     {
         if (showNetwork)

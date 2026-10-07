@@ -80,10 +80,6 @@ public static partial class LineParser
         return new ParsedLine(LineKind.Text) { Raw = line };
     }
 
-    /// <summary>
-    /// Il marcatore che apre o chiude un blocco di codice. Si guarda da fuori
-    /// dal formattatore, che deve sapere da che parte del recinto sta una riga.
-    /// </summary>
     public static bool IsFence(string line) => FencePattern().IsMatch(line.TrimStart());
 
     [GeneratedRegex(@"^(>+)\s?(.*)$")]

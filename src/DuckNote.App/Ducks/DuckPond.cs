@@ -54,11 +54,6 @@ public sealed class DuckPond(Canvas canvas)
             double angle = _random.NextDouble() * Math.PI * 2;
             double speed = 0.4 + (_random.NextDouble() * 0.7);
 
-            // Il rettangolo nasce GRANDE QUANTO SERVE, non 512x512 poi
-            // rimpicciolito: con una maschera addosso, il compositore paga la
-            // dimensione dichiarata, non quella che si vede. Ventidue rettangoli
-            // da mezzo megapixel ridisegnati a ogni fotogramma erano la causa
-            // dello scatto, misurata accendendo e spegnendo le papere.
             RotateTransform rotate = new() { CenterX = size / 2, CenterY = size / 2 };
             TranslateTransform move = new();
 
@@ -128,17 +123,6 @@ public sealed class DuckPond(Canvas canvas)
         return (x, y);
     }
 
-    /// <summary>
-    /// Il movimento e' agganciato al disegno, non a un timer.
-    /// </summary>
-    /// <remarks>
-    /// Un DispatcherTimer a 40 ms scatta quando gli pare, e i suoi istanti non
-    /// coincidono con quelli in cui WPF compone il fotogramma: alcune posizioni
-    /// vengono scritte subito dopo che il fotogramma e' partito e si vedono solo
-    /// al giro dopo, altre due volte. Da qui lo scatto, anche con la CPU
-    /// scarica. CompositionTarget.Rendering arriva una volta per fotogramma,
-    /// appena prima che venga disegnato.
-    /// </remarks>
     public void Start()
     {
         if (_ducks.Count == 0 || _running)
@@ -169,9 +153,6 @@ public sealed class DuckPond(Canvas canvas)
             return;
         }
 
-        // Il tempo trascorso DAVVERO fra due fotogrammi: su uno schermo a 144 Hz
-        // le papere andrebbero altrimenti due volte e mezza piu' in fretta che
-        // su uno a 60, perche' i fotogrammi sono piu' fitti.
         TimeSpan now = frame.RenderingTime;
         if (_lastFrame == TimeSpan.Zero)
         {
@@ -182,8 +163,6 @@ public sealed class DuckPond(Canvas canvas)
         double elapsed = (now - _lastFrame).TotalMilliseconds;
         _lastFrame = now;
 
-        // Dopo una pausa - finestra ridotta a icona, macchina sotto sforzo - il
-        // salto sarebbe enorme e le papere si teletrasporterebbero.
         Step(Math.Min(elapsed, 50) / FrameMilliseconds);
     }
 
@@ -257,18 +236,6 @@ public sealed class DuckPond(Canvas canvas)
         if (duck.Y > height + half) { duck.Y = height + half; duck.VY = -Math.Abs(duck.VY); }
     }
 
-    /// <summary>
-    /// Posizione e rotazione passano per la TRASFORMAZIONE, mai per
-    /// Canvas.SetLeft.
-    /// </summary>
-    /// <remarks>
-    /// Canvas.Left e' una proprieta' di dipendenza che invalida la disposizione:
-    /// ventidue papere per fotogramma significano ventidue passaggi di layout
-    /// prima di ogni disegno, ed e' da li' che veniva lo scatto. Una
-    /// RenderTransform salta misura e disposizione e arriva diritta al
-    /// compositore. La scala non cambia mai dopo la nascita: si imposta in
-    /// Build e non si tocca piu'.
-    /// </remarks>
     private static void Place(Duck duck)
     {
         duck.Rotate.Angle = Math.Sin(duck.Wobble) * 5;
