@@ -148,7 +148,7 @@ public partial class MainWindow
         FmtRule.Click += (_, _) => _commands.InsertLine("---");
         FmtFind.Click += (_, _) => ToggleFindBar();
 
-        _tables = new TableCommands(Editor, _formatter);
+        _tables = new TableCommands(Editor, _formatter, _editorBrushes);
         _tables.Refused += message => StatusText.Text = message;
 
         TblNew.Click += (_, _) => _tables.Insert();
