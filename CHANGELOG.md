@@ -111,6 +111,10 @@ be noise. Two levels, read at a glance.
   12.5 and 10.5 — and sit on one baseline. Centred one by one, three different
   sizes read as crooked; the toolbar button template now takes its content
   alignment from outside instead of hardcoding centre.
+- **The sources carry no comments.** 544 lines came out of 21 files. What they
+  explained — the WPF traps, the measurements behind each decision — is in this
+  changelog, where it is readable by someone who is not already inside the code,
+  and in the history of this file.
 
 ### Fixed
 
@@ -169,6 +173,18 @@ children. Made exact, it failed for a second reason — the harness formatted
 `19,5` with a comma while the geometry is written `19.5` with a point, which is
 exactly why the geometry is formatted culture-invariant and not with the
 ambient culture.
+
+Taking the comments out was held to the same standard. The tool reads C# through
+Roslyn, so a `//` inside a string or an URL is not a comment, and it refuses to
+write a file whose token sequence changed — removing a comment cannot change a
+token. Its first run corrupted the sources: the cut mask was indexed on the
+original text while the lines were counted on a copy with the line endings
+normalised, so every CRLF shifted the cuts by one, cumulatively, and
+`Models.SideNode` became `Models.SideNo`. The trap file had been LF-only. With
+the normalisation done once and the guard in place, that same sabotage is
+refused instead of written, the LF and CRLF copies of a trap file come out
+identical, and over the whole repository the diff is 545 removals against a
+single addition — a `#pragma` line that lost its trailing comment.
 
 ## [0.0.8] - 2026-10-07
 
