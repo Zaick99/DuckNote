@@ -478,6 +478,7 @@
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="Auto"/>
+          <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
           <ColumnDefinition Width="Auto"/>
         </Grid.ColumnDefinitions>
@@ -492,116 +493,130 @@
                    Background="Transparent" Padding="0,3"
                    MouseLeftButtonDown="OnBranchToggle"/>
 
-        <TextBlock x:Name="label" Grid.Column="2" Text="{Binding Title}" Visibility="{Binding LabelVis}"
+        <Path x:Name="sheet" Grid.Column="2" Visibility="Collapsed"
+              Width="11" Height="13" Margin="0,0,1,0" Stretch="Uniform" VerticalAlignment="Center"
+              Data="M0.8,0.8 H6.6 L10.2,4.4 V12.2 H0.8 Z M6.6,0.8 V4.4 H10.2"
+              Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+              StrokeThickness="1.1" StrokeLineJoin="Round" SnapsToDevicePixels="True"/>
+
+        <TextBlock x:Name="label" Grid.Column="3" Text="{Binding Title}" Visibility="{Binding LabelVis}"
                    FontSize="11" VerticalAlignment="Center" Margin="2,0,0,0"
                    TextTrimming="CharacterEllipsis"/>
 
-        <TextBox x:Name="rename" Grid.Column="2" Text="{Binding Title, Mode=OneWay}"
+        <TextBox x:Name="rename" Grid.Column="3" Text="{Binding Title, Mode=OneWay}"
                  Visibility="{Binding EditVis}" Style="{StaticResource Field}"
                  Height="21" FontSize="11.5" Margin="2,0,0,0" Padding="5,0"
                  KeyDown="OnPageRenameKey" LostFocus="OnPageRenameDone"/>
 
-        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-          <Border Visibility="{Binding BadgeVis}" Margin="4,0,0,0" Padding="5,0"
-                  CornerRadius="{StaticResource RControl}" Background="{DynamicResource BgPressed}">
-            <TextBlock Text="{Binding Badge}" FontSize="9.5" Foreground="{DynamicResource LabelTertiary}"/>
-          </Border>
-          <Rectangle Visibility="{Binding HereVis}" Width="6" Height="6" RadiusX="3" RadiusY="3"
-                     Margin="5,0,2,0" Fill="{DynamicResource AccentFill}"/>
-        </StackPanel>
+        <Border Grid.Column="4" Visibility="{Binding BadgeVis}" Margin="5,0,1,0" Padding="5,0"
+                VerticalAlignment="Center" CornerRadius="{StaticResource RControl}"
+                Background="{DynamicResource BgPressed}">
+          <TextBlock Text="{Binding Badge}" FontSize="9.5" Foreground="{DynamicResource LabelTertiary}"/>
+        </Border>
       </Grid>
 
       <DataTemplate.Triggers>
         <DataTrigger Binding="{Binding IsPage}" Value="True">
+          <Setter TargetName="sheet" Property="Visibility" Value="Visible"/>
           <Setter TargetName="label" Property="FontSize" Value="12.5"/>
           <Setter TargetName="label" Property="FontWeight" Value="SemiBold"/>
-          <Setter TargetName="toggle" Property="FontSize" Value="12"/>
-          <Setter TargetName="toggle" Property="Width" Value="18"/>
+          <Setter TargetName="toggle" Property="FontSize" Value="11"/>
+          <Setter TargetName="toggle" Property="Width" Value="14"/>
           <Setter TargetName="toggle" Property="Opacity" Value="1"/>
-          <Setter TargetName="toggle" Property="Foreground" Value="{DynamicResource AccentDark}"/>
+        </DataTrigger>
+
+        <DataTrigger Binding="{Binding HereVis}" Value="Visible">
+          <Setter TargetName="sheet" Property="Stroke" Value="{DynamicResource AccentFill}"/>
+          <Setter TargetName="sheet" Property="StrokeThickness" Value="1.4"/>
+          <Setter TargetName="label" Property="Foreground" Value="{DynamicResource Label}"/>
         </DataTrigger>
       </DataTemplate.Triggers>
     </DataTemplate>
 
+    <ControlTemplate x:Key="PickedRow" TargetType="ListBoxItem">
+      <Grid x:Name="row">
+        <Grid.RenderTransform>
+          <TranslateTransform x:Name="slide"/>
+        </Grid.RenderTransform>
+
+        <Border x:Name="b" CornerRadius="{StaticResource RRow}" Background="Transparent"
+                Padding="{TemplateBinding Padding}">
+          <ContentPresenter/>
+        </Border>
+
+        <Border x:Name="bar" Width="2.5" CornerRadius="1.25" Margin="-4,4,0,4"
+                HorizontalAlignment="Left" Background="{DynamicResource AccentFill}"
+                Opacity="0" RenderTransformOrigin="0.5,0.5">
+          <Border.RenderTransform>
+            <ScaleTransform x:Name="barS" ScaleY="0.25"/>
+          </Border.RenderTransform>
+        </Border>
+      </Grid>
+
+      <ControlTemplate.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter TargetName="b" Property="Background" Value="{DynamicResource BgHover}"/>
+          <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+        </Trigger>
+
+        <Trigger Property="IsSelected" Value="True">
+          <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoft}"/>
+          <Setter Property="Foreground" Value="{DynamicResource AccentDark}"/>
+          <Trigger.EnterActions>
+            <BeginStoryboard>
+              <Storyboard>
+                <DoubleAnimation Storyboard.TargetName="bar" Storyboard.TargetProperty="Opacity"
+                                 To="1" Duration="0:0:0.12"/>
+                <DoubleAnimation Storyboard.TargetName="barS" Storyboard.TargetProperty="ScaleY"
+                                 To="1" Duration="0:0:0.22">
+                  <DoubleAnimation.EasingFunction>
+                    <BackEase EasingMode="EaseOut" Amplitude="0.6"/>
+                  </DoubleAnimation.EasingFunction>
+                </DoubleAnimation>
+              </Storyboard>
+            </BeginStoryboard>
+          </Trigger.EnterActions>
+          <Trigger.ExitActions>
+            <BeginStoryboard>
+              <Storyboard>
+                <DoubleAnimation Storyboard.TargetName="bar" Storyboard.TargetProperty="Opacity"
+                                 To="0" Duration="0:0:0.12"/>
+                <DoubleAnimation Storyboard.TargetName="barS" Storyboard.TargetProperty="ScaleY"
+                                 To="0.25" Duration="0:0:0.12"/>
+              </Storyboard>
+            </BeginStoryboard>
+          </Trigger.ExitActions>
+        </Trigger>
+
+        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+          <BeginStoryboard>
+            <Storyboard>
+              <DoubleAnimation Storyboard.TargetName="row" Storyboard.TargetProperty="Opacity"
+                               From="0" To="1" Duration="0:0:0.17"/>
+              <DoubleAnimation Storyboard.TargetName="slide" Storyboard.TargetProperty="X"
+                               From="-8" To="0" Duration="0:0:0.24">
+                <DoubleAnimation.EasingFunction>
+                  <CubicEase EasingMode="EaseOut"/>
+                </DoubleAnimation.EasingFunction>
+              </DoubleAnimation>
+            </Storyboard>
+          </BeginStoryboard>
+        </EventTrigger>
+      </ControlTemplate.Triggers>
+    </ControlTemplate>
+
     <Style x:Key="BranchItem" TargetType="ListBoxItem">
-      <Setter Property="Padding" Value="7,0"/>
-      <Setter Property="Margin" Value="6,0"/>
+      <Setter Property="Padding" Value="6,0"/>
+      <Setter Property="Margin" Value="6,1"/>
       <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="ListBoxItem">
-            <Grid x:Name="row">
-              <Grid.RenderTransform>
-                <TranslateTransform x:Name="slide"/>
-              </Grid.RenderTransform>
-              <Border x:Name="b" CornerRadius="{StaticResource RRow}" Background="Transparent"
-                      BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}">
-                <ContentPresenter/>
-              </Border>
-              <Rectangle x:Name="bar" Width="3" RadiusX="1.5" RadiusY="1.5" Margin="0,4"
-                         HorizontalAlignment="Left" Fill="{DynamicResource AccentFill}" Opacity="0"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="b" Property="Background" Value="{DynamicResource BgHover}"/>
-                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
-              </Trigger>
-              <Trigger Property="IsSelected" Value="True">
-                <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoft}"/>
-                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource AccentBorder}"/>
-                <Setter TargetName="bar" Property="Opacity" Value="1"/>
-                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
-              </Trigger>
-              <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-                <BeginStoryboard>
-                  <Storyboard>
-                    <DoubleAnimation Storyboard.TargetName="row" Storyboard.TargetProperty="Opacity"
-                                     From="0" To="1" Duration="0:0:0.17"/>
-                    <DoubleAnimation Storyboard.TargetName="slide" Storyboard.TargetProperty="X"
-                                     From="-8" To="0" Duration="0:0:0.24">
-                      <DoubleAnimation.EasingFunction>
-                        <CubicEase EasingMode="EaseOut"/>
-                      </DoubleAnimation.EasingFunction>
-                    </DoubleAnimation>
-                  </Storyboard>
-                </BeginStoryboard>
-              </EventTrigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
+      <Setter Property="Template" Value="{StaticResource PickedRow}"/>
     </Style>
 
     <Style x:Key="SideItem" TargetType="ListBoxItem">
-      <Setter Property="Padding" Value="9,6"/>
+      <Setter Property="Padding" Value="8,6"/>
       <Setter Property="Margin" Value="6,1"/>
       <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="ListBoxItem">
-            <Grid>
-              <Border x:Name="b" CornerRadius="{StaticResource RRow}" Background="Transparent"
-                      BorderBrush="Transparent" BorderThickness="1" Padding="{TemplateBinding Padding}">
-                <ContentPresenter/>
-              </Border>
-              <Rectangle x:Name="bar" Width="3" RadiusX="1.5" RadiusY="1.5" Margin="0,7"
-                         HorizontalAlignment="Left" Fill="{DynamicResource AccentFill}" Opacity="0"/>
-            </Grid>
-            <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True">
-                <Setter TargetName="b" Property="Background" Value="{DynamicResource BgHover}"/>
-                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
-              </Trigger>
-              <Trigger Property="IsSelected" Value="True">
-                <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoft}"/>
-                <Setter TargetName="b" Property="BorderBrush" Value="{DynamicResource AccentBorder}"/>
-                <Setter TargetName="bar" Property="Opacity" Value="1"/>
-                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
-              </Trigger>
-            </ControlTemplate.Triggers>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
+      <Setter Property="Template" Value="{StaticResource PickedRow}"/>
     </Style>
 
     <Style x:Key="GridHeader" TargetType="DataGridColumnHeader">
