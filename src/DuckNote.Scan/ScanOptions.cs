@@ -2,7 +2,9 @@
 
 public sealed class ScanOptions
 {
-    public int Concurrency { get; init; } = 64;
+    public int Concurrency { get; init; } = 256;
+
+    public int Sockets { get; init; } = 900;
 
     public int PingCount { get; init; } = 2;
     public TimeSpan PingTimeout { get; init; } = TimeSpan.FromMilliseconds(800);

@@ -68,6 +68,12 @@ public partial class GateWindow : Window
 
         ContentRendered += (_, _) => Motion.OpenDialog(GRoot);
 
+        Closed += (_, _) =>
+        {
+            GPwd.Clear();
+            GPwd2.Clear();
+        };
+
         GTitleBar.MouseLeftButtonDown += (_, _) =>
         {
             try

@@ -192,9 +192,27 @@
         <Border Style="{StaticResource Card}">
           <StackPanel>
             <Grid Style="{StaticResource Line}">
-              <TextBlock Style="{StaticResource Name}" Text="Analisi simultanee"/>
-              <TextBox x:Name="PThreads" Style="{DynamicResource Field}" Width="92"
-                       TextAlignment="Right" HorizontalAlignment="Right"/>
+              <StackPanel>
+                <Grid>
+                  <TextBlock Style="{StaticResource Name}" Text="Host analizzati insieme"/>
+                  <TextBox x:Name="PThreads" Style="{DynamicResource Field}" Width="92"
+                           TextAlignment="Right" HorizontalAlignment="Right"/>
+                </Grid>
+                <TextBlock Style="{StaticResource Hint}"
+                           Text="Quanti host vengono presi in carico nello stesso momento."/>
+              </StackPanel>
+            </Grid>
+            <Rectangle Style="{StaticResource Rule}"/>
+            <Grid Style="{StaticResource Line}">
+              <StackPanel>
+                <Grid>
+                  <TextBlock Style="{StaticResource Name}" Text="Connessioni aperte insieme"/>
+                  <TextBox x:Name="PSockets" Style="{DynamicResource Field}" Width="92"
+                           TextAlignment="Right" HorizontalAlignment="Right"/>
+                </Grid>
+                <TextBlock Style="{StaticResource Hint}"
+                           Text="Tetto complessivo alle porte TCP provate nello stesso istante, da tutti gli host insieme. Alzare gli host senza alzare questo non rende: Windows ha un numero finito di porte di partenza."/>
+              </StackPanel>
             </Grid>
             <Rectangle Style="{StaticResource Rule}"/>
             <Grid Style="{StaticResource Line}">

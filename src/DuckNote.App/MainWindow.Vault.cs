@@ -192,19 +192,54 @@ public partial class MainWindow
         }
 
         SaveNote();
+
         _saveTimer?.Stop();
         _formatTimer?.Stop();
+        _monitorTimer?.Stop();
+        _idleTimer?.Stop();
+        _session.Stop();
 
         _detail?.Dispose();
         UpdateInspectGlyph();
+        ShutChildren();
 
         _vault.Lock();
-        Editor.Document = NoteDocument.Empty(_editorBrushes.Text);
+        ForgetNote();
+        ForgetScan();
 
         UpdateLockButton();
         StatusText.Text = $"Chiusa a chiave ({reason}).";
 
         ShowLockScreen();
+    }
+
+    private void ShutChildren()
+    {
+        foreach (Window child in OwnedWindows.OfType<Window>().ToArray())
+        {
+            child.Close();
+        }
+    }
+
+    private void ForgetNote()
+    {
+        _book.Forget();
+        _book = NoteBook.Of(NoteDocument.Empty(_editorBrushes.Text));
+        _page = _book.Pages[0];
+
+        _swapping = true;
+        try
+        {
+            Editor.Document = _page.Document;
+        }
+        finally
+        {
+            _swapping = false;
+        }
+
+        _hostStates.Clear();
+        _noteDirty = false;
+        RefreshSideList();
     }
 
     private void ApplyTimers()

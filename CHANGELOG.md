@@ -4,28 +4,119 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.0.14] - 2026-10-11
 
-### Fixed
+From here the version stops moving at every change: work accumulates under
+0.0.14 until there is a reason to cut a new one.
 
-- **The tree only animated when closing.** Opening a branch was instant, and the
-  reason was not the animation: the sidebar list recycles its containers, and a
-  recycled container does not raise `Loaded` again. The entrance was a `Loaded`
-  trigger in the row template, so it fired on the first population and never on
-  an expand — the rows that appeared were containers that already existed.
+### Security
 
-  Opening is driven from code now, where it is known that a branch opened, and it
-  mirrors closing: each row fades in and glides 14 px from the left, **one after
-  the other**, 28 ms apart. Closing got the same cascade in reverse, bottom row
-  first, so the branch folds up instead of blinking out. The stagger saturates
-  after six rows, so a page with thirty sections does not take a second to open.
-  The `Loaded` trigger is gone: the whole list already animates when the sidebar
-  switches mode, and with it in place the two animations fought over the same
-  properties.
+Asked for, and the review found more than it was asked about.
+
+- **No single-instance guard.** Two DuckNote processes could run at once, each
+  with its own vault session writing the same `store.bin` — last writer wins,
+  and a torn write is one explanation for the corrupted container the readme
+  tells you to restore from `.bak`. Worse for the lock: **locking one instance
+  left the other open and readable**, which defeats the point. A lock file in
+  the data folder, opened without sharing and deleted on close, now refuses the
+  second copy. It is keyed to the data folder rather than to the machine, so two
+  instances on two different `DUCKNOTE_HOME` folders are still allowed — they
+  share nothing.
+
+  The first attempt used a named mutex, and the harness caught it: a mutex is
+  re-entrant for the thread that owns it, so a second claim inside one process
+  succeeded and one release left it held.
+
+- **Only the open page was discarded on lock.** `Editor.Document` was replaced
+  with an empty one, but the note is a collection: every other page's plaintext
+  stayed in memory, fully formed. Locking now empties every page and drops the
+  collection.
+
+- **The monitor kept scanning while locked.** The lock stopped the save and
+  format timers but not the periodic host check, so a locked DuckNote went on
+  probing the network on a timer, reading hosts out of the note still held in
+  memory. The lock now stops the monitor, stops the idle timer, cancels a scan
+  in flight, and empties the host table and the set-aside list. Unlocking puts
+  them back from the vault.
+
+- **Child windows stayed up.** The host card was closed, but a settings or link
+  dialog open when the idle timer fired would sit on top of the veil. Every
+  owned window is closed on lock.
+
+- **The set-aside hosts were written in plaintext.** `IgnoredHosts` went into
+  `settings.json` outside the container — a list of exactly the addresses you
+  care about, next to a vault whose whole point is that nothing is written in
+  clear. The vault has had an unused `Private` section since the port; the list
+  goes there now when the container is open, and a plaintext list left by an
+  earlier build is moved in and blanked on first run.
+
+What the review found already correct: the password never leaves a
+`SecureString` in the UI, the bytes derived from it are zeroed in `finally`, the
+Argon2id output is zeroed, the key-encryption key is zeroed after `Unlock`, the
+pending key is zeroed on both commit and dispose, and vault sections are zeroed
+when replaced or cleared. The password fields are now also cleared when the gate
+window closes by any path, not only on the paths that already did it.
+
+### Changed
+
+- **Every open and close of a branch animates, and the stagger adapts.** The
+  animation was there and could not fire: `SyncNodes` keeps the `SideNode`
+  instances already in the list and copies values onto them, while
+  `Outline.Build` makes fresh ones each pass — so the node arriving at the toggle
+  belonged to an older generation and its `Children` were not the objects in the
+  list. `ContainerFromItem` returned null for every one of them and the cascade
+  had nothing to animate. Rows are found by page and kind now, against the list
+  itself, with no instance identity involved. The delay between rows is
+  `min(28 ms, 190 ms / rows)`, so three sections cascade and thirty still finish
+  in under a fifth of a second.
+
+- **Faster scanning, and more hosts at once.** The ping attempts went out one
+  after another, so a silent host cost `attempts × timeout` — two seconds each,
+  which is what a /24 sweep spends most of its time on. They go out together
+  now: one timeout, whatever the count. With that out of the way the host
+  concurrency default rose from 64 to 256, which is only safe with a ceiling on
+  sockets: 34 ports × 256 hosts would ask Windows for more ephemeral ports than
+  it has. A budget shared by the whole scan now caps TCP connects in flight
+  (default 900), and both numbers are in the settings, with the reason written
+  next to them.
+
+- **The app opens on the note, with the structure in the sidebar.** It opened on
+  the host list. The saved `SidebarMode` was written on close and never read by
+  anyone, so it is gone rather than left looking meaningful.
+
+### Verified
+
+Six new tests in the scan suite: the socket budget hands out exactly its
+budget, makes the next taker wait, is not widened by a double release, gives up
+on cancellation, and never exceeds itself under 200 concurrent takers; and the
+ping attempts measured against the clock, which fails if they are sequential
+again. 132 tests pass.
+
+In the harness: a note of two pages with a password written in it, held by
+reference from outside, must come back empty after the lock — blocks gone, text
+gone, the word itself gone; the host table and the set-aside list empty; and the
+single-instance guard refusing the second claim and allowing one again after
+release.
+
+Twenty-eight sabotages, all caught — but two were worthless until the tests were
+fixed. The page-wiping check read `book.Pages`, which is empty after the
+collection is dropped, so it passed whether or not the documents were cleared;
+it holds the pages from outside now. And the instance-guard sabotage opened the
+lock file with sharing but without share-delete, which `DeleteOnClose` refuses
+anyway — it was proving the wrong thing. Both now fail the way a real defect
+would.
+
+### Fixed, earlier in the same version
+
+- **The tree would not animate on opening at all.** The first cause was the
+  template: the sidebar recycles its containers, and a recycled container does
+  not raise `Loaded` again, so the entrance trigger fired when the list was first
+  built and never on an expand. Driving it from code uncovered the second cause,
+  the stale nodes above. Both are gone, and the `Loaded` trigger with them — the
+  whole list already animates when the sidebar switches mode, and leaving the
+  trigger in place made the two fight over the same properties.
 
 - **"Mostra dettagli" no longer drags you to the network view.** It switched tab
   before opening the card. The card is its own window beside the main one, so
   there was never a reason to leave the note you were reading.
-
-### Verified
 
 An animation needs frames, and the harness renders none, so what it checks is
 the mechanism the animation hangs from: the translate transform the code looks

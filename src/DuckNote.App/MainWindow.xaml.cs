@@ -35,7 +35,7 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        _session.Restore(_settings.IgnoredHosts.Split(IgnoredSeparators, StringSplitOptions.RemoveEmptyEntries));
+        RecallIgnored();
 
         NetGrid.ItemsSource = _session.Rows;
         _session.PropertyChanged += OnSessionChanged;
@@ -475,7 +475,6 @@ public partial class MainWindow : Window
         SaveNote();
         _vault.Dispose();
 
-        _settings.SidebarMode = _outlineMode ? "outline" : "host";
         if (ColSidebar.ActualWidth > 1)
         {
             _settings.SidebarWidth = (int)ColSidebar.ActualWidth;

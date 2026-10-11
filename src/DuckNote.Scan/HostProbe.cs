@@ -5,7 +5,7 @@ using DuckNote.Scan.Wire;
 
 namespace DuckNote.Scan;
 
-public sealed class HostProbe(ScanOptions options, IVendorLookup vendors)
+public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, SocketBudget? sockets = null)
 {
     private static readonly int[] HttpPorts = [80, 8080, 8000, 8006, 5000, 3000, 8888, 9090, 10000];
     private static readonly int[] TlsPorts = [443, 8443, 5986, 9443];
@@ -99,7 +99,7 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors)
     {
         IReadOnlyList<int> open = options.Ports.Count == 0
             ? []
-            : await PortProbe.ScanAsync(address, options.Ports, options.PortTimeout, cancellationToken)
+            : await PortProbe.ScanAsync(address, options.Ports, options.PortTimeout, sockets, cancellationToken)
                              .ConfigureAwait(false);
 
         result.OpenPorts = open;

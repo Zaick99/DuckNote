@@ -62,6 +62,17 @@ public sealed class ScanSession : INotifyPropertyChanged
         }
     }
 
+    public void Clear()
+    {
+        _ignored.Clear();
+        _index.Clear();
+        Rows.Clear();
+        Message = "Pronto.";
+
+        Notify(nameof(UpCount));
+        Notify(nameof(DownCount));
+    }
+
     private void Forget(string host)
     {
         _index.Remove(host);
