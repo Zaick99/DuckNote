@@ -10,7 +10,7 @@ public static class Outline
 {
     public const double Step = 26;
 
-    public const double Half = 9;
+    public const double Half = 7;
 
     public const double PageRow = 25;
 

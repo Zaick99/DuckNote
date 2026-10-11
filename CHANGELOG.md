@@ -2,6 +2,65 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.12] - 2026-10-11
+
+**The structure sidebar, redrawn.** A page now carries a page.
+
+### Added
+
+- **Pages wear a sheet icon.** A small outlined page with a folded corner sits
+  before every page name, and nothing sits before a heading: the two kinds of row
+  are told apart at a glance instead of by reading their weight. The icon follows
+  the row's state — grey normally, accent when the row is selected — and the page
+  you are reading keeps it in the accent colour with a heavier stroke. That
+  replaces the accent dot that used to sit at the far right of the row: a page's
+  own icon saying "you are here" beats a dot at the other end of the line.
+
+### Changed
+
+- **The selected row was three signals for one state.** A soft orange fill, an
+  orange border *and* a bar that popped in at the left, all at once, on a row 18
+  or 25 px tall — which is what made it look like a dialog from 2012. It is one
+  surface now: a soft accent fill with a 7 px radius, **no border**, the label
+  turning accent-dark, and a 2.5 px rounded bar that **grows into place** with a
+  slight overshoot instead of appearing. The bar sits in the item's own gutter, 4
+  px outside the fill, so it no longer collides with the tree lines of a heading.
+  Hover stays what it was: a barely-there neutral fill.
+
+- **One template for both sidebar modes.** The structure rows and the host rows
+  had the same visuals written twice, which is how one of them ended up modern
+  and the other dated. There is one `PickedRow` template now, and both styles
+  point at it.
+
+- **A section's title lines up with its page's.** The sheet icon takes 12 px in
+  front of a page name, which would have pushed page titles right of their own
+  sections — undoing the 0.0.11 fix. The page toggle narrowed from 18 to 14 px so
+  that toggle plus icon is exactly the tree step, 26: a page title and the titles
+  under it now start at the same x, with the elbow pointing at the heading from 4
+  px away.
+
+### Verified
+
+Measured, not reasoned about this time. The harness builds the real
+`MainWindow`, takes `BranchRow` and `BranchItem` out of its resources, puts a
+page and a heading through a real ListBox in a shown window, and reads the
+rendered tree: the page shows the sheet and the heading does not, the open page's
+icon is the accent brush itself, the unselected row is transparent with no
+border, the selected row's fill is the accent wash with the border still absent,
+the label turns accent-dark, and the bar's transform starts at a quarter height
+so it has somewhere to grow from.
+
+**And the alignment is measured through the layout**, by transforming each
+label's origin into the list's coordinates and comparing: page title and section
+title must start within 0.6 px of each other. Narrowing the tree step back to 13
+fails that check — which is what it is for, and what the previous release could
+only claim.
+
+Twenty-one sabotages, all caught. One did not apply on the first run: the
+replacement text spanned two lines written with `\n` against a CRLF file, the
+same mismatch that corrupted the sources in 0.0.9. Anchored on a single line it
+applies, and the border coming back is caught twice.
+
 ## [0.0.11] - 2026-10-11
 
 **Six things that looked wrong.** Not broken this time — misplaced, misshaped or
