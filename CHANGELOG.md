@@ -2,10 +2,12 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.0.14] - 2026-10-11
+## [0.0.10] - 2026-10-11
 
-From here the version stops moving at every change: work accumulates under
-0.0.14 until there is a reason to cut a new one.
+The version is pinned here on purpose: work accumulates under 0.0.10 until there
+is a reason to cut a new one. The numbers 0.0.11 to 0.0.14 were cut on the same
+day and are retired — their entries stay below, because they were published, but
+everything they describe is part of this 0.0.10.
 
 ### Security
 
@@ -127,7 +129,7 @@ catches exactly that. Twenty-four sabotages, all caught.
 The cascade itself, and the tab staying where it is, are a few lines each and
 were read, not measured.
 
-## [0.0.13] - 2026-10-11
+## 0.0.13 - numero ritirato, confluito in 0.0.10
 
 **Two notches on yesterday's sidebar.**
 
@@ -157,7 +159,7 @@ assertion — caught, but for the wrong reason, which is the same as not caught.
 Wrapping the presenter and the bar in a Grid makes it valid, and the assertion
 fails on its own merits.
 
-## [0.0.12] - 2026-10-11
+## 0.0.12 - numero ritirato, confluito in 0.0.10
 
 **The structure sidebar, redrawn.** A page now carries a page.
 
@@ -216,7 +218,7 @@ replacement text spanned two lines written with `\n` against a CRLF file, the
 same mismatch that corrupted the sources in 0.0.9. Anchored on a single line it
 applies, and the border coming back is caught twice.
 
-## [0.0.11] - 2026-10-11
+## 0.0.11 - numero ritirato, confluito in 0.0.10
 
 **Six things that looked wrong.** Not broken this time — misplaced, misshaped or
 the wrong colour.
@@ -283,7 +285,7 @@ harness ran, because an unread primary-constructor parameter is an error here.
 Rewritten to read the parameter and ask it the wrong question, they fail the way
 a real defect would — 3 and 1 red checks instead of none.
 
-## [0.0.10] - 2026-10-11
+## 0.0.10 - prima tornata
 
 **Eight things that did not work.** Three of them were dead on arrival — menu
 entries wired to nothing — and the worst one locked you out of your own note.
