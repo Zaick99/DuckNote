@@ -1,15 +1,18 @@
-﻿using System.IO;
+using System.Diagnostics;
+using System.IO;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media.Animation;
+using System.Windows.Navigation;
 using System.Windows.Threading;
 using DuckNote.App.Editor;
 using DuckNote.App.Storage;
 using DuckNote.App.Theme;
 using DuckNote.App.Vault;
+using DuckNote.App.Views;
 
 namespace DuckNote.App;
 
@@ -27,6 +30,7 @@ public partial class MainWindow
     private DispatcherTimer? _saveTimer;
     private bool _noteDirty;
     private bool _fresh;
+    private bool _tidied;
 
     private NoteBook _book = null!;
     private NotePage _page = null!;
@@ -43,6 +47,10 @@ public partial class MainWindow
         };
         _commands = new EditorCommands(Editor, _formatter, _renderer, _blocks);
         _commands.Refused += message => StatusText.Text = message;
+        _commands.AskForLink = AskForLink;
+
+        Editor.IsDocumentEnabled = true;
+        Editor.AddHandler(Hyperlink.RequestNavigateEvent, new RequestNavigateEventHandler(OnNavigate));
 
         _editorBrushes.Sync(_theme);
         Editor.Document = NoteDocument.Empty(_editorBrushes.Text);
@@ -104,17 +112,12 @@ public partial class MainWindow
 
     private void OnEditorClick(object sender, MouseButtonEventArgs e)
     {
-        if (Editor.GetPositionFromPoint(e.GetPosition(Editor), snapToText: false) is not { } point)
+        if (Editor.GetPositionFromPoint(e.GetPosition(Editor), snapToText: true) is not { } point)
         {
             return;
         }
 
-        if (point.Paragraph is not { } row || !Looks.Is(row, Look.Todo))
-        {
-            return;
-        }
-
-        if (point.Parent is not Run first || !ReferenceEquals(first, row.Inlines.FirstInline))
+        if (point.Paragraph is not { } row || !Looks.Is(row, Look.Todo) || !Looks.OnMark(row, point))
         {
             return;
         }
@@ -130,6 +133,35 @@ public partial class MainWindow
         }
 
         e.Handled = true;
+    }
+
+    private LinkChoice? AskForLink(string shown, string address)
+    {
+        LinkWindow sheet = new(shown, address, _theme, Resources) { Owner = this };
+
+        return sheet.ShowDialog() == true
+            ? new LinkChoice(sheet.Address, sheet.Removed)
+            : null;
+    }
+
+    private void OnNavigate(object sender, RequestNavigateEventArgs e)
+    {
+        e.Handled = true;
+
+        if (!WebAddress.Safe(e.Uri))
+        {
+            StatusText.Text = $"Collegamento non aperto: lo schema {e.Uri.Scheme} non e' fra quelli ammessi.";
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.ToString()) { UseShellExecute = true });
+        }
+        catch (Exception problem) when (problem is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            StatusText.Text = "Nessun programma risponde per questo collegamento.";
+        }
     }
 
     private void WireFormatBar()
@@ -156,7 +188,7 @@ public partial class MainWindow
 
         FmtCodeBlock.Click += (_, _) => _commands.ToggleCode();
         FmtRule.Click += (_, _) => _commands.InsertRule();
-        FmtFind.Click += (_, _) => ToggleFindBar();
+        FmtFind.Click += (_, _) => ToggleFind();
 
         _tables = new TableCommands(Editor, _formatter, _editorBrushes);
         _tables.Refused += message => StatusText.Text = message;
@@ -169,24 +201,6 @@ public partial class MainWindow
     }
 
     private TableCommands? _tables;
-
-    private void ToggleFindBar()
-    {
-        bool opening = FindBar.Visibility != Visibility.Visible;
-
-        if (opening)
-        {
-            FindBar.Visibility = Visibility.Visible;
-            FindBar.BeginAnimation(OpacityProperty, Motion.Slide(0, 1, 180, Motion.Ease()));
-            FindBox.Focus();
-            return;
-        }
-
-        DoubleAnimation fade = Motion.Slide(FindBar.Opacity, 0, 150, Motion.Ease(mode: EasingMode.EaseIn));
-        fade.Completed += (_, _) => FindBar.Visibility = Visibility.Collapsed;
-        FindBar.BeginAnimation(OpacityProperty, fade);
-        Editor.Focus();
-    }
 
     private void RecolourHosts() => _formatter?.RecolourAll();
 
@@ -201,7 +215,7 @@ public partial class MainWindow
             {
                 foreach (HostToken token in HostTokens.Find(LiveFormatter.TextOf(row)))
                 {
-                    if (seen.Add(token.Value))
+                    if (seen.Add(token.Value) && !_session.IsIgnored(token.Value))
                     {
                         hosts.Add(token.Value);
                     }
@@ -266,7 +280,7 @@ public partial class MainWindow
             StatusText.Text = "Nota convertita: i marcatori sono diventati formattazione.";
         }
 
-        _noteDirty = _fresh || converted || single;
+        _noteDirty = _fresh || converted || single || _tidied;
 
         if (_noteDirty)
         {
@@ -289,6 +303,8 @@ public partial class MainWindow
             {
                 _swapping = false;
             }
+
+            _tidied |= NoteDocument.Flatten(page.Document);
 
             if (_formatter.NeedsImport())
             {

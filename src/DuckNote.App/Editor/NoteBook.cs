@@ -23,7 +23,7 @@ public sealed class NoteBook
     public NotePage Add(Brush foreground)
     {
         NotePage page = new() { Id = NotePage.FreshId(), Document = NoteDocument.Empty(foreground) };
-        page.Document.Blocks.Add(new Paragraph());
+        page.Document.Blocks.Add(NoteDocument.Row());
         _pages.Add(page);
 
         return page;

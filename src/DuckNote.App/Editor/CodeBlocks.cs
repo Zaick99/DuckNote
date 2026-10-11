@@ -35,7 +35,8 @@ public sealed class CodeBlocks(RichTextBox editor, MarkdownRenderer renderer)
 
         foreach (string line in Lines(block))
         {
-            Paragraph row = new(new Run(line));
+            Paragraph row = NoteDocument.Row();
+            row.Inlines.Add(new Run(line));
             where.InsertAfter(after, row);
             after = row;
             first ??= row;

@@ -46,9 +46,8 @@ original one — but have no code behind them yet:
 
 - table filter and search, and the status dropdown
 - CSV export, and sending scan results into the note as a table
-- find and replace
 - zoom
-- right-click context menus
+- highlighting every match of a search, not only the current one
 
 Everything else in this page is implemented and works. The missing pieces are
 wired into the interface and waiting for their code.
@@ -77,6 +76,25 @@ block takes exactly what you selected.
 **Enter knows where it is.** Inside a code block it adds a line to the block;
 on a list item it starts the next one; on an empty item it ends the list; after
 a heading it goes back to writing normally.
+
+**Links keep their address.** The link button opens a small window in the same
+dress as the rest: the selected text on one side, the address on the other,
+and a way to take the link off that leaves the text behind. A link is a real
+hyperlink, so the address survives the note being closed and reopened, and
+Ctrl+click opens it. Anything that is not http, https or mailto is refused.
+
+**Find works like Ctrl+F elsewhere.** A small panel slides down over the top
+right of the note: type and it jumps to the first match and counts them, Enter
+and the arrows walk them, F3 and Shift+F3 too, Esc closes. Matches are found
+across runs, so a word half in bold is still one word. Replace sits behind a
+toggle so the panel stays small.
+
+**Right-click knows what it is looking at.** On an address in the note:
+analyse it now — which adds it to the host table — set it aside so it is never
+scanned again, or copy it. On anything else those entries do not appear. A host
+set aside stays out of single scans, ranges and the monitor, and is remembered
+between runs; the host list's menu lists the ones set aside, one click to take
+them back.
 
 **Real tables.** The table buttons build a grid, not rows of pipe characters:
 a header with its own background, one-pixel borders, cells you tab through.

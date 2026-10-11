@@ -36,7 +36,7 @@ public sealed partial class MarkdownRenderer(EditorBrushes brushes, Func<IReadOn
 
     public Paragraph CodeBlock(IEnumerable<string> lines)
     {
-        Paragraph block = new();
+        Paragraph block = NoteDocument.Row();
         bool first = true;
 
         foreach (string line in lines)
@@ -294,10 +294,7 @@ public sealed partial class MarkdownRenderer(EditorBrushes brushes, Func<IReadOn
         if (match.Groups["link"].Success)
         {
             int split = whole.IndexOf("](", StringComparison.Ordinal);
-            Run label = Plain(whole[1..split]);
-            Link(label);
-            label.ToolTip = whole[(split + 2)..^1];
-            row.Inlines.Add(label);
+            row.Inlines.Add(Anchor(whole[1..split], whole[(split + 2)..^1]));
             return;
         }
 
@@ -367,6 +364,24 @@ public sealed partial class MarkdownRenderer(EditorBrushes brushes, Func<IReadOn
         {
             Emit(Plain(text[last..]), host: null);
         }
+    }
+
+    private Inline Anchor(string label, string target)
+    {
+        Run shown = Plain(label.Length > 0 ? label : target);
+
+        if (WebAddress.Parse(target) is not { } address)
+        {
+            Link(shown);
+            return shown;
+        }
+
+        return new Hyperlink(shown)
+        {
+            NavigateUri = address,
+            ToolTip = address.ToString(),
+            Foreground = brushes.Link
+        };
     }
 
     private Run Plain(string text, Brush? colour = null) =>

@@ -2,6 +2,107 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.10] - 2026-10-11
+
+**Eight things that did not work.** Three of them were dead on arrival — menu
+entries wired to nothing — and the worst one locked you out of your own note.
+
+### Fixed
+
+- **The unlock button stopped responding after the second lock.** You could
+  type the password and press Enter, but the button was dead to the mouse. Two
+  flags are turned off while the vault is being opened — the form's hit-testing
+  and the button's own enabled state — and the screen that shows the lock reset
+  neither. After the first successful unlock they stayed off for good. The veil
+  now has one place that puts it back on stage, and the lock screen goes through
+  it instead of repeating half of it.
+
+- **The checkboxes were not clickable.** Every click was thrown away by a guard
+  asking for the character under the pointer with snapping switched off, which
+  returns nothing even dead centre on the box — measured. With snapping on, the
+  position arrives; whether it counts is now decided by where it falls inside
+  the marker, not by which run it landed in, so it keeps working after an
+  address splits the line into several runs. The box and the space left of it
+  toggle; the text does not.
+
+- **Pressing Enter left too much space.** A paragraph's default margin in WPF is
+  `Auto`, not zero, and six of the eight places that make one took the default:
+  the new line after Enter, the separator and the line after it, the lines a code
+  block unfolds into, a fresh page, an empty document. Only the two that said
+  `Margin = 0` were tight. There is now one factory, so the mistake has nowhere
+  left to happen, and notes already carrying automatic margins are flattened the
+  first time they open.
+
+- **The host panel lagged behind the window while dragging.** Moving the window
+  only restarted a 90 ms timer, so the panel did not follow — it jumped to the
+  end of each pause. It now follows every move, and the timer keeps doing what it
+  was for, which is letting the ducks settle. The panel also stops rewriting its
+  own height on every move: that forced a layout pass and was the jerk itself.
+
+- **"Non analizzare" did nothing, and never appeared on an address in the note.**
+  No item of either context menu was connected to anything. A host set aside is
+  now dropped from the table, kept out of future scans — single hosts, ranges and
+  the monitor alike — and written into the settings so it survives a restart. The
+  list's menu names the host it will set aside and lists the ones already aside,
+  each clickable to take it back.
+
+- **"Analizza adesso" appeared on any selected text and did nothing.** It now
+  appears only when the right-click lands on an IP or a domain name — found by
+  the same reader that colours addresses in the note, so the two can never
+  disagree — and it adds that host to the table before scanning it, without
+  clearing the rows already there. "Copia indirizzo" names the address too, and
+  cut, copy, paste, paste-without-format and select-all, equally unwired, now
+  work.
+
+- **A link had nowhere to keep its address.** `[testo](indirizzo)` rendered as
+  underlined text with the address in a tooltip, and a tooltip does not survive
+  the note being saved — nor does `Tag` — so the address was lost on reopening.
+  A real `Hyperlink` with its `NavigateUri` does survive, measured both ways. The
+  link button now opens a window in the same dress as the others: the selected
+  text on one side, the address to write or correct on the other, and a way to
+  take the link off that leaves the text behind. Without a scheme, `https://` is
+  added; an address that is not http, https or mailto is refused, in the dialog
+  and again before anything is opened. Ctrl+click opens it.
+
+- **The find bar opened and found nothing.** It was a full-width strip with two
+  fields and no search behind them. It is now a small panel over the top right of
+  the note, sliding down as it appears: type and it jumps to the first match and
+  counts them, Enter and the arrows walk them, F3 and Shift+F3 too, Esc closes,
+  Ctrl+F opens it on whatever is selected. Matches are found across runs, so a
+  word half in bold is still one word. Replace moved behind a toggle, so the bar
+  stays small when all you want is to find something.
+
+### Verified
+
+A harness drives the real editor, the real scan session and the real commands
+without opening a window. Margins: every one of the six paths that make a
+paragraph, plus repairing a note that already has automatic ones and not
+repairing it twice. Checkboxes: a hit on the box, a miss in the middle of the
+line, a miss on the first letter of the text, and the state flipping back and
+forth. Search: counting with and without regard for case, stepping forward and
+wrapping round, stepping back from the first to the last, a word that is not
+there, replacing one and replacing all, and a match spanning two runs. Links:
+the address tidied, a bad scheme refused, a link made from a selection, read
+back after a save with its text, found again under a real mouse click and when
+the caret lands at its edge, edited, and taken off leaving the sentence whole.
+Hosts: set aside and the row goes, set aside twice does nothing, taken back and
+the row returns, the name matched whatever its case, and the ones read from the
+settings staying out.
+
+Each was checked against sabotaged code before being trusted: the automatic
+margin put back gave 8 failures, the click target widened by one character 1,
+case folded always 1, the search not wrapping 2, any scheme allowed 1, the link
+not looked for around the position 1, the set-aside row left in place 4, and a
+set-aside host let back into the queue 2.
+
+The first run of that pass let the widened click target through: the test
+clicked at the end of the line, far from the boundary it was supposed to defend.
+The boundary is the first letter of the text, and that is what it clicks now.
+
+Two fixes are not in the harness, because both live in a window that has to
+exist: the unlock button and the panel following the drag. The first is a reset
+of two flags in one method, the second one call moved out of a timer.
+
 ## [0.0.9] - 2026-10-07
 
 **The note stops being its own source.** Markdown goes in and formatting comes

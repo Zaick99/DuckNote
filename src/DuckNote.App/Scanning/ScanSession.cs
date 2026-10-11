@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
@@ -12,6 +12,8 @@ public sealed class ScanSession : INotifyPropertyChanged
     private readonly IVendorLookup _vendors = new OuiVendorLookup();
     private readonly Dictionary<string, ScanRow> _index = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly SortedSet<string> _ignored = new(StringComparer.OrdinalIgnoreCase);
+
     private CancellationTokenSource? _stop;
     private bool _running;
     private string _message = "Pronto.";
@@ -19,6 +21,65 @@ public sealed class ScanSession : INotifyPropertyChanged
     private int _total;
 
     public ObservableCollection<ScanRow> Rows { get; } = [];
+
+    public IReadOnlyCollection<string> Ignored => _ignored;
+
+    public bool IsIgnored(string host) => _ignored.Contains(host);
+
+    public bool Ignore(string host)
+    {
+        if (host.Length == 0 || !_ignored.Add(host))
+        {
+            return false;
+        }
+
+        Forget(host);
+        Message = $"{host} non verra' piu' analizzato.";
+
+        return true;
+    }
+
+    public bool Watch(string host)
+    {
+        if (!_ignored.Remove(host))
+        {
+            return false;
+        }
+
+        Message = $"{host} torna fra gli host da analizzare.";
+
+        return true;
+    }
+
+    public void Restore(IEnumerable<string> hosts)
+    {
+        foreach (string host in hosts)
+        {
+            if (host.Length > 0)
+            {
+                _ignored.Add(host);
+            }
+        }
+    }
+
+    private void Forget(string host)
+    {
+        _index.Remove(host);
+
+        for (int i = Rows.Count - 1; i >= 0; i--)
+        {
+            if (Names(Rows[i]).Any(name => _ignored.Contains(name)))
+            {
+                Rows.RemoveAt(i);
+            }
+        }
+
+        Notify(nameof(UpCount));
+        Notify(nameof(DownCount));
+    }
+
+    private static IEnumerable<string> Names(ScanRow row) =>
+        ((string[])[row.IP, row.NoteKey, row.Hostname]).Where(name => name.Length > 0);
 
     public bool IsRunning
     {
@@ -61,7 +122,7 @@ public sealed class ScanSession : INotifyPropertyChanged
     {
         foreach (string host in hosts)
         {
-            if (host.Length == 0 || _index.ContainsKey(host))
+            if (host.Length == 0 || _index.ContainsKey(host) || _ignored.Contains(host))
             {
                 continue;
             }
@@ -90,7 +151,7 @@ public sealed class ScanSession : INotifyPropertyChanged
         IReadOnlyList<string> targets;
         try
         {
-            targets = TargetList.Expand(range);
+            targets = [.. TargetList.Expand(range).Where(host => !_ignored.Contains(host))];
         }
         catch (ArgumentException ex)
         {
@@ -100,7 +161,9 @@ public sealed class ScanSession : INotifyPropertyChanged
 
         if (targets.Count == 0)
         {
-            Message = "Indica un intervallo, per esempio 192.168.1.0/24";
+            Message = _ignored.Count > 0
+                ? "Niente da analizzare: gli host indicati sono tutti fra gli ignorati."
+                : "Indica un intervallo, per esempio 192.168.1.0/24";
             return;
         }
 

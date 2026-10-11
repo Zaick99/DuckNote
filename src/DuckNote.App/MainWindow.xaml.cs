@@ -137,8 +137,18 @@ public partial class MainWindow : Window
             UpdateInspectGlyph();
         };
 
-        LocationChanged += (_, _) => RequestSettle();
-        SizeChanged += (_, _) => RequestSettle();
+        LocationChanged += (_, _) =>
+        {
+            _detail.Follow();
+            RequestSettle();
+        };
+
+        SizeChanged += (_, _) =>
+        {
+            _detail.Follow();
+            RequestSettle();
+        };
+
         StateChanged += (_, _) => _detail.Follow();
     }
 
@@ -260,6 +270,8 @@ public partial class MainWindow : Window
         }
 
         SetUpSidebar();
+        SetUpHostMenus();
+        SetUpFind();
         SyncNoteHosts();
         SetUpVault();
         StartMonitor();
@@ -391,7 +403,7 @@ public partial class MainWindow : Window
         await ScanAsync(string.Join(',', hosts));
     }
 
-    private async Task ScanAsync(string? targets = null, bool showNetwork = false)
+    private async Task ScanAsync(string? targets = null, bool showNetwork = false, bool keepExisting = false)
     {
         if (showNetwork)
         {
@@ -404,7 +416,7 @@ public partial class MainWindow : Window
             _settings.Save();
         }
 
-        await _session.RunAsync(targets ?? RangeBox.Text, _settings.ToScanOptions());
+        await _session.RunAsync(targets ?? RangeBox.Text, _settings.ToScanOptions(), keepExisting);
 
         SyncNoteHosts();
         RefreshCounts();

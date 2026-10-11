@@ -127,6 +127,18 @@ public static class Looks
         return Counting(text);
     }
 
+    public static bool OnMark(Paragraph row, TextPointer point)
+    {
+        try
+        {
+            return new TextRange(row.ContentStart, point).Text.Length < MarkLength(row);
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
     public static Thickness Indent(Look look) => look switch
     {
         Look.Quote => new Thickness(12, 0, 0, 0),

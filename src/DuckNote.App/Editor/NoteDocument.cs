@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -10,6 +10,28 @@ namespace DuckNote.App.Editor;
 public static class NoteDocument
 {
     public const string UiFonts = "SF Pro Text, Segoe UI Variable Text, Segoe UI";
+
+    private static readonly Thickness Flush = new(0);
+
+    public static Paragraph Row() => new() { Margin = Flush };
+
+    public static bool Flatten(FlowDocument? document)
+    {
+        bool changed = false;
+
+        foreach (Paragraph row in LiveFormatter.RowsOf(document))
+        {
+            if (row.Margin == Flush)
+            {
+                continue;
+            }
+
+            row.Margin = Flush;
+            changed = true;
+        }
+
+        return changed;
+    }
 
     public static FlowDocument Empty(Brush foreground) => new()
     {
@@ -47,7 +69,7 @@ public static class NoteDocument
                 continue;
             }
 
-            Paragraph paragraph = new() { Margin = new Thickness(0) };
+            Paragraph paragraph = Row();
             document.Blocks.Add(paragraph);
             renderer.Render(paragraph, line);
         }
@@ -59,7 +81,7 @@ public static class NoteDocument
 
         if (document.Blocks.Count == 0)
         {
-            document.Blocks.Add(new Paragraph());
+            document.Blocks.Add(Row());
         }
 
         return document;
