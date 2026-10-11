@@ -230,9 +230,40 @@ public partial class MainWindow
 
     private void KeepIgnored()
     {
-        _settings.IgnoredHosts = string.Join(',', _session.Ignored);
+        string list = string.Join(',', _session.Ignored);
+
+        if (_vault.IsOpen)
+        {
+            _vault.PrivateData = list;
+            _vault.Save();
+
+            if (_settings.IgnoredHosts.Length > 0)
+            {
+                _settings.IgnoredHosts = string.Empty;
+                _settings.Save();
+            }
+
+            return;
+        }
+
+        _settings.IgnoredHosts = list;
         _settings.Save();
     }
+
+    private void RecallIgnored()
+    {
+        _session.Restore(Written().Split(IgnoredSeparators, StringSplitOptions.RemoveEmptyEntries));
+
+        if (_vault.IsOpen && _settings.IgnoredHosts.Length > 0)
+        {
+            KeepIgnored();
+        }
+    }
+
+    private string Written() =>
+        _vault.IsOpen && _vault.PrivateData.Length > 0 ? _vault.PrivateData : _settings.IgnoredHosts;
+
+    private void ForgetScan() => _session.Clear();
 
     private void CopyHost(string? host)
     {

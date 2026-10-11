@@ -31,6 +31,17 @@ public sealed class NoteBook
 
     public bool Remove(NotePage page) => _pages.Count > 1 && _pages.Remove(page);
 
+    public void Forget()
+    {
+        foreach (NotePage page in _pages)
+        {
+            page.Document.Blocks.Clear();
+            page.Name = string.Empty;
+        }
+
+        _pages.Clear();
+    }
+
     public NotePage? ById(string id) => _pages.FirstOrDefault(page => page.Id == id);
 
     public void Move(NotePage page, int to)

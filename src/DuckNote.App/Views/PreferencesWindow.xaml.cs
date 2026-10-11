@@ -77,6 +77,7 @@ public partial class PreferencesWindow : Window
         PMonSec.Text = Number(_settings.MonitorIntervalSec);
 
         PThreads.Text = Number(_settings.MaxThreads);
+        PSockets.Text = Number(_settings.MaxSockets);
         PPingN.Text = Number(_settings.PingCount);
         PPingMs.Text = Number(_settings.PingTimeoutMs);
         PPortMs.Text = Number(_settings.PortTimeoutMs);
@@ -138,7 +139,8 @@ public partial class PreferencesWindow : Window
         _settings.MonitorEnabled = PMonitor.IsChecked == true;
         _settings.MonitorIntervalSec = Clamp(PMonSec.Text, _settings.MonitorIntervalSec, 10, 86400);
 
-        _settings.MaxThreads = Clamp(PThreads.Text, _settings.MaxThreads, 1, 512);
+        _settings.MaxThreads = Clamp(PThreads.Text, _settings.MaxThreads, 1, 1024);
+        _settings.MaxSockets = Clamp(PSockets.Text, _settings.MaxSockets, 16, 4096);
         _settings.PingCount = Clamp(PPingN.Text, _settings.PingCount, 1, 10);
         _settings.PingTimeoutMs = Clamp(PPingMs.Text, _settings.PingTimeoutMs, 100, 10000);
         _settings.PortTimeoutMs = Clamp(PPortMs.Text, _settings.PortTimeoutMs, 50, 10000);

@@ -18,7 +18,8 @@ public sealed class AppSettings
     public bool MonitorEnabled { get; set; } = true;
     public int MonitorIntervalSec { get; set; } = 60;
 
-    public int MaxThreads { get; set; } = 64;
+    public int MaxThreads { get; set; } = 256;
+    public int MaxSockets { get; set; } = 900;
     public int PingCount { get; set; } = 2;
     public int PingTimeoutMs { get; set; } = 800;
     public int PortTimeoutMs { get; set; } = 500;
@@ -52,7 +53,6 @@ public sealed class AppSettings
     public int DuckOpacity { get; set; } = 4;
 
     public int EditorZoom { get; set; } = 100;
-    public string SidebarMode { get; set; } = "host";
     public bool ShowLineHighlight { get; set; } = true;
 
     public bool SecurityPrompted { get; set; }
@@ -110,6 +110,7 @@ public sealed class AppSettings
     public DuckNote.Scan.ScanOptions ToScanOptions() => new()
     {
         Concurrency = MaxThreads,
+        Sockets = MaxSockets,
         PingCount = PingCount,
         PingTimeout = TimeSpan.FromMilliseconds(PingTimeoutMs),
         PortTimeout = TimeSpan.FromMilliseconds(PortTimeoutMs),

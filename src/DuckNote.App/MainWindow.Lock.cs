@@ -208,8 +208,11 @@ public partial class MainWindow
         AppGrid.Visibility = Visibility.Visible;
         LoadNote();
         VaultSession.RemoveLeftovers();
+        RecallIgnored();
+        SyncNoteHosts();
         RecolourHosts();
         RefreshSideList();
+        StartMonitor();
 
         DoubleAnimation fade = Motion.Slide(1, 0, 260, Motion.Ease(mode: EasingMode.EaseIn));
         fade.Completed += (_, _) =>

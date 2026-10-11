@@ -12,6 +12,8 @@ namespace DuckNote.App;
 
 public partial class App : Application
 {
+    private OnlyOne? _single;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -19,6 +21,19 @@ public partial class App : Application
         DispatcherUnhandledException += Rescue;
 
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        _single = OnlyOne.Claim();
+        if (_single is null)
+        {
+            MessageBox.Show(
+                "DuckNote e' gia' aperto in questa sessione.\n\n" +
+                "Una copia sola per volta: due copie scriverebbero la stessa cassaforte, " +
+                "e chiudere a chiave l'una lascerebbe l'altra aperta.",
+                "DuckNote", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            Shutdown();
+            return;
+        }
 
         AppSettings settings = AppSettings.Load();
         string theme = settings.FollowSystemTheme ? ThemeTokens.FromSystem() : settings.Theme;
@@ -80,6 +95,14 @@ public partial class App : Application
 
         CryptographicOperations.ZeroMemory(key);
         return true;
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _single?.Dispose();
+        _single = null;
+
+        base.OnExit(e);
     }
 
     private void Rescue(object sender, DispatcherUnhandledExceptionEventArgs e)

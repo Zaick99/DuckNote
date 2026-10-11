@@ -34,7 +34,8 @@ public partial class MainWindow
         PageNew.Click += (_, _) => AddPage();
         _pageMenu = PageMenu();
 
-        SwitchSideMode(outline: false, immediate: true);
+        SideModeOutline.IsChecked = true;
+        SwitchSideMode(outline: true, immediate: true);
     }
 
     private void JumpTo(Paragraph row)
@@ -148,17 +149,24 @@ public partial class MainWindow
         Fold(node);
     }
 
-    private const int Cascade = 28;
+    private const double Sideways = 14;
 
-    private const int LongestCascade = 6;
+    private const int Apart = 28;
 
-    private static TimeSpan After(int place) =>
-        TimeSpan.FromMilliseconds(Math.Min(place, LongestCascade) * Cascade);
+    private const int Cascade = 190;
+
+    private const int Entering = 220;
+
+    private const int Leaving = 150;
+
+    private static TimeSpan After(int place, int many) =>
+        TimeSpan.FromMilliseconds(place * Math.Min(Apart, (double)Cascade / Math.Max(1, many)));
 
     private ListBoxItem[] Shown(SideNode node) =>
     [
-        .. Outline.Flat(node.Children)
-            .Select(child => SideList.ItemContainerGenerator.ContainerFromItem(child))
+        .. _sideNodes
+            .Where(row => !row.IsPage && row.PageId == node.PageId)
+            .Select(row => SideList.ItemContainerGenerator.ContainerFromItem(row))
             .OfType<ListBoxItem>()
     ];
 
@@ -166,49 +174,18 @@ public partial class MainWindow
     {
         SideList.UpdateLayout();
 
-        int step = 0;
+        ListBoxItem[] rows = Shown(node);
+        IEasingFunction ease = Motion.Ease();
 
-        foreach (ListBoxItem row in Shown(node))
+        for (int i = 0; i < rows.Length; i++)
         {
-            TimeSpan start = After(step);
-            step++;
+            ListBoxItem row = rows[i];
+            TimeSpan start = After(i, rows.Length);
 
-            Appear(row, start);
-            Glide(row, start);
+            Hide(row);
+            Play(row, OpacityProperty, 0, 1, Entering, ease, start, () => Rest(row));
+            Play(Shifter(row), TranslateTransform.XProperty, -Sideways, 0, Entering, ease, start);
         }
-    }
-
-    private static void Appear(ListBoxItem row, TimeSpan start)
-    {
-        row.Opacity = 0;
-
-        DoubleAnimation fade = Motion.Slide(0, 1, 180, Motion.Ease());
-        fade.BeginTime = start;
-        fade.Completed += (_, _) =>
-        {
-            row.BeginAnimation(OpacityProperty, null);
-            row.Opacity = 1;
-        };
-
-        row.BeginAnimation(OpacityProperty, fade);
-    }
-
-    private static void Glide(ListBoxItem row, TimeSpan start)
-    {
-        if (row.Template?.FindName("slide", row) is not TranslateTransform shift)
-        {
-            return;
-        }
-
-        DoubleAnimation glide = Motion.Slide(-14, 0, 280, Motion.Ease());
-        glide.BeginTime = start;
-        glide.Completed += (_, _) =>
-        {
-            shift.BeginAnimation(TranslateTransform.XProperty, null);
-            shift.X = 0;
-        };
-
-        shift.BeginAnimation(TranslateTransform.XProperty, glide);
     }
 
     private void Fold(SideNode node)
@@ -221,27 +198,83 @@ public partial class MainWindow
             return;
         }
 
+        IEasingFunction ease = Motion.Ease(mode: EasingMode.EaseIn);
         int left = rows.Length;
-        int step = rows.Length - 1;
 
-        foreach (ListBoxItem row in rows)
+        for (int i = 0; i < rows.Length; i++)
         {
-            DoubleAnimation fade = Motion.Slide(1, 0, 150, Motion.Ease(mode: EasingMode.EaseIn));
-            fade.BeginTime = After(step);
-            step--;
+            ListBoxItem row = rows[i];
+            TimeSpan start = After(rows.Length - 1 - i, rows.Length);
 
-            fade.Completed += (_, _) =>
+            Play(row, OpacityProperty, 1, 0, Leaving, ease, start, () =>
             {
-                row.BeginAnimation(OpacityProperty, null);
-
-                if (--left == 0)
+                if (--left > 0)
                 {
-                    Shut(node);
+                    return;
                 }
-            };
 
-            row.BeginAnimation(OpacityProperty, fade);
+                Shut(node);
+
+                foreach (ListBoxItem gone in rows)
+                {
+                    Rest(gone);
+                }
+            });
+
+            Play(Shifter(row), TranslateTransform.XProperty, 0, -Sideways, Leaving, ease, start);
         }
+    }
+
+    private static void Hide(ListBoxItem row)
+    {
+        row.Opacity = 0;
+
+        if (Shifter(row) is { } shift)
+        {
+            shift.X = -Sideways;
+        }
+    }
+
+    private static void Rest(ListBoxItem row)
+    {
+        row.BeginAnimation(OpacityProperty, null);
+        row.Opacity = 1;
+
+        if (Shifter(row) is { } shift)
+        {
+            shift.BeginAnimation(TranslateTransform.XProperty, null);
+            shift.X = 0;
+        }
+    }
+
+    private static TranslateTransform? Shifter(ListBoxItem row) =>
+        row.Template?.FindName("slide", row) as TranslateTransform;
+
+    private static void Play(
+        IAnimatable? target,
+        DependencyProperty property,
+        double from,
+        double to,
+        int milliseconds,
+        IEasingFunction ease,
+        TimeSpan start,
+        Action? then = null)
+    {
+        if (target is null)
+        {
+            then?.Invoke();
+            return;
+        }
+
+        DoubleAnimation move = Motion.Slide(from, to, milliseconds, ease);
+        move.BeginTime = start;
+
+        if (then is not null)
+        {
+            move.Completed += (_, _) => then();
+        }
+
+        target.BeginAnimation(property, move);
     }
 
     private void Shut(SideNode node)

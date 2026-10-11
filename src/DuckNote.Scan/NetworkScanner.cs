@@ -36,7 +36,9 @@ public sealed class NetworkScanner(ScanOptions options, IVendorLookup vendors)
         IReadOnlyList<string> targets, ChannelWriter<HostScanResult> writer, CancellationToken cancellationToken)
     {
         using SemaphoreSlim gate = new(Math.Max(1, options.Concurrency));
-        HostProbe probe = new(options, vendors);
+        using SocketBudget sockets = new(options.Sockets);
+
+        HostProbe probe = new(options, vendors, sockets);
         Exception? failure = null;
 
         try
