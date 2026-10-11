@@ -2,6 +2,40 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.14] - 2026-10-11
+
+### Fixed
+
+- **The tree only animated when closing.** Opening a branch was instant, and the
+  reason was not the animation: the sidebar list recycles its containers, and a
+  recycled container does not raise `Loaded` again. The entrance was a `Loaded`
+  trigger in the row template, so it fired on the first population and never on
+  an expand — the rows that appeared were containers that already existed.
+
+  Opening is driven from code now, where it is known that a branch opened, and it
+  mirrors closing: each row fades in and glides 14 px from the left, **one after
+  the other**, 28 ms apart. Closing got the same cascade in reverse, bottom row
+  first, so the branch folds up instead of blinking out. The stagger saturates
+  after six rows, so a page with thirty sections does not take a second to open.
+  The `Loaded` trigger is gone: the whole list already animates when the sidebar
+  switches mode, and with it in place the two animations fought over the same
+  properties.
+
+- **"Mostra dettagli" no longer drags you to the network view.** It switched tab
+  before opening the card. The card is its own window beside the main one, so
+  there was never a reason to leave the note you were reading.
+
+### Verified
+
+An animation needs frames, and the harness renders none, so what it checks is
+the mechanism the animation hangs from: the translate transform the code looks
+up by name inside the row template, for a page row and for a section row. Rename
+it and the glide silently stops happening — the sabotage proves the check
+catches exactly that. Twenty-four sabotages, all caught.
+
+The cascade itself, and the tab staying where it is, are a few lines each and
+were read, not measured.
+
 ## [0.0.13] - 2026-10-11
 
 **Two notches on yesterday's sidebar.**
