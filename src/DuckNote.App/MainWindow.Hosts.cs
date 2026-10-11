@@ -167,8 +167,6 @@ public partial class MainWindow
             return;
         }
 
-        TabNet.IsChecked = true;
-
         _syncingSelection = true;
         try
         {

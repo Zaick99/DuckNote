@@ -534,7 +534,7 @@
     </DataTemplate>
 
     <ControlTemplate x:Key="PickedRow" TargetType="ListBoxItem">
-      <Grid x:Name="row">
+      <Grid>
         <Grid.RenderTransform>
           <TranslateTransform x:Name="slide"/>
         </Grid.RenderTransform>
@@ -555,21 +555,6 @@
           <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoft}"/>
           <Setter Property="Foreground" Value="{DynamicResource AccentDark}"/>
         </Trigger>
-
-        <EventTrigger RoutedEvent="FrameworkElement.Loaded">
-          <BeginStoryboard>
-            <Storyboard>
-              <DoubleAnimation Storyboard.TargetName="row" Storyboard.TargetProperty="Opacity"
-                               From="0" To="1" Duration="0:0:0.17"/>
-              <DoubleAnimation Storyboard.TargetName="slide" Storyboard.TargetProperty="X"
-                               From="-8" To="0" Duration="0:0:0.24">
-                <DoubleAnimation.EasingFunction>
-                  <CubicEase EasingMode="EaseOut"/>
-                </DoubleAnimation.EasingFunction>
-              </DoubleAnimation>
-            </Storyboard>
-          </BeginStoryboard>
-        </EventTrigger>
       </ControlTemplate.Triggers>
     </ControlTemplate>
 

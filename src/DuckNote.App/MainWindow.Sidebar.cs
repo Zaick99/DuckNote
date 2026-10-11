@@ -141,20 +141,79 @@ public partial class MainWindow
         {
             _openBranches[node.Key] = true;
             RefreshSideList();
+            Unfold(node);
             return;
         }
 
         Fold(node);
     }
 
+    private const int Cascade = 28;
+
+    private const int LongestCascade = 6;
+
+    private static TimeSpan After(int place) =>
+        TimeSpan.FromMilliseconds(Math.Min(place, LongestCascade) * Cascade);
+
+    private ListBoxItem[] Shown(SideNode node) =>
+    [
+        .. Outline.Flat(node.Children)
+            .Select(child => SideList.ItemContainerGenerator.ContainerFromItem(child))
+            .OfType<ListBoxItem>()
+    ];
+
+    private void Unfold(SideNode node)
+    {
+        SideList.UpdateLayout();
+
+        int step = 0;
+
+        foreach (ListBoxItem row in Shown(node))
+        {
+            TimeSpan start = After(step);
+            step++;
+
+            Appear(row, start);
+            Glide(row, start);
+        }
+    }
+
+    private static void Appear(ListBoxItem row, TimeSpan start)
+    {
+        row.Opacity = 0;
+
+        DoubleAnimation fade = Motion.Slide(0, 1, 180, Motion.Ease());
+        fade.BeginTime = start;
+        fade.Completed += (_, _) =>
+        {
+            row.BeginAnimation(OpacityProperty, null);
+            row.Opacity = 1;
+        };
+
+        row.BeginAnimation(OpacityProperty, fade);
+    }
+
+    private static void Glide(ListBoxItem row, TimeSpan start)
+    {
+        if (row.Template?.FindName("slide", row) is not TranslateTransform shift)
+        {
+            return;
+        }
+
+        DoubleAnimation glide = Motion.Slide(-14, 0, 280, Motion.Ease());
+        glide.BeginTime = start;
+        glide.Completed += (_, _) =>
+        {
+            shift.BeginAnimation(TranslateTransform.XProperty, null);
+            shift.X = 0;
+        };
+
+        shift.BeginAnimation(TranslateTransform.XProperty, glide);
+    }
+
     private void Fold(SideNode node)
     {
-        ListBoxItem[] rows =
-        [
-            .. Outline.Flat(node.Children)
-                .Select(child => SideList.ItemContainerGenerator.ContainerFromItem(child))
-                .OfType<ListBoxItem>()
-        ];
+        ListBoxItem[] rows = Shown(node);
 
         if (rows.Length == 0)
         {
@@ -163,10 +222,13 @@ public partial class MainWindow
         }
 
         int left = rows.Length;
+        int step = rows.Length - 1;
 
         foreach (ListBoxItem row in rows)
         {
-            DoubleAnimation fade = Motion.Slide(1, 0, 130, Motion.Ease(mode: EasingMode.EaseIn));
+            DoubleAnimation fade = Motion.Slide(1, 0, 150, Motion.Ease(mode: EasingMode.EaseIn));
+            fade.BeginTime = After(step);
+            step--;
 
             fade.Completed += (_, _) =>
             {
