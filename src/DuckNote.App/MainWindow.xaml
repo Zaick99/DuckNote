@@ -661,9 +661,10 @@
     </Style>
     <Style x:Key="GridCell" TargetType="DataGridCell">
       <Setter Property="BorderThickness" Value="0"/>
-      <Setter Property="Padding" Value="9,0"/>
+      <Setter Property="Padding" Value="7,0"/>
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+      <Setter Property="TextBlock.TextTrimming" Value="CharacterEllipsis"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="DataGridCell">
@@ -1224,6 +1225,7 @@
               <RichTextBox.ContextMenu>
                 <ContextMenu x:Name="EdMenu">
                   <MenuItem x:Name="EdMenuPing" Header="Analizza adesso"/>
+                  <MenuItem x:Name="EdMenuDetails" Header="Mostra dettagli"/>
                   <MenuItem x:Name="EdMenuWatch" Header="Non analizzare piu'"/>
                   <MenuItem x:Name="EdMenuCopyHost" Header="Copia indirizzo"/>
                   <Separator x:Name="EdMenuSep"/>
@@ -1389,9 +1391,10 @@
                         HorizontalGridLinesBrush="{DynamicResource SeparatorSoft}"
                         RowStyle="{StaticResource GridRow}" CellStyle="{StaticResource GridCell}"
                         ColumnHeaderStyle="{StaticResource GridHeader}"
-                        ScrollViewer.CanContentScroll="True">
+                        ScrollViewer.CanContentScroll="True"
+                        ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                 <DataGrid.Columns>
-                  <DataGridTemplateColumn Header="" Width="30" SortMemberPath="StatusRank" CanUserResize="False">
+                  <DataGridTemplateColumn Header="" Width="26" SortMemberPath="StatusRank" CanUserResize="False">
                     <DataGridTemplateColumn.CellTemplate>
                       <DataTemplate>
                         <Ellipse Width="8" Height="8" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -1399,13 +1402,13 @@
                       </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                   </DataGridTemplateColumn>
-                  <DataGridTextColumn Header="Indirizzo IP" Binding="{Binding IP}" SortMemberPath="SortKey" Width="116"/>
-                  <DataGridTextColumn Header="Nome host"   Binding="{Binding Hostname}" Width="1.2*" MinWidth="120"/>
-                  <DataGridTextColumn Header="MAC"         Binding="{Binding Mac}" Width="124"/>
-                  <DataGridTextColumn Header="Produttore"  Binding="{Binding Vendor}" Width="1*" MinWidth="90"/>
-                  <DataGridTextColumn Header="Risposta"    Binding="{Binding RttMs}" SortMemberPath="RttAvg" Width="70"/>
-                  <DataGridTextColumn Header="Sistema"     Binding="{Binding OsGuess}" Width="1.1*" MinWidth="100"/>
-                  <DataGridTextColumn Header="Porte aperte" Binding="{Binding OpenPorts}" SortMemberPath="PortCount" Width="1.6*" MinWidth="140"/>
+                  <DataGridTextColumn Header="Indirizzo IP" Binding="{Binding IP}" SortMemberPath="SortKey" Width="1.1*" MinWidth="86"/>
+                  <DataGridTextColumn Header="Nome host"   Binding="{Binding Hostname}" Width="1.3*" MinWidth="70"/>
+                  <DataGridTextColumn Header="MAC"         Binding="{Binding Mac}" Width="1.2*" MinWidth="74"/>
+                  <DataGridTextColumn Header="Produttore"  Binding="{Binding Vendor}" Width="1*" MinWidth="60"/>
+                  <DataGridTextColumn Header="Risposta"    Binding="{Binding RttMs}" SortMemberPath="RttAvg" Width="0.7*" MinWidth="52"/>
+                  <DataGridTextColumn Header="Sistema"     Binding="{Binding OsGuess}" Width="1.1*" MinWidth="64"/>
+                  <DataGridTextColumn Header="Porte aperte" Binding="{Binding OpenPorts}" SortMemberPath="PortCount" Width="1.6*" MinWidth="80"/>
                 </DataGrid.Columns>
               </DataGrid>
             </Grid>

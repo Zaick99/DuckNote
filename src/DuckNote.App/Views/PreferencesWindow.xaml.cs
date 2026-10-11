@@ -96,10 +96,6 @@ public partial class PreferencesWindow : Window
 
         PLockMin.Text = Number(_settings.AutoLockMinutes);
 
-        PParallel.IsChecked = true;
-        PParallel.IsEnabled = false;
-        PParallelInfo.Text = "Un motore solo, sempre asincrono.";
-
         POui.Click += (_, _) => POuiInfo.Text = "Scaricamento non ancora portato.";
 
         ShowSecurity();

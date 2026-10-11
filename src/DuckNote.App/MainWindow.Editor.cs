@@ -39,9 +39,12 @@ public partial class MainWindow
 
     private void SetUpEditor()
     {
-        _renderer = new MarkdownRenderer(_editorBrushes, () => _hostStates);
+        _renderer = new MarkdownRenderer(_editorBrushes, () => _hostStates, _session.IsIgnored);
         _blocks = new CodeBlocks(Editor, _renderer);
-        _formatter = new LiveFormatter(Editor, _renderer, new HostPaint(_editorBrushes, () => _hostStates))
+        _formatter = new LiveFormatter(
+            Editor,
+            _renderer,
+            new HostPaint(_editorBrushes, () => _hostStates, _session.IsIgnored))
         {
             Rules = new InputRules(Editor, _renderer, _blocks, _editorBrushes)
         };

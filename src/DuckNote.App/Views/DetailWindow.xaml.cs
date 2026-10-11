@@ -1,7 +1,9 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Shapes;
 using DuckNote.App.Models;
+using DuckNote.App.Theme;
 
 namespace DuckNote.App.Views;
 
@@ -46,6 +48,7 @@ public partial class DetailWindow : Window
             DTitle.Text = "Nessuna selezione";
             DSub.Text = "Seleziona un host nella tabella.";
             DBadgeBox.Visibility = Visibility.Collapsed;
+            Tone(StatusTones.Blank);
             return;
         }
 
@@ -123,9 +126,15 @@ public partial class DetailWindow : Window
         DBadge.Text = row.Status?.ToUpperInvariant() ?? string.Empty;
         DBadgeBox.Visibility = string.IsNullOrWhiteSpace(row.Status) ? Visibility.Collapsed : Visibility.Visible;
 
-        string tone = row.StatusRank <= 1 ? "Green" : row.StatusRank <= 3 ? "Red" : "LabelTertiary";
-        DBadge.SetResourceReference(TextBlock.ForegroundProperty, tone);
-        DBadgeBox.SetResourceReference(Border.BorderBrushProperty, tone);
+        Tone(StatusTones.Of(row.StatusRank));
+    }
+
+    private void Tone(StatusTone tone)
+    {
+        DHead.SetResourceReference(Border.BackgroundProperty, tone.Wash);
+        DPulse.SetResourceReference(Shape.FillProperty, tone.Ink);
+        DBadge.SetResourceReference(TextBlock.ForegroundProperty, tone.Ink);
+        DBadgeBox.SetResourceReference(Border.BorderBrushProperty, tone.Ink);
     }
 
     private void Section(string title)

@@ -6,7 +6,10 @@ using System.Windows.Media;
 
 namespace DuckNote.App.Editor;
 
-public sealed partial class MarkdownRenderer(EditorBrushes brushes, Func<IReadOnlyDictionary<string, bool>> hostStates)
+public sealed partial class MarkdownRenderer(
+    EditorBrushes brushes,
+    Func<IReadOnlyDictionary<string, bool>> hostStates,
+    Func<string, bool>? setAside = null)
 {
     public const string MonoFonts = "SF Mono, Cascadia Mono, Consolas, Menlo, Courier New";
 
@@ -349,7 +352,7 @@ public sealed partial class MarkdownRenderer(EditorBrushes brushes, Func<IReadOn
         }
 
         int last = 0;
-        foreach (HostToken token in HostTokens.Find(text))
+        foreach (HostToken token in HostTokens.Find(text).Where(token => setAside?.Invoke(token.Value) != true))
         {
             if (token.Start > last)
             {

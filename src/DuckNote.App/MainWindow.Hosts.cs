@@ -13,13 +13,12 @@ public partial class MainWindow
 
     private void SetUpHostMenus()
     {
-        _session.Restore(_settings.IgnoredHosts.Split(IgnoredSeparators, StringSplitOptions.RemoveEmptyEntries));
-
         HostMenu.Opened += (_, _) => DressHostMenu();
         HostMenuIgnore.Click += (_, _) => StopWatching(SelectedHost());
 
         EdMenu.Opened += (_, _) => DressEditorMenu();
         EdMenuPing.Click += (_, _) => AnalyseNow(_hostInSight);
+        EdMenuDetails.Click += (_, _) => ShowDetails(_hostInSight);
         EdMenuWatch.Click += (_, _) => ToggleWatching(_hostInSight);
         EdMenuCopyHost.Click += (_, _) => CopyHost(_hostInSight);
 
@@ -57,6 +56,7 @@ public partial class MainWindow
         bool found = _hostInSight is not null;
 
         EdMenuPing.Visibility = Show(found);
+        EdMenuDetails.Visibility = Show(found);
         EdMenuWatch.Visibility = Show(found);
         EdMenuCopyHost.Visibility = Show(found);
         EdMenuSep.Visibility = Show(found);
@@ -67,6 +67,7 @@ public partial class MainWindow
         }
 
         EdMenuPing.Header = $"Analizza adesso {host}";
+        EdMenuDetails.Header = $"Mostra dettagli di {host}";
         EdMenuCopyHost.Header = $"Copia {host}";
         EdMenuWatch.Header = _session.IsIgnored(host)
             ? $"Analizza di nuovo {host}"
@@ -144,6 +145,50 @@ public partial class MainWindow
         await ScanAsync(host, keepExisting: true);
     }
 
+    private void ShowDetails(string? host)
+    {
+        if (host is null)
+        {
+            return;
+        }
+
+        if (_session.IsIgnored(host))
+        {
+            StatusText.Text = $"{host} e' fra gli host da non analizzare: riprendilo per vederne i dettagli.";
+            return;
+        }
+
+        _session.EnsurePending([host]);
+        RefreshCounts();
+
+        if (Known(host) is not { } row)
+        {
+            StatusText.Text = $"Di {host} non c'e' ancora nulla da mostrare.";
+            return;
+        }
+
+        TabNet.IsChecked = true;
+
+        _syncingSelection = true;
+        try
+        {
+            NetGrid.SelectedItem = row;
+            NetGrid.ScrollIntoView(row);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        Reveal(row);
+    }
+
+    private ScanRow? Known(string host) =>
+        _session.Rows.FirstOrDefault(row =>
+            string.Equals(row.IP, host, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(row.NoteKey, host, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(row.Hostname, host, StringComparison.OrdinalIgnoreCase));
+
     private void ToggleWatching(string? host)
     {
         if (host is null)
@@ -168,6 +213,7 @@ public partial class MainWindow
         }
 
         KeepIgnored();
+        _formatter.PaintAll();
         RefreshCounts();
     }
 
@@ -180,6 +226,7 @@ public partial class MainWindow
 
         KeepIgnored();
         SyncNoteHosts();
+        _formatter.PaintAll();
         RefreshCounts();
     }
 

@@ -35,6 +35,8 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
+        _session.Restore(_settings.IgnoredHosts.Split(IgnoredSeparators, StringSplitOptions.RemoveEmptyEntries));
+
         NetGrid.ItemsSource = _session.Rows;
         _session.PropertyChanged += OnSessionChanged;
         _session.Rows.CollectionChanged += (_, _) => RefreshCounts();

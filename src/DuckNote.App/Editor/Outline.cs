@@ -8,9 +8,9 @@ namespace DuckNote.App.Editor;
 
 public static class Outline
 {
-    public const double Step = 13;
+    public const double Step = 26;
 
-    public const double Half = 6.5;
+    public const double Half = 9;
 
     public const double PageRow = 25;
 
@@ -90,7 +90,7 @@ public static class Outline
             Dressed(child);
         }
 
-        node.ToggleVis = node.Children.Count > 0 ? "Visible" : "Hidden";
+        node.ToggleVis = node.Children.Count > 0 ? "Visible" : node.IsPage ? "Hidden" : "Collapsed";
         node.Toggle = node.IsPage
             ? node.IsOpen ? "▾" : "▸"
             : node.IsOpen ? "⌄" : "›";
