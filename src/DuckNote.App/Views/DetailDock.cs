@@ -92,8 +92,8 @@ public sealed class DetailDock
         Rect bounds = OwnerBounds();
         (double x, int side) = Slot(bounds);
 
-        _panel.Top = bounds.Top + Margin;
-        _panel.Height = Math.Max(MinimumHeight, bounds.Height - 8);
+        Settle(_panel, Window.TopProperty, _panel.Top, bounds.Top + Margin);
+        Settle(_panel, FrameworkElement.HeightProperty, _panel.Height, Math.Max(MinimumHeight, bounds.Height - 8));
 
         if (side != _side)
         {
@@ -102,7 +102,17 @@ public sealed class DetailDock
             return;
         }
 
-        _panel.Left = x;
+        Settle(_panel, Window.LeftProperty, _panel.Left, x);
+    }
+
+    private static void Settle(Window panel, DependencyProperty property, double now, double wanted)
+    {
+        if (Math.Abs(now - wanted) < 0.5)
+        {
+            return;
+        }
+
+        panel.SetValue(property, wanted);
     }
 
     public void Dispose()

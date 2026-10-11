@@ -47,7 +47,7 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
 
             if (table.NextBlock is null)
             {
-                editor.Document.Blocks.InsertAfter(table, new Paragraph { Margin = new Thickness(0) });
+                editor.Document.Blocks.InsertAfter(table, NoteDocument.Row());
             }
 
             landing = Opening(table);
@@ -231,7 +231,7 @@ public sealed class TableCommands(RichTextBox editor, LiveFormatter formatter, E
 
     private TableCell Cell(string text, bool header)
     {
-        Paragraph content = new() { Margin = new Thickness(0) };
+        Paragraph content = NoteDocument.Row();
 
         if (text.Length > 0)
         {

@@ -114,8 +114,6 @@ public partial class MainWindow
             {
                 _pond?.Start();
             }
-
-            _detail?.Follow();
         });
 
         _settle.Stop();

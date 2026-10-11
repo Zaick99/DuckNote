@@ -1,0 +1,70 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="DuckNote.App.Views.LinkWindow"
+        Title="Collegamento" Width="460" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize" ShowInTaskbar="False"
+        WindowStyle="None" AllowsTransparency="True" UseLayoutRounding="True"
+        FontFamily="SF Pro Text, Segoe UI Variable Text, Segoe UI" FontSize="13"
+        Background="Transparent">
+  <Border x:Name="LRoot" CornerRadius="14" Background="{DynamicResource BgSidebarGlass}"
+          RenderTransformOrigin="0.5,0.45" Opacity="0">
+    <Border.RenderTransform>
+      <TransformGroup>
+        <ScaleTransform x:Name="LScale" ScaleX="0.96" ScaleY="0.96"/>
+        <TranslateTransform x:Name="LMove" Y="12"/>
+      </TransformGroup>
+    </Border.RenderTransform>
+    <Grid>
+      <Grid.RowDefinitions>
+        <RowDefinition Height="44"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+
+      <Border x:Name="LTitleBar" Grid.Row="0" Background="{DynamicResource BgToolbarGlass}" CornerRadius="13,13,0,0">
+        <Grid>
+          <Button x:Name="LClose" Style="{DynamicResource TrafficBtn}" Background="{DynamicResource TLClose}"
+                  HorizontalAlignment="Left" VerticalAlignment="Center" Margin="14,0,0,0" ToolTip="Chiudi (Esc)">
+            <Path Data="M 0,0 L 6,6 M 6,0 L 0,6" Stroke="#5A1416" StrokeThickness="1.2" Stretch="Uniform"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+          </Button>
+          <TextBlock x:Name="LHead" Text="Collegamento" FontSize="13" FontWeight="SemiBold"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Foreground="{DynamicResource Label}"/>
+        </Grid>
+      </Border>
+
+      <StackPanel Grid.Row="1" Margin="22,18,22,4">
+        <TextBlock Text="Testo" FontSize="12" Margin="2,0,0,7"
+                   Foreground="{DynamicResource LabelSecondary}"/>
+        <Border CornerRadius="8" Background="{DynamicResource SheetScrim}" Padding="11,8">
+          <TextBlock x:Name="LText" FontSize="13" TextTrimming="CharacterEllipsis"
+                     Foreground="{DynamicResource Label}"/>
+        </Border>
+
+        <TextBlock Text="Indirizzo" FontSize="12" Margin="2,16,0,7"
+                   Foreground="{DynamicResource LabelSecondary}"/>
+        <TextBox x:Name="LUrl" Style="{DynamicResource Field}" Height="34" Padding="10,0"
+                 FontFamily="SF Mono, Cascadia Mono, Consolas" FontSize="12.5"/>
+
+        <TextBlock x:Name="LNote" FontSize="11" Margin="2,8,0,0" TextWrapping="Wrap"
+                   Text="Senza schema viene aggiunto https://. Nella nota si apre con Ctrl+clic."
+                   Foreground="{DynamicResource LabelTertiary}"/>
+        <TextBlock x:Name="LError" FontSize="12" Margin="2,8,0,0" TextWrapping="Wrap"
+                   Foreground="{DynamicResource Red}" Visibility="Collapsed"/>
+      </StackPanel>
+
+      <Border Grid.Row="2" Background="{DynamicResource BgToolbarGlass}" Padding="18,12" CornerRadius="0,0,13,13"
+              Margin="0,14,0,0">
+        <Grid>
+          <Button x:Name="LDrop" Style="{DynamicResource QuietBtn}" Content="Togli il collegamento"
+                  HorizontalAlignment="Left" Foreground="{DynamicResource Red}" Visibility="Collapsed"/>
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="LCancel" Style="{DynamicResource QuietBtn}" Content="Annulla" Margin="0,0,8,0"/>
+            <Button x:Name="LOk" Style="{DynamicResource PrimaryBtn}" Content="Salva"/>
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+  </Border>
+</Window>

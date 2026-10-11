@@ -83,22 +83,14 @@ public partial class MainWindow
     {
         _locked = true;
         _unlocking = false;
-        _veilBare = false;
 
         _unlockWork = null;
         _lockHeader = null;
-        VeilPwd.Clear();
         VeilMsg.Visibility = Visibility.Collapsed;
         VeilWork.Visibility = Visibility.Collapsed;
-        VeilForm.IsEnabled = true;
         VeilCard.Opacity = 1;
 
-        VeilBody.BeginAnimation(OpacityProperty, null);
-        VeilBodyT.BeginAnimation(TranslateTransform.YProperty, null);
-        VeilLoaderT.BeginAnimation(TranslateTransform.YProperty, null);
-        VeilBody.Opacity = 1;
-        VeilBodyT.Y = 0;
-        VeilLoaderT.Y = 0;
+        ResetVeilForm();
 
         VeilSeal.Opacity = 0;
         VeilRing1.Opacity = 0.5;
@@ -358,6 +350,24 @@ public partial class MainWindow
 
         VeilLoaderT.BeginAnimation(TranslateTransform.YProperty, null);
         VeilLoaderT.Y = _veilDescent;
+    }
+
+    private void ResetVeilForm()
+    {
+        _veilBare = false;
+        _veilDescent = 0;
+
+        VeilBody.BeginAnimation(OpacityProperty, null);
+        VeilBodyT.BeginAnimation(TranslateTransform.YProperty, null);
+        VeilLoaderT.BeginAnimation(TranslateTransform.YProperty, null);
+        VeilBody.Opacity = 1;
+        VeilBodyT.Y = 0;
+        VeilLoaderT.Y = 0;
+
+        VeilBody.IsHitTestVisible = true;
+        VeilForm.IsEnabled = true;
+        VeilGo.IsEnabled = true;
+        VeilPwd.Clear();
     }
 
     private void ShowVeilForm()

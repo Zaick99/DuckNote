@@ -208,6 +208,38 @@
       </Setter>
     </Style>
 
+    <Style x:Key="ToolToggle" TargetType="ToggleButton">
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="MinWidth" Value="28"/>
+      <Setter Property="Padding" Value="7,0"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ToggleButton">
+            <Border x:Name="b" CornerRadius="{StaticResource RControl}" Background="{TemplateBinding Background}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource BgHover}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="b" Property="Background" Value="{DynamicResource AccentSoft}"/>
+                <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
     <Style x:Key="PrimaryBtn" TargetType="Button" BasedOn="{StaticResource Toolbtn}">
       <Setter Property="Foreground" Value="{DynamicResource AccentText}"/>
       <Setter Property="Background" Value="{DynamicResource AccentFill}"/>
@@ -1180,63 +1212,6 @@
               </ScrollViewer>
             </Border>
 
-            <Border x:Name="FindBar" Grid.Row="1" Visibility="Collapsed" Padding="12,0" Opacity="0"
-                    MaxHeight="0" Background="{DynamicResource BgFieldAlt}"
-                    BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,0,0,1"
-                    RenderTransformOrigin="0.5,0">
-              <Border.RenderTransform>
-                <TransformGroup>
-                  <ScaleTransform x:Name="FindBarS" ScaleY="1"/>
-                  <TranslateTransform x:Name="FindBarT" Y="-16"/>
-                </TransformGroup>
-              </Border.RenderTransform>
-              <Grid Height="46">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" MinWidth="120"/>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="*" MinWidth="120"/>
-                  <ColumnDefinition Width="Auto"/>
-                  <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <Grid Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
-                  <TextBox x:Name="FindBox" Style="{StaticResource Field}"/>
-                  <TextBlock x:Name="FindHint" Text="Trova" IsHitTestVisible="False" Margin="11,0,0,0"
-                             VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource LabelTertiary}"/>
-                </Grid>
-
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button x:Name="FindPrev" Style="{StaticResource Toolbtn}" Content="&#8593;" ToolTip="Precedente (Shift+F3)"/>
-                  <Button x:Name="FindNext" Style="{StaticResource Toolbtn}" Content="&#8595;" ToolTip="Successivo (F3)"/>
-                </StackPanel>
-
-                <TextBlock x:Name="FindCount" Grid.Column="2" VerticalAlignment="Center" FontSize="11"
-                           Margin="8,0,12,0" MinWidth="74" TextAlignment="Right"
-                           Foreground="{DynamicResource LabelSecondary}"/>
-
-                <Rectangle Grid.Column="3" Width="1" Height="20" Margin="0,0,12,0"
-                           Fill="{DynamicResource Separator}" VerticalAlignment="Center"/>
-
-                <Grid Grid.Column="4" Margin="0,0,8,0" VerticalAlignment="Center">
-                  <TextBox x:Name="ReplBox" Style="{StaticResource Field}"/>
-                  <TextBlock x:Name="ReplHint" Text="Sostituisci con" IsHitTestVisible="False" Margin="11,0,0,0"
-                             VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource LabelTertiary}"/>
-                </Grid>
-
-                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button x:Name="ReplOne" Style="{StaticResource QuietBtn}" Content="Sostituisci"/>
-                  <Button x:Name="ReplAll" Style="{StaticResource QuietBtn}" Content="Tutte" Margin="8,0,0,0"/>
-                  <CheckBox x:Name="FindCase" Content="Aa" VerticalAlignment="Center" Margin="14,0,0,0"
-                            ToolTip="Distingui maiuscole e minuscole"/>
-                </StackPanel>
-
-                <Button x:Name="FindClose" Grid.Column="6" Style="{StaticResource Toolbtn}" Content="&#10005;"
-                        FontSize="11" Margin="12,0,0,0" VerticalAlignment="Center" ToolTip="Chiudi (Esc)"/>
-              </Grid>
-            </Border>
-
             <RichTextBox x:Name="Editor" Grid.Row="2"
                          AcceptsReturn="True" AcceptsTab="True"
                          VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
@@ -1248,8 +1223,8 @@
                          SpellCheck.IsEnabled="False" IsUndoEnabled="True" UndoLimit="300">
               <RichTextBox.ContextMenu>
                 <ContextMenu x:Name="EdMenu">
-                  <MenuItem x:Name="EdMenuWatch" Header="Pinga"/>
                   <MenuItem x:Name="EdMenuPing" Header="Analizza adesso"/>
+                  <MenuItem x:Name="EdMenuWatch" Header="Non analizzare piu'"/>
                   <MenuItem x:Name="EdMenuCopyHost" Header="Copia indirizzo"/>
                   <Separator x:Name="EdMenuSep"/>
                   <MenuItem x:Name="EdMenuCut" Header="Taglia"/>
@@ -1261,6 +1236,60 @@
                 </ContextMenu>
               </RichTextBox.ContextMenu>
             </RichTextBox>
+
+            <Border x:Name="FindBar" Grid.Row="2" Visibility="Collapsed" Opacity="0" Panel.ZIndex="5"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,18,0"
+                    CornerRadius="10" Padding="7,6" Background="{DynamicResource BgToolbarGlass}"
+                    BorderBrush="{DynamicResource GlassRim}" BorderThickness="1"
+                    RenderTransformOrigin="1,0">
+              <Border.RenderTransform>
+                <TransformGroup>
+                  <ScaleTransform x:Name="FindBarS" ScaleX="1" ScaleY="1"/>
+                  <TranslateTransform x:Name="FindBarT" Y="-14"/>
+                </TransformGroup>
+              </Border.RenderTransform>
+
+              <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                  <Grid Width="178" Height="28">
+                    <TextBox x:Name="FindBox" Style="{StaticResource Field}" Padding="9,0" FontSize="12.5"/>
+                    <TextBlock x:Name="FindHint" Text="Trova nella nota" IsHitTestVisible="False"
+                               Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                               Foreground="{DynamicResource LabelTertiary}"/>
+                  </Grid>
+
+                  <TextBlock x:Name="FindCount" VerticalAlignment="Center" FontSize="11"
+                             Margin="9,0,4,0" MinWidth="44" TextAlignment="Right"
+                             Foreground="{DynamicResource LabelSecondary}"/>
+
+                  <Button x:Name="FindPrev" Style="{StaticResource Toolbtn}" Content="&#8593;"
+                          FontSize="12" ToolTip="Precedente (Shift+F3)"/>
+                  <Button x:Name="FindNext" Style="{StaticResource Toolbtn}" Content="&#8595;"
+                          FontSize="12" ToolTip="Successivo (F3)"/>
+
+                  <Rectangle Width="1" Height="17" Margin="5,0" Fill="{DynamicResource Separator}"
+                             VerticalAlignment="Center"/>
+
+                  <ToggleButton x:Name="FindCase" Style="{StaticResource ToolToggle}" Content="Aa"
+                                FontSize="11" ToolTip="Distingui maiuscole e minuscole"/>
+                  <ToggleButton x:Name="FindSwap" Style="{StaticResource ToolToggle}" Content="&#8644;"
+                                FontSize="13" ToolTip="Sostituisci"/>
+                  <Button x:Name="FindClose" Style="{StaticResource Toolbtn}" Content="&#10005;"
+                          FontSize="10.5" ToolTip="Chiudi (Esc)"/>
+                </StackPanel>
+
+                <StackPanel x:Name="ReplRow" Orientation="Horizontal" Margin="0,6,0,0" Visibility="Collapsed">
+                  <Grid Width="178" Height="28">
+                    <TextBox x:Name="ReplBox" Style="{StaticResource Field}" Padding="9,0" FontSize="12.5"/>
+                    <TextBlock x:Name="ReplHint" Text="Sostituisci con" IsHitTestVisible="False"
+                               Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12"
+                               Foreground="{DynamicResource LabelTertiary}"/>
+                  </Grid>
+                  <Button x:Name="ReplOne" Style="{StaticResource QuietBtn}" Content="Questa" Margin="9,0,0,0"/>
+                  <Button x:Name="ReplAll" Style="{StaticResource QuietBtn}" Content="Tutte" Margin="6,0,0,0"/>
+                </StackPanel>
+              </StackPanel>
+            </Border>
             </Grid>
             </Border>
           </Grid>

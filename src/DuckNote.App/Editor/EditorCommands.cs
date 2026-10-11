@@ -16,12 +16,22 @@ public enum Mark
     Link
 }
 
+public sealed record LinkChoice(string Address, bool Removed);
+
 public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, MarkdownRenderer renderer, CodeBlocks blocks)
 {
     public event Action<string>? Refused;
 
+    public Func<string, string, LinkChoice?>? AskForLink { get; set; }
+
     public void Toggle(Mark mark)
     {
+        if (mark == Mark.Link)
+        {
+            Address();
+            return;
+        }
+
         if (editor.Selection.IsEmpty)
         {
             Refused?.Invoke("Seleziona il testo da formattare.");
@@ -52,10 +62,6 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
 
             case Mark.Code:
                 Letters();
-                break;
-
-            case Mark.Link:
-                Address();
                 break;
         }
     }
@@ -108,19 +114,135 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
 
     private void Address()
     {
-        string selected = editor.Selection.Text.Trim();
-
-        if (!selected.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
-            && !selected.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
-            && !selected.StartsWith("www.", StringComparison.OrdinalIgnoreCase))
+        if (AskForLink is null)
         {
-            Refused?.Invoke("Seleziona un indirizzo, oppure scrivi [testo](indirizzo).");
             return;
         }
 
-        editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, renderer.Palette.Link);
-        editor.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty, TextDecorations.Underline);
+        Hyperlink? here = editor.Selection.IsEmpty
+            ? LinkAt(editor.Selection.Start)
+            : Covering(editor.Selection);
+
+        if (here is null && editor.Selection.IsEmpty)
+        {
+            Refused?.Invoke("Seleziona il testo da collegare.");
+            return;
+        }
+
+        if (here is null && editor.Selection.Start.Paragraph != editor.Selection.End.Paragraph)
+        {
+            Refused?.Invoke("Un collegamento sta su una riga sola: restringi la selezione.");
+            return;
+        }
+
+        string shown = here is null
+            ? editor.Selection.Text
+            : new TextRange(here.ContentStart, here.ContentEnd).Text;
+
+        if (AskForLink(shown, here?.NavigateUri?.ToString() ?? string.Empty) is not { } choice)
+        {
+            return;
+        }
+
+        formatter.Suspended = true;
+        try
+        {
+            editor.BeginChange();
+            try
+            {
+                Relink(here, choice);
+            }
+            finally
+            {
+                editor.EndChange();
+            }
+        }
+        catch (Exception problem) when (problem is ArgumentException or InvalidOperationException)
+        {
+            Refused?.Invoke("Il collegamento non si e' potuto applicare a questa selezione.");
+        }
+        finally
+        {
+            formatter.Suspended = false;
+        }
     }
+
+    private void Relink(Hyperlink? here, LinkChoice choice)
+    {
+        if (choice.Removed)
+        {
+            Unlink(here);
+            return;
+        }
+
+        if (here is not null)
+        {
+            here.NavigateUri = new Uri(choice.Address);
+            here.ToolTip = choice.Address;
+            return;
+        }
+
+        Hyperlink fresh = new(editor.Selection.Start, editor.Selection.End)
+        {
+            NavigateUri = new Uri(choice.Address),
+            ToolTip = choice.Address,
+            Foreground = renderer.Palette.Link
+        };
+
+        editor.Selection.Select(fresh.ContentStart, fresh.ContentEnd);
+    }
+
+    private static void Unlink(Hyperlink? link)
+    {
+        if (link is null || Holder(link) is not { } around)
+        {
+            return;
+        }
+
+        foreach (Inline kept in (Inline[])[.. link.Inlines])
+        {
+            link.Inlines.Remove(kept);
+            around.InsertBefore(link, kept);
+        }
+
+        around.Remove(link);
+    }
+
+    private static InlineCollection? Holder(Inline? inline) => inline?.Parent switch
+    {
+        Paragraph paragraph => paragraph.Inlines,
+        Span span => span.Inlines,
+        _ => null
+    };
+
+    public static Hyperlink? LinkAt(TextPointer? point)
+    {
+        if (point is null)
+        {
+            return null;
+        }
+
+        for (DependencyObject? up = point.Parent; up is not null; up = LogicalTreeHelper.GetParent(up))
+        {
+            if (up is Hyperlink inside)
+            {
+                return inside;
+            }
+        }
+
+        return point.Paragraph is { } row ? Around(row, point) : null;
+    }
+
+    private static Hyperlink? Around(Paragraph row, TextPointer point) =>
+        row.Inlines.OfType<Hyperlink>().FirstOrDefault(link =>
+            link.ElementStart.CompareTo(point) <= 0 && link.ElementEnd.CompareTo(point) >= 0);
+
+    private static Hyperlink? Covering(TextSelection selection) =>
+        LinkAt(selection.Start) is { } link
+            && link.ElementStart.CompareTo(selection.Start) <= 0
+            && link.ElementEnd.CompareTo(selection.End) >= 0
+                ? link
+                : null;
 
     public void SetLook(Look look)
     {
@@ -211,11 +333,11 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
             editor.BeginChange();
             try
             {
-                Paragraph rule = new();
+                Paragraph rule = NoteDocument.Row();
                 renderer.Dress(rule, Look.Rule);
                 where.InsertAfter(last, rule);
 
-                Paragraph after = new();
+                Paragraph after = NoteDocument.Row();
                 where.InsertAfter(rule, after);
                 editor.CaretPosition = after.ContentStart;
             }
@@ -259,7 +381,7 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
             return true;
         }
 
-        Paragraph next = new();
+        Paragraph next = NoteDocument.Row();
         where.InsertAfter(row, next);
 
         if (listed)
