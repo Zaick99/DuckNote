@@ -2,6 +2,36 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.13] - 2026-10-11
+
+**Two notches on yesterday's sidebar.**
+
+### Changed
+
+- **Two more pixels between a page's icon and its name.** The sheet sat 3 px from
+  the title; it sits 5 px away now. The tree step went 26 → 28 with it, because
+  the step has to equal the page toggle plus the icon or a section's title stops
+  lining up with its page's — the alignment check measures that through the
+  layout, so widening the gap alone would have failed it.
+
+- **The accent bar on the left of a selected row is gone.** The selection is one
+  surface: a soft accent fill and an accent-dark label. One state, one signal.
+  Both sidebar modes lose it together — they share the template.
+
+### Verified
+
+The harness now reads the gap between the icon's right edge and the label's left
+edge through the rendered layout, and the bar's absence by name. Twenty-three
+sabotages, all caught.
+
+Two of them were not worth anything until rewritten. One still pointed at the
+transform of the bar that had just been removed, so it could never apply. The
+other injected the bar back as a sibling placed before `Grid.RenderTransform`,
+which is invalid XAML: the harness failed on a parse error instead of on the
+assertion — caught, but for the wrong reason, which is the same as not caught.
+Wrapping the presenter and the bar in a Grid makes it valid, and the assertion
+fails on its own merits.
+
 ## [0.0.12] - 2026-10-11
 
 **The structure sidebar, redrawn.** A page now carries a page.

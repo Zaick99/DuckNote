@@ -8,7 +8,7 @@ namespace DuckNote.App.Editor;
 
 public static class Outline
 {
-    public const double Step = 26;
+    public const double Step = 28;
 
     public const double Half = 7;
 
