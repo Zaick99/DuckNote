@@ -2,6 +2,73 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.11] - 2026-10-11
+
+**Six things that looked wrong.** Not broken this time — misplaced, misshaped or
+the wrong colour.
+
+### Added
+
+- **Right-click an address and open its card.** *Mostra dettagli* joins *Analizza
+  adesso* on an IP or a domain name in the note: it adds the host to the table if
+  it is not there yet, switches to the network view, selects the row and opens the
+  side panel on it. An address set aside says so instead, rather than opening an
+  empty card.
+
+### Changed
+
+- **A section's title now sits where its line points.** A heading left room for a
+  fold toggle it can never have — only pages hold sections — so every title was
+  pushed 15 px right of its own connector, with a void in between. The toggle's
+  place is now kept only for pages, and the tree step widened from 13 to 26 so a
+  section's text lands just past its parent's, not before it. The elbow stops 4 px
+  short of the text, which is a tree line pointing at a label rather than a gap.
+
+- **The network table has no horizontal scrollbar.** Four columns were a fixed
+  width and the rest had minimums adding up to 790 px, so a narrow window grew a
+  scrollbar. All but the status dot are proportional now, with minimums that fit
+  in half the space, cells trim with an ellipsis, and horizontal scrolling is off.
+
+- **The settings window is laid out, not stacked.** Eight cards of rows at four
+  different label widths and five different margins became one grammar: a header,
+  a card, rows of a fixed label and a fixed field, and **a divider between every
+  row**. Papere moved out of *Aspetto* into their own card, security sits above
+  the scan details because it is what people come for, and the probes are under
+  one heading that says what they are for. Out went the *Motore parallelo di
+  PowerShell 7* checkbox: forced on, disabled, unchangeable — a leftover of an era
+  that ended two versions ago.
+
+- **An address set aside reads as ordinary text.** It kept its colour and its
+  monospaced font, which said "I am watching this" about something deliberately
+  not watched. It now loses both the moment it is set aside — the note repaints
+  under your eyes — and takes them back when the host does. A note opened with
+  hosts already set aside never marks them at all.
+
+- **The host card is coloured by state.** It was always the same dark orange.
+  Green when the host answers, red when it does not, orange when it has never
+  been checked, with a dot next to the title in the same tone. The tint is a 12%
+  wash, not a fill, so the title and the subtitle keep the label colour and stay
+  readable in both themes.
+
+### Verified
+
+The harness grew three groups. **Set aside:** the address is recognised, green
+because it answers, monospaced; set aside it keeps its text but takes the plain
+colour and loses the monospace, with nothing left marked as a host; taken back it
+is coloured again; and a document rendered from scratch while it is set aside
+never marks it. **Tone:** every rank maps to the colour the request asked for,
+every token exists in both palettes, and every wash is transparent enough
+(alpha < 0x60) that text over it stays legible. **Windows:** the host card, the
+link dialog and the settings window are each constructed and filled in both
+themes — the settings window was rewritten whole, and a window that throws on
+open is the one defect a build cannot catch.
+
+Sixteen sabotages, all caught. Two of them were worthless on the first run: with
+the set-aside predicate stubbed out the *compiler* stopped the build before the
+harness ran, because an unread primary-constructor parameter is an error here.
+Rewritten to read the parameter and ask it the wrong question, they fail the way
+a real defect would — 3 and 1 red checks instead of none.
+
 ## [0.0.10] - 2026-10-11
 
 **Eight things that did not work.** Three of them were dead on arrival — menu

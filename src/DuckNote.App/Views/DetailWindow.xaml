@@ -55,20 +55,25 @@
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Padding="18,15,18,13">
+            <Border x:Name="DHead" Grid.Row="0" Padding="18,15,18,13" CornerRadius="14,14,0,0"
+                    Background="{DynamicResource OrangeSoft}"
+                    BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,0,0,1">
               <StackPanel>
                 <StackPanel Orientation="Horizontal">
+                  <Rectangle x:Name="DPulse" Width="9" Height="9" RadiusX="4.5" RadiusY="4.5"
+                             Margin="0,0,9,0" VerticalAlignment="Center"
+                             Fill="{DynamicResource Orange}"/>
                   <TextBlock x:Name="DTitle" Text="Nessuna selezione" FontSize="17" FontWeight="SemiBold"
                              Foreground="{DynamicResource Label}" TextTrimming="CharacterEllipsis"/>
                   <Border x:Name="DBadgeBox" CornerRadius="9" Margin="9,2,0,0" Padding="9,2"
-                          VerticalAlignment="Center" Background="{DynamicResource AccentSoft}"
-                          BorderBrush="{DynamicResource AccentBorder}" BorderThickness="1"
+                          VerticalAlignment="Center" Background="{DynamicResource BgField}"
+                          BorderBrush="{DynamicResource OrangeBorder}" BorderThickness="1"
                           Visibility="Collapsed">
                     <TextBlock x:Name="DBadge" FontSize="10" FontWeight="SemiBold"
-                               Foreground="{DynamicResource Accent}"/>
+                               Foreground="{DynamicResource Orange}"/>
                   </Border>
                 </StackPanel>
-                <TextBlock x:Name="DSub" Text="Seleziona un host nella tabella." Margin="0,4,0,0"
+                <TextBlock x:Name="DSub" Text="Seleziona un host nella tabella." Margin="18,4,0,0"
                            FontSize="11.5" Foreground="{DynamicResource LabelSecondary}" TextWrapping="Wrap"/>
               </StackPanel>
             </Border>

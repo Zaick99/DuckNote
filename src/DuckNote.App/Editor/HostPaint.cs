@@ -3,7 +3,10 @@ using System.Windows.Media;
 
 namespace DuckNote.App.Editor;
 
-public sealed class HostPaint(EditorBrushes brushes, Func<IReadOnlyDictionary<string, bool>> states)
+public sealed class HostPaint(
+    EditorBrushes brushes,
+    Func<IReadOnlyDictionary<string, bool>> states,
+    Func<string, bool>? setAside = null)
 {
     public const string Mark = "host:";
 
@@ -19,15 +22,25 @@ public sealed class HostPaint(EditorBrushes brushes, Func<IReadOnlyDictionary<st
     {
         foreach (Run run in row.Inlines.OfType<Run>())
         {
-            if (Named(run) is { } host)
+            if (Named(run) is not { } host)
             {
-                run.Foreground = brushes.ForHost(host, states());
+                continue;
             }
+
+            if (Aside(host))
+            {
+                Undo(run);
+                continue;
+            }
+
+            run.Foreground = brushes.ForHost(host, states());
         }
     }
 
     public static string? Named(Run run) =>
         run.Tag is string tag && tag.StartsWith(Mark, StringComparison.Ordinal) ? tag[Mark.Length..] : null;
+
+    private bool Aside(string host) => setAside?.Invoke(host) ?? false;
 
     private void Split(Paragraph row, Run run)
     {
@@ -35,18 +48,16 @@ public sealed class HostPaint(EditorBrushes brushes, Func<IReadOnlyDictionary<st
 
         if (Named(run) is { } already)
         {
-            if (already == text)
+            if (already == text && !Aside(already))
             {
                 run.Foreground = brushes.ForHost(already, states());
                 return;
             }
 
-            run.Tag = null;
-            run.ClearValue(TextElement.FontFamilyProperty);
-            run.Foreground = brushes.Text;
+            Undo(run);
         }
 
-        HostToken[] tokens = [.. HostTokens.Find(text)];
+        HostToken[] tokens = [.. HostTokens.Find(text).Where(token => !Aside(token.Value))];
         if (tokens.Length == 0)
         {
             return;
@@ -81,6 +92,13 @@ public sealed class HostPaint(EditorBrushes brushes, Func<IReadOnlyDictionary<st
         }
 
         row.Inlines.Remove(run);
+    }
+
+    private void Undo(Run run)
+    {
+        run.Tag = null;
+        run.ClearValue(TextElement.FontFamilyProperty);
+        run.Foreground = brushes.Text;
     }
 
     private void Wear(Run run, string host)
