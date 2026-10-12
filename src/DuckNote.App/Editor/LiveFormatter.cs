@@ -56,7 +56,11 @@ public sealed partial class LiveFormatter(RichTextBox editor, MarkdownRenderer r
                 Rules?.Apply(row);
             }
 
+            int caret = OffsetOf(row, editor.CaretPosition);
+
             hosts.Paint(row);
+
+            Land(row, caret);
         }
         catch (InvalidOperationException)
         {
@@ -64,6 +68,19 @@ public sealed partial class LiveFormatter(RichTextBox editor, MarkdownRenderer r
         finally
         {
             IsFormatting = false;
+        }
+    }
+
+    private void Land(Paragraph row, int caret)
+    {
+        if (caret < 0 || OffsetOf(row, editor.CaretPosition) == caret)
+        {
+            return;
+        }
+
+        if (PointAt(row, caret) is { } back)
+        {
+            editor.CaretPosition = back;
         }
     }
 
@@ -266,6 +283,59 @@ public sealed partial class LiveFormatter(RichTextBox editor, MarkdownRenderer r
                     break;
             }
         }
+    }
+
+    public static int OffsetOf(Paragraph? row, TextPointer? point)
+    {
+        if (row is null || point is null || !ReferenceEquals(point.Paragraph, row))
+        {
+            return -1;
+        }
+
+        int seen = 0;
+
+        for (TextPointer? at = row.ContentStart; at is not null && at.CompareTo(row.ContentEnd) < 0;)
+        {
+            if (at.GetPointerContext(LogicalDirection.Forward) != TextPointerContext.Text)
+            {
+                at = at.GetNextContextPosition(LogicalDirection.Forward);
+                continue;
+            }
+
+            int length = at.GetTextRunLength(LogicalDirection.Forward);
+            TextPointer? next = at.GetPositionAtOffset(length);
+
+            if (next is null || next.CompareTo(point) > 0)
+            {
+                return seen + Math.Max(0, at.GetOffsetToPosition(point));
+            }
+
+            seen += length;
+            at = next;
+        }
+
+        return seen;
+    }
+
+    public static TextPointer? PointAt(Paragraph row, int offset)
+    {
+        TextPointer? at = row.ContentStart;
+        int left = offset;
+
+        while (at is not null && left > 0 && at.CompareTo(row.ContentEnd) < 0)
+        {
+            if (at.GetPointerContext(LogicalDirection.Forward) != TextPointerContext.Text)
+            {
+                at = at.GetNextContextPosition(LogicalDirection.Forward);
+                continue;
+            }
+
+            int step = Math.Min(at.GetTextRunLength(LogicalDirection.Forward), left);
+            at = at.GetPositionAtOffset(step);
+            left -= step;
+        }
+
+        return left == 0 ? at : null;
     }
 
     public static string TextOf(Paragraph paragraph)

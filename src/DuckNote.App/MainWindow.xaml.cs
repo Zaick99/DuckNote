@@ -354,7 +354,13 @@ public partial class MainWindow : Window
         ScanProgress.Visibility = _session.IsRunning ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void SyncNoteHosts() => _session.EnsurePending(NoteHosts());
+    private void SyncNoteHosts()
+    {
+        IReadOnlyList<string> written = NoteHosts();
+
+        _session.EnsurePending(written);
+        _session.Prune(written);
+    }
 
     private void RefreshCounts()
     {

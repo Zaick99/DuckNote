@@ -62,6 +62,36 @@ public sealed class ScanSession : INotifyPropertyChanged
         }
     }
 
+    public void Prune(IEnumerable<string> written)
+    {
+        HashSet<string> keep = new(written, StringComparer.OrdinalIgnoreCase);
+        bool went = false;
+
+        for (int i = Rows.Count - 1; i >= 0; i--)
+        {
+            ScanRow row = Rows[i];
+
+            if (row.StatusRank < ScanRow.NeverChecked || Names(row).Any(keep.Contains))
+            {
+                continue;
+            }
+
+            foreach (string name in Names(row))
+            {
+                _index.Remove(name);
+            }
+
+            Rows.RemoveAt(i);
+            went = true;
+        }
+
+        if (went)
+        {
+            Notify(nameof(UpCount));
+            Notify(nameof(DownCount));
+        }
+    }
+
     public void Clear()
     {
         _ignored.Clear();
