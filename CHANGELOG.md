@@ -5,9 +5,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [0.0.10] - 2026-10-11
 
 The version is pinned here on purpose: work accumulates under 0.0.10 until there
-is a reason to cut a new one. The numbers 0.0.11 to 0.0.14 were cut on the same
-day and are retired — their entries stay below, because they were published, but
-everything they describe is part of this 0.0.10.
+is a reason to cut a new one. Four more numbers were minted during one day of
+work and then withdrawn — this entry is the whole of it, newest first, with the
+earlier rounds of the same day kept as sections rather than as versions.
 
 ### Fixed
 
@@ -123,15 +123,23 @@ gone, the word itself gone; the host table and the set-aside list empty; and the
 single-instance guard refusing the second claim and allowing one again after
 release.
 
-Twenty-eight sabotages, all caught — but two were worthless until the tests were
-fixed. The page-wiping check read `book.Pages`, which is empty after the
-collection is dropped, so it passed whether or not the documents were cleared;
-it holds the pages from outside now. And the instance-guard sabotage opened the
-lock file with sharing but without share-delete, which `DeleteOnClose` refuses
-anyway — it was proving the wrong thing. Both now fail the way a real defect
-would.
+For the caret: the offset measured before and after a repaint, on four kinds of
+line — after an IPv4, after a domain name, with text following the address, and
+on a line with no address at all, which must come through untouched. And with the
+caret in the middle of a line rather than at its end. For the pruning: an address
+removed from the note loses its row, writing it again brings it back, and a row
+carrying a real result survives being pruned.
 
-### Fixed, earlier in the same version
+Thirty-two sabotages, all caught — but four were worthless until the tests or the
+sabotages themselves were fixed. One was stopped by the compiler before the
+harness ran. One produced invalid XAML, so the harness failed on a parse error
+instead of on the assertion. The page-wiping check read `book.Pages`, which is
+empty by then, so it passed whether or not the documents were cleared. And the
+instance-guard sabotage opened the lock file without share-delete, which
+`DeleteOnClose` refuses anyway — it was proving the wrong thing. A sabotage that
+fails for the wrong reason is the same as a sabotage that was not caught.
+
+### Earlier the same day: the tree animation and the host card
 
 - **The tree would not animate on opening at all.** The first cause was the
   template: the sidebar recycles its containers, and a recycled container does
@@ -154,11 +162,11 @@ catches exactly that. Twenty-four sabotages, all caught.
 The cascade itself, and the tab staying where it is, are a few lines each and
 were read, not measured.
 
-## 0.0.13 - numero ritirato, confluito in 0.0.10
+### Earlier: the sidebar, two notches
 
 **Two notches on yesterday's sidebar.**
 
-### Changed
+#### Changed
 
 - **Two more pixels between a page's icon and its name.** The sheet sat 3 px from
   the title; it sits 5 px away now. The tree step went 26 → 28 with it, because
@@ -170,7 +178,7 @@ were read, not measured.
   surface: a soft accent fill and an accent-dark label. One state, one signal.
   Both sidebar modes lose it together — they share the template.
 
-### Verified
+#### Verified
 
 The harness now reads the gap between the icon's right edge and the label's left
 edge through the rendered layout, and the bar's absence by name. Twenty-three
@@ -184,11 +192,11 @@ assertion — caught, but for the wrong reason, which is the same as not caught.
 Wrapping the presenter and the bar in a Grid makes it valid, and the assertion
 fails on its own merits.
 
-## 0.0.12 - numero ritirato, confluito in 0.0.10
+### Earlier: the sidebar, redrawn
 
 **The structure sidebar, redrawn.** A page now carries a page.
 
-### Added
+#### Added
 
 - **Pages wear a sheet icon.** A small outlined page with a folded corner sits
   before every page name, and nothing sits before a heading: the two kinds of row
@@ -198,7 +206,7 @@ fails on its own merits.
   replaces the accent dot that used to sit at the far right of the row: a page's
   own icon saying "you are here" beats a dot at the other end of the line.
 
-### Changed
+#### Changed
 
 - **The selected row was three signals for one state.** A soft orange fill, an
   orange border *and* a bar that popped in at the left, all at once, on a row 18
@@ -216,12 +224,13 @@ fails on its own merits.
 
 - **A section's title lines up with its page's.** The sheet icon takes 12 px in
   front of a page name, which would have pushed page titles right of their own
-  sections — undoing the 0.0.11 fix. The page toggle narrowed from 18 to 14 px so
+  sections — undoing the fix from the round before. The page toggle narrowed from
+18 to 14 px so
   that toggle plus icon is exactly the tree step, 26: a page title and the titles
   under it now start at the same x, with the elbow pointing at the heading from 4
   px away.
 
-### Verified
+#### Verified
 
 Measured, not reasoned about this time. The harness builds the real
 `MainWindow`, takes `BranchRow` and `BranchItem` out of its resources, puts a
@@ -243,12 +252,12 @@ replacement text spanned two lines written with `\n` against a CRLF file, the
 same mismatch that corrupted the sources in 0.0.9. Anchored on a single line it
 applies, and the border coming back is caught twice.
 
-## 0.0.11 - numero ritirato, confluito in 0.0.10
+### Earlier: six things that looked wrong
 
 **Six things that looked wrong.** Not broken this time — misplaced, misshaped or
 the wrong colour.
 
-### Added
+#### Added
 
 - **Right-click an address and open its card.** *Mostra dettagli* joins *Analizza
   adesso* on an IP or a domain name in the note: it adds the host to the table if
@@ -256,7 +265,7 @@ the wrong colour.
   side panel on it. An address set aside says so instead, rather than opening an
   empty card.
 
-### Changed
+#### Changed
 
 - **A section's title now sits where its line points.** A heading left room for a
   fold toggle it can never have — only pages hold sections — so every title was
@@ -291,7 +300,7 @@ the wrong colour.
   wash, not a fill, so the title and the subtitle keep the label colour and stay
   readable in both themes.
 
-### Verified
+#### Verified
 
 The harness grew three groups. **Set aside:** the address is recognised, green
 because it answers, monospaced; set aside it keeps its text but takes the plain
@@ -310,12 +319,12 @@ harness ran, because an unread primary-constructor parameter is an error here.
 Rewritten to read the parameter and ask it the wrong question, they fail the way
 a real defect would — 3 and 1 red checks instead of none.
 
-## 0.0.10 - prima tornata
+### Earlier: eight things that did not work
 
 **Eight things that did not work.** Three of them were dead on arrival — menu
 entries wired to nothing — and the worst one locked you out of your own note.
 
-### Fixed
+#### Fixed
 
 - **The unlock button stopped responding after the second lock.** You could
   type the password and press Enter, but the button was dead to the mouse. Two
@@ -380,7 +389,7 @@ entries wired to nothing — and the worst one locked you out of your own note.
   word half in bold is still one word. Replace moved behind a toggle, so the bar
   stays small when all you want is to find something.
 
-### Verified
+#### Verified
 
 A harness drives the real editor, the real scan session and the real commands
 without opening a window. Margins: every one of the six paths that make a
@@ -422,7 +431,7 @@ the note is saved as XAML, so styles, borders and backgrounds survive being
 closed and reopened. A paragraph's `Tag` does not — measured — so the look of a
 line **is** its state, and nothing has to be kept in sync.
 
-### The markers are gone
+#### The markers are gone
 
 Write `**così**` and you get **così**: the asterisks said how to read it and
 their job is done. Up to 0.0.8 they stayed in the text, dimmed, and the note was
@@ -454,7 +463,7 @@ in.
   in `note.xaml.bak`, which saving always writes first, and tables are not
   flattened by the conversion.
 
-### Pages
+#### Pages
 
 One note was one document; now it is a collection of them.
 
@@ -477,7 +486,7 @@ One note was one document; now it is a collection of them.
 - **Addresses are collected from every page**, not only the open one, so the host
   list and the network table cover the whole note.
 
-### The structure is a tree
+#### The structure is a tree
 
 Pages are the roots, and under each one are **its `##` sections** — nothing
 else. The first level is already the page's name and does not repeat under
@@ -514,7 +523,7 @@ be noise. Two levels, read at a glance.
   headings, and the text inside it. Searching is for finding, not for filtering
   names.
 
-### Also
+#### Also
 
 - **The `H1`, `H2` and `H3` buttons scale like the headings they make** — 15,
   12.5 and 10.5 — and sit on one baseline. Centred one by one, three different
@@ -525,14 +534,14 @@ be noise. Two levels, read at a glance.
   changelog, where it is readable by someone who is not already inside the code,
   and in the history of this file.
 
-### Fixed
+#### Fixed
 
 - **A converted note was converted again at every open.** The check read the
   text alone, and on a numbered list the preview is `1. voce` — character for
   character the Markdown marker. It now also asks what the line already is: a
   line already dressed has no markers left to consume.
 
-### Verified
+#### Verified
 
 Measured end to end on a note written in the old format and opened by the real
 executable, with `DUCKNOTE_HOME` pointed at a scratch folder:
@@ -597,7 +606,7 @@ single addition — a `#pragma` line that lost its trailing comment.
 
 ## [0.0.8] - 2026-10-07
 
-### Fixed
+#### Fixed
 
 - **Live formatting stopped after the first line.** `FormatAll` walked the
   document with a lazy enumerator and redrew as it went — and redrawing a line
@@ -635,7 +644,7 @@ single addition — a `#pragma` line that lost its trailing comment.
   Two brushes for it, `TableLine` and `TableHeader`, had been sitting in
   `EditorBrushes` unused since the port.
 
-### Changed
+#### Changed
 
 - **A separator line looks like a separator.** It used to render as three grey
   minus signs. The cut is now drawn by the paragraph's own border, edge to
@@ -667,7 +676,7 @@ single addition — a `#pragma` line that lost its trailing comment.
 - **A table cannot be born inside a table.** With the caret in a cell the
   button refuses and says so, rather than nesting a grid in a cell.
 
-### Verified
+#### Verified
 
 Two harnesses build the real editor, press the buttons and read the document
 back.
@@ -693,7 +702,7 @@ Both harnesses were checked against sabotaged code before being trusted: with
 with `Change` touching only the first row the formatting harness failed on
 thirty-five, naming each.
 
-### Known
+#### Known
 
 `An_open_port_is_found_and_named` still fails intermittently when both test
 projects run at once, and passes on its own — the socket flake documented in
@@ -701,7 +710,7 @@ projects run at once, and passes on its own — the socket flake documented in
 
 ## [0.0.7] - 2026-10-07
 
-### Added
+#### Added
 
 - **Tables.** The five table buttons did nothing at all. They now insert a
   Markdown table and add or remove its rows and columns. Tables here are text,
@@ -719,7 +728,7 @@ projects run at once, and passes on its own — the socket flake documented in
 - **The find button** opens and closes the search bar. The fields in it still do
   not search; the button at least opens what it promises.
 
-### Changed
+#### Changed
 
 - **Scanning the note's hosts no longer jumps to the network view.** Whoever
   presses that button from the note wants the addresses there checked, not to be
@@ -727,7 +736,7 @@ projects run at once, and passes on its own — the socket flake documented in
   network view still opens when the scan starts from there, where the result is
   the table.
 
-### Verified
+#### Verified
 
 Every button on the format bar was pressed in a harness and checked for an
 actual change to the note — in the context where it makes sense: clearing wants
@@ -737,7 +746,7 @@ delete, which refuses on purpose and says so in the status bar.
 
 ## [0.0.6] - 2026-10-05
 
-### Removed
+#### Removed
 
 - **The grid behind the note.** A tiled pattern of faint lines with an orange
   one every 160 px, drawn under the editor since the PowerShell days. It read as
@@ -751,7 +760,7 @@ delete, which refuses on purpose and says so in the status bar.
 
 Three fixes on the animations, and the documentation the repository was missing.
 
-### Fixed
+#### Fixed
 
 - **Picking a heading in Struttura now goes somewhere.** It did nothing at all:
   the guard that routes sidebar clicks asked for an address, and a heading has
@@ -770,13 +779,13 @@ Three fixes on the animations, and the documentation the repository was missing.
   grow by half, but the scale is a render transform and layout cannot see it —
   the box was 132 tall while the circle took 168.
 
-### Added
+#### Added
 
 - A `CHANGELOG.md`, which this repository did not have.
 - The README now mentions what the application already did and the page did not
   say: scrolling to a heading, and the ducks behind the editor.
 
-### Known
+#### Known
 
 The scanner tests touch real sockets and fail intermittently — on this code and
 on 0.0.4 alike, verified by cloning and running them. Widening the timeouts did
@@ -796,7 +805,7 @@ worth: two scan engines to support both PowerShell 5.1 and 7, Argon2id written
 in a language without unsigned 64-bit arithmetic, and nothing that could be
 tested without opening the window.
 
-### Added
+#### Added
 
 - **126 tests**, running headless in about a second. `DuckNote.Core` and
   `DuckNote.Scan` have no reference to WPF, which is what makes them possible.
@@ -816,7 +825,7 @@ tested without opening the window.
 - **The padlock is always in the toolbar**, open when the note has no key:
   whoever declined encryption at first start can still turn it on.
 
-### Changed
+#### Changed
 
 - One scan engine instead of two: `SemaphoreSlim`, `Channel` and
   `IAsyncEnumerable`.
@@ -825,7 +834,7 @@ tested without opening the window.
 - Auto-lock now defaults to **15 minutes**, was 30.
 - Every surface shares one glass material, and the window has no light border.
 
-### Fixed
+#### Fixed
 
 - **Closing the key screen no longer opens the note.** The cross and *Piu'
   tardi* used to mean the same thing; whoever gave up at the first screen got
@@ -848,12 +857,12 @@ tested without opening the window.
 - A scan that fails no longer takes the window down with it, and an unexpected
   error saves the note before leaving.
 
-### Known
+#### Known
 
 The scanner tests touch real sockets and fail intermittently on a busy machine.
 It is the test harness that is unreliable, not the scanner.
 
-### Not ported yet
+#### Not ported yet
 
 Visible in the interface but without code behind them: table filter and search,
 the status dropdown, CSV export, sending results into the note, find and
