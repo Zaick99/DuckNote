@@ -221,26 +221,7 @@ public sealed partial class InputRules(RichTextBox editor, MarkdownRenderer rend
         }
     }
 
-    private static TextPointer? At(Paragraph row, int offset)
-    {
-        TextPointer? at = row.ContentStart;
-        int left = offset;
-
-        while (at is not null && left > 0 && at.CompareTo(row.ContentEnd) < 0)
-        {
-            if (at.GetPointerContext(LogicalDirection.Forward) != TextPointerContext.Text)
-            {
-                at = at.GetNextContextPosition(LogicalDirection.Forward);
-                continue;
-            }
-
-            int step = Math.Min(at.GetTextInRun(LogicalDirection.Forward).Length, left);
-            at = at.GetPositionAtOffset(step);
-            left -= step;
-        }
-
-        return left == 0 ? at : null;
-    }
+    private static TextPointer? At(Paragraph row, int offset) => LiveFormatter.PointAt(row, offset);
 
     [GeneratedRegex(@"^(?:(?<hash>#{1,3})|(?<quote>>)|[-*+]\s+\[(?<done>[ xX])\]|(?<number>\d+)[.)]|[-*+])\s")]
     private static partial Regex Opening();

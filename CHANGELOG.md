@@ -9,6 +9,31 @@ is a reason to cut a new one. The numbers 0.0.11 to 0.0.14 were cut on the same
 day and are retired — their entries stay below, because they were published, but
 everything they describe is part of this 0.0.10.
 
+### Fixed
+
+- **The caret jumped to the start of the line after typing an address.** Write
+  an IP or a domain name, press space, and the cursor was at column zero. Nothing
+  to do with the space: 180 ms after the keystroke the live formatter repaints
+  the line, and colouring an address means **replacing the runs it sits in** —
+  the original run is removed and copies are inserted around the address. The
+  caret was inside that run, so it was lost, and WPF put it back at the start.
+  Measured: the offset went from 23 to 0, and only on lines that contain an
+  address — a line without one came through untouched, which is exactly what you
+  reported.
+
+  The caret's character offset in the line is now taken before the repaint and
+  put back after. The two halves — measuring an offset and finding the position
+  for one — walk the text runs the same way, from one shared pair of functions,
+  so they cannot drift apart. The input rules already had their own copy of that
+  walk; they use the shared one now.
+
+- **Addresses deleted from the note left their rows behind.** `SyncNoteHosts`
+  only ever added: typing an address created a pending row, deleting it left the
+  row in the host table and in the sidebar for good. The note's addresses are now
+  pruned as well as added — but only the rows that were **never checked**. A row
+  carrying a real result is scan history and stays, whether or not the note still
+  mentions it.
+
 ### Security
 
 Asked for, and the review found more than it was asked about.
