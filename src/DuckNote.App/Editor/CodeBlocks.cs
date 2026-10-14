@@ -3,7 +3,7 @@ using System.Windows.Documents;
 
 namespace DuckNote.App.Editor;
 
-public sealed class CodeBlocks(RichTextBox editor, MarkdownRenderer renderer)
+public sealed class CodeBlocks(RichTextBox editor, Dresser renderer)
 {
     public Paragraph? Fold(IReadOnlyList<Paragraph> rows)
     {

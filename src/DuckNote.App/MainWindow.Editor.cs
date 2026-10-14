@@ -1,10 +1,10 @@
 using System.Diagnostics;
 using System.IO;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Navigation;
 using System.Windows.Threading;
@@ -21,7 +21,7 @@ public partial class MainWindow
     private readonly EditorBrushes _editorBrushes = new();
     private readonly Dictionary<string, bool> _hostStates = new(StringComparer.OrdinalIgnoreCase);
 
-    private MarkdownRenderer _renderer = null!;
+    private Dresser _renderer = null!;
     private LiveFormatter _formatter = null!;
     private EditorCommands _commands = null!;
     private CodeBlocks _blocks = null!;
@@ -39,15 +39,11 @@ public partial class MainWindow
 
     private void SetUpEditor()
     {
-        _renderer = new MarkdownRenderer(_editorBrushes, () => _hostStates, _session.IsIgnored);
+        _renderer = new Dresser(_editorBrushes);
         _blocks = new CodeBlocks(Editor, _renderer);
         _formatter = new LiveFormatter(
             Editor,
-            _renderer,
-            new HostPaint(_editorBrushes, () => _hostStates, _session.IsIgnored))
-        {
-            Rules = new InputRules(Editor, _renderer, _blocks, _editorBrushes)
-        };
+            new HostPaint(_editorBrushes, () => _hostStates, _session.IsIgnored));
         _commands = new EditorCommands(Editor, _formatter, _renderer, _blocks);
         _commands.Refused += message => StatusText.Text = message;
         _commands.AskForLink = AskForLink;
@@ -85,6 +81,7 @@ public partial class MainWindow
         };
 
         WireFormatBar();
+        SetUpInsets();
         LoadNote();
     }
 
@@ -143,7 +140,7 @@ public partial class MainWindow
         LinkWindow sheet = new(shown, address, _theme, Resources) { Owner = this };
 
         return sheet.ShowDialog() == true
-            ? new LinkChoice(sheet.Address, sheet.Removed)
+            ? new LinkChoice(sheet.Address, sheet.Shown, sheet.Removed)
             : null;
     }
 
@@ -196,11 +193,29 @@ public partial class MainWindow
         _tables = new TableCommands(Editor, _formatter, _editorBrushes);
         _tables.Refused += message => StatusText.Text = message;
 
+        TblMenu.Click += (_, _) => DropTableMenu();
+
         TblNew.Click += (_, _) => _tables.Insert();
         TblRowAdd.Click += (_, _) => _tables.AddRow();
         TblRowDel.Click += (_, _) => _tables.RemoveRow();
         TblColAdd.Click += (_, _) => _tables.AddColumn();
         TblColDel.Click += (_, _) => _tables.RemoveColumn();
+    }
+
+    /// <summary>
+    /// Il menu della tabella scende da sotto il suo tasto, non dove sta il
+    /// mouse: e' un menu di barra, non un menu di destro.
+    /// </summary>
+    private void DropTableMenu()
+    {
+        if (TblMenu.ContextMenu is not { } menu)
+        {
+            return;
+        }
+
+        menu.PlacementTarget = TblMenu;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.IsOpen = true;
     }
 
     private TableCommands? _tables;
@@ -247,19 +262,19 @@ public partial class MainWindow
 
             if (_vault.IsDamaged)
             {
-                _book = NoteBook.Of(NoteDocument.FromText(Unreadable(), _renderer, _editorBrushes.Text));
+                _book = NoteBook.Of(NoteDocument.FromText(Unreadable(), _editorBrushes.Text));
                 Editor.IsReadOnly = true;
                 StatusText.Text = "Contenitore danneggiato: salvataggio sospeso.";
             }
             else if (stored is { Length: > 0 }
-                && NoteBook.Load(stored, _editorBrushes.Text, out single) is { } saved)
+                && NoteBook.Load(stored, _editorBrushes, out single) is { } saved)
             {
                 _book = saved;
                 StatusText.Text = _vault.IsOpen ? "Nota aperta dalla cassaforte." : "Nota aperta.";
             }
             else
             {
-                _book = NoteBook.Of(NoteDocument.FromText(Welcome(), _renderer, _editorBrushes.Text));
+                _book = NoteBook.Of(Welcome(_renderer, _editorBrushes.Text));
                 StatusText.Text = "Nota nuova.";
 
                 _fresh = true;
@@ -267,7 +282,7 @@ public partial class MainWindow
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            _book = NoteBook.Of(NoteDocument.FromText(Welcome(), _renderer, _editorBrushes.Text));
+            _book = NoteBook.Of(Welcome(_renderer, _editorBrushes.Text));
             StatusText.Text = "Nota non leggibile: ne apro una nuova.";
         }
         finally
@@ -275,15 +290,11 @@ public partial class MainWindow
             _formatter.Suspended = false;
         }
 
-        bool converted = ConvertPages();
+        ReadyPages();
+        AdoptInsets();
         ShowPage(_book.Pages[0]);
 
-        if (converted)
-        {
-            StatusText.Text = "Nota convertita: i marcatori sono diventati formattazione.";
-        }
-
-        _noteDirty = _fresh || converted || single || _tidied;
+        _noteDirty = _fresh || single || _tidied;
 
         if (_noteDirty)
         {
@@ -291,10 +302,8 @@ public partial class MainWindow
         }
     }
 
-    private bool ConvertPages()
+    private void ReadyPages()
     {
-        bool any = false;
-
         foreach (NotePage page in _book.Pages)
         {
             _swapping = true;
@@ -308,18 +317,8 @@ public partial class MainWindow
             }
 
             _tidied |= NoteDocument.Flatten(page.Document);
-
-            if (_formatter.NeedsImport())
-            {
-                _formatter.Import();
-                any = true;
-                continue;
-            }
-
             _formatter.PaintAll();
         }
-
-        return any;
     }
 
     private void ShowPage(NotePage page)
@@ -411,32 +410,55 @@ public partial class MainWindow
         Chiudi DuckNote, rinominala in store.bin e riapri.
         """;
 
-    [GeneratedRegex(@"^(#{1,3})\s+(.+)$")]
-    private static partial Regex HeadingLine();
+    private static FlowDocument Welcome(Dresser dress, Brush ink)
+    {
+        FlowDocument note = NoteDocument.Empty(ink);
 
-    private static string Welcome() =>
-        """
-        # DuckNote
+        Add(note, dress, Look.Heading1, "DuckNote");
+        Add(note, dress, Look.Text, "Note tecniche e scanner di rete nella stessa finestra.");
+        Add(note, dress, Look.Text, string.Empty);
+        Add(note, dress, Look.Text,
+            "Scrivi un indirizzo e DuckNote lo controlla: il gateway 192.168.1.1, il NAS " +
+            "nas.casa.lan, i DNS 1.1.1.1 e 1.0.0.1. Ogni indirizzo riconosciuto prende il " +
+            "colore del suo stato: verde raggiungibile, rosso spento, grigio mai provato.");
+        Add(note, dress, Look.Text, string.Empty);
 
-        Note tecniche e scanner di rete nella stessa finestra.
+        Add(note, dress, Look.Heading2, "Come si scrive");
+        Add(note, dress, Look.Text,
+            "Si scrive e si preme un tasto della barra: niente marcatori da ricordare. " +
+            "Grassetto, corsivo, sottolineato, barrato, evidenziato, codice, titoli, " +
+            "elenchi, spunte, citazioni, tabelle, collegamenti.");
+        Add(note, dress, Look.Text, string.Empty);
 
-        Scrivi un indirizzo e DuckNote lo controlla: il gateway 192.168.1.1, il NAS
-        nas.casa.lan, i DNS 1.1.1.1 e 1.0.0.1. Ogni indirizzo riconosciuto prende il
-        colore del suo stato — verde raggiungibile, rosso spento, grigio mai provato.
+        Add(note, dress, Look.Todo, "provare una spunta, cliccandoci sopra");
+        Add(note, dress, Look.Bullet, "una voce di elenco");
+        Add(note, dress, Look.Quote, "Una citazione, per le cose dette da altri.");
+        Add(note, dress, Look.Text, string.Empty);
 
-        ## Come si scrive
+        Add(note, dress, Look.Heading2, "Disegni, immagini e grafici");
+        Add(note, dress, Look.Text,
+            "I tre tasti in fondo alla barra mettono nel testo un riquadro da disegno, " +
+            "un'immagine o un grafico. Il riquadro si disegna col mouse; l'immagine arriva " +
+            "da un file o dagli appunti; il grafico da qualche numero.");
+        Add(note, dress, Look.Text, string.Empty);
 
-        Il testo e' **grassetto**, *corsivo*, __sottolineato__, ~~barrato~~, ==evidenziato==
-        e `codice`. I marcatori restano scritti, cosi' il file resta leggibile.
+        return note;
+    }
 
-        - [ ] provare una spunta, cliccandoci sopra
-        - [x] questa e' gia' fatta
-        - un elenco normale
+    private static void Add(FlowDocument note, Dresser dress, Look look, string line)
+    {
+        Paragraph row = NoteDocument.Row();
 
-        > Una citazione, per le cose dette da altri.
+        if (line.Length > 0)
+        {
+            row.Inlines.Add(dress.Plain(line));
+        }
 
-        ---
+        note.Blocks.Add(row);
 
-        ; le righe che cominciano con punto e virgola sono commenti
-        """;
+        if (look != Look.Text)
+        {
+            dress.Dress(row, look);
+        }
+    }
 }

@@ -83,7 +83,6 @@ public partial class MainWindow
 
         _theme = _settings.FollowSystemTheme ? ThemeTokens.FromSystem() : _settings.Theme;
         ApplyTheme(_theme);
-        _renderer.LiveFormatting = _settings.LiveFormatting;
         StartMonitor();
         StartIdleWatch();
         RebuildDucks();

@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using DuckNote.App.Storage;
@@ -65,7 +65,6 @@ public partial class PreferencesWindow : Window
     {
         PSysTheme.IsChecked = _settings.FollowSystemTheme;
         PTheme.SelectedIndex = _settings.Theme == "dark" ? 1 : 0;
-        PLiveFmt.IsChecked = _settings.LiveFormatting;
 
         PDucks.IsChecked = _settings.DuckBackground;
         PDuckN.Text = Number(_settings.DuckCount);
@@ -128,7 +127,6 @@ public partial class PreferencesWindow : Window
     {
         _settings.FollowSystemTheme = PSysTheme.IsChecked == true;
         _settings.Theme = PTheme.SelectedIndex == 1 ? "dark" : "light";
-        _settings.LiveFormatting = PLiveFmt.IsChecked == true;
 
         _settings.DuckBackground = PDucks.IsChecked == true;
         _settings.DuckCount = Clamp(PDuckN.Text, _settings.DuckCount, 0, 200);

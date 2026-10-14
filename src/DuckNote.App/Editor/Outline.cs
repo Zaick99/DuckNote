@@ -49,15 +49,22 @@ public static class Outline
         return Dressed(root);
     }
 
+    /// <summary>
+    /// Appende i titoli sotto la pagina, mettendo ogni h2 sotto l'h1 che lo
+    /// precede. Un h2 senza nessun h1 davanti sta sotto la pagina: nessun
+    /// titolo sparisce per colpa di come e' scritta la nota.
+    /// </summary>
     private static void Nest(
         SideNode root,
-        List<(string Text, Paragraph Row)> headings,
+        List<(string Text, Paragraph Row, int Level)> headings,
         string filter,
         IReadOnlyDictionary<string, bool> open)
     {
+        SideNode? head = null;
+
         for (int i = 0; i < headings.Count; i++)
         {
-            (string text, Paragraph row) = headings[i];
+            (string text, Paragraph row, int level) = headings[i];
 
             if (!Matches(filter, text))
             {
@@ -67,7 +74,14 @@ public static class Outline
             SideNode node = Node($"h:{root.PageId}:{i}", root.PageId, isPage: false, text, open);
             node.Heading = row;
 
-            root.Children.Add(node);
+            if (level == 1)
+            {
+                root.Children.Add(node);
+                head = node;
+                continue;
+            }
+
+            (head ?? root).Children.Add(node);
         }
     }
 
@@ -169,20 +183,33 @@ public static class Outline
     private static string Figure(string shape, params object[] parts) =>
         string.Format(CultureInfo.InvariantCulture, shape, parts);
 
-    public static List<(string Text, Paragraph Row)> Headings(NotePage page)
+    /// <summary>
+    /// I titoli del testo, in ordine di lettura e col loro grado: il primo
+    /// livello sono gli h1, e gli h2 che li seguono gli stanno sotto.
+    /// </summary>
+    public static List<(string Text, Paragraph Row, int Level)> Headings(NotePage page)
     {
-        List<(string, Paragraph)> found = [];
+        List<(string, Paragraph, int)> found = [];
 
         foreach (Paragraph row in LiveFormatter.RowsOf(page.Document))
         {
-            if (Looks.Is(row, Look.Heading2))
+            if (Grade(row) is not { } level)
             {
-                found.Add((LiveFormatter.TextOf(row).Trim(), row));
+                continue;
             }
+
+            found.Add((LiveFormatter.TextOf(row).Trim(), row, level));
         }
 
         return found;
     }
+
+    private static int? Grade(Paragraph row) => Looks.Of(row) switch
+    {
+        Look.Heading1 => 1,
+        Look.Heading2 => 2,
+        _ => null
+    };
 
     public static bool Matches(string filter, string text) =>
         filter.Length == 0 || Regex.IsMatch(text, Regex.Escape(filter), RegexOptions.IgnoreCase);

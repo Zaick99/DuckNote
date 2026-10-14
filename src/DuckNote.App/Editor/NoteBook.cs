@@ -1,5 +1,6 @@
 using System.IO;
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Windows.Documents;
 using System.Windows.Markup;
@@ -35,6 +36,11 @@ public sealed class NoteBook
     {
         foreach (NotePage page in _pages)
         {
+            foreach (InsetBox box in InsetFolding.Boxes(page.Document))
+            {
+                CryptographicOperations.ZeroMemory(box.Inset.Bytes);
+            }
+
             page.Document.Blocks.Clear();
             page.Name = string.Empty;
         }
@@ -68,9 +74,7 @@ public sealed class NoteBook
             foreach (NotePage page in _pages)
             {
                 order.Append(page.Id).Append('\t').Append(NotePage.Clean(page.Name)).Append('\n');
-
-                using Stream entry = archive.CreateEntry($"{page.Id}.xaml", CompressionLevel.Optimal).Open();
-                entry.Write(NoteDocument.ToXaml(page.Document));
+                Write(archive, page);
             }
 
             using Stream index = archive.CreateEntry(Index, CompressionLevel.Optimal).Open();
@@ -80,11 +84,32 @@ public sealed class NoteBook
         return stream.ToArray();
     }
 
-    public static NoteBook? Load(byte[] bytes, Brush foreground, out bool single)
+    /// <summary>
+    /// Una pagina sono il suo XAML e i byte dei suoi riquadri. Mentre si scrive,
+    /// al posto delle cornici stanno i segnaposti: un BlockUIContainer non
+    /// tornerebbe indietro dal salvataggio.
+    /// </summary>
+    private static void Write(ZipArchive archive, NotePage page)
+    {
+        using InsetFolding.Folding folded = InsetFolding.Fold(page.Document);
+
+        using (Stream entry = archive.CreateEntry($"{page.Id}.xaml", CompressionLevel.Optimal).Open())
+        {
+            entry.Write(NoteDocument.ToXaml(page.Document));
+        }
+
+        foreach (Inset inset in folded.Insets)
+        {
+            using Stream entry = archive.CreateEntry(inset.Entry, CompressionLevel.Optimal).Open();
+            entry.Write(inset.Bytes);
+        }
+    }
+
+    public static NoteBook? Load(byte[] bytes, EditorBrushes brushes, out bool single)
     {
         single = !IsArchive(bytes);
 
-        return single ? Lone(bytes, foreground) : Many(bytes, foreground);
+        return single ? Lone(bytes, brushes.Text) : Many(bytes, brushes);
     }
 
     private static bool IsArchive(byte[] bytes) => bytes.Length > 1 && bytes[0] == 'P' && bytes[1] == 'K';
@@ -92,7 +117,7 @@ public sealed class NoteBook
     private static NoteBook? Lone(byte[] bytes, Brush foreground) =>
         NoteDocument.FromXaml(bytes, foreground) is { } document ? Of(document) : null;
 
-    private static NoteBook? Many(byte[] bytes, Brush foreground)
+    private static NoteBook? Many(byte[] bytes, EditorBrushes brushes)
     {
         try
         {
@@ -103,19 +128,14 @@ public sealed class NoteBook
 
             foreach ((string id, string name) in Order(archive))
             {
-                if (archive.GetEntry($"{id}.xaml") is not { } entry)
+                if (Read(archive, $"{id}.xaml") is not { } saved
+                    || NoteDocument.FromXaml(saved, brushes.Text) is not { } document)
                 {
                     continue;
                 }
 
-                using Stream content = entry.Open();
-                using MemoryStream raw = new();
-                content.CopyTo(raw);
-
-                if (NoteDocument.FromXaml(raw.ToArray(), foreground) is { } document)
-                {
-                    book._pages.Add(new NotePage { Id = id, Document = document, Name = name });
-                }
+                InsetFolding.Unfold(document, inset => Read(archive, inset.Entry), brushes);
+                book._pages.Add(new NotePage { Id = id, Document = document, Name = name });
             }
 
             return book.Count > 0 ? book : null;
@@ -124,6 +144,20 @@ public sealed class NoteBook
         {
             return null;
         }
+    }
+
+    private static byte[]? Read(ZipArchive archive, string name)
+    {
+        if (archive.GetEntry(name) is not { } entry)
+        {
+            return null;
+        }
+
+        using Stream content = entry.Open();
+        using MemoryStream raw = new();
+        content.CopyTo(raw);
+
+        return raw.ToArray();
     }
 
     private static List<(string Id, string Name)> Order(ZipArchive archive)

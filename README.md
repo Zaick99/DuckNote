@@ -25,7 +25,7 @@ What the rewrite bought:
 | | PowerShell | C# / .NET 10 |
 |---|---|---|
 | Scan engine | two, one per PowerShell version | one, `Channel` + `IAsyncEnumerable` |
-| Tests | none that could run headless | 126, run in about a second |
+| Tests | none that could run headless | 132, run in about a second |
 | Startup | script extraction, BOM dance, hash check | a single executable |
 | Argon2id | hand-rolled 64-bit arithmetic | same algorithm, verified against RFC 9106 §5.3 |
 | Type errors | at runtime, in front of the user | at compile time |
@@ -56,16 +56,16 @@ wired into the interface and waiting for their code.
 
 ## What it does
 
-**Markdown goes in, formatting comes out — the markers do not stay.** Write
-`**così**` and you get **così**: the asterisks have said how to read it and
-their job is done. Headings, bold, italic, underline, strikethrough, highlight,
-inline code, code blocks, lists, numbered lists, quotes, checkboxes, links,
-separators. A separator is a line, not three dashes. A code block is one block,
-not a fence above and a fence below. A bullet is a bullet, not a hyphen.
+**You type text and press a button — there is no markup to remember.** Headings,
+bold, italic, underline, strikethrough, highlight, inline code, code blocks,
+lists, numbered lists, quotes, checkboxes, links, separators. A separator is a
+line, not three dashes. A code block is one block, not a fence above and a fence
+below. A bullet is a bullet, not a hyphen. Asterisks, backticks and `#` are
+characters like any other: `2 * 3 * 4` stays as written.
 
-Markdown is how you write, not what you read. It is applied when a marker
-closes, and `2 * 3 * 4` keeps its asterisks — a marker with a space against it
-from the inside is not a marker.
+Markdown used to be the way in, and it was the wrong one — a parser watching
+every keystroke, deciding when a marker had closed, and rewriting the line under
+the caret. Notes written that way are read exactly as before; nothing is lost.
 
 **Every button works on the selection.** Select three lines, press any button,
 and all three change: a style sits on the text, so there is no syntax that has
@@ -97,10 +97,27 @@ between runs; the host list's menu lists the ones set aside, one click to take
 them back.
 
 **Real tables.** The table buttons build a grid, not rows of pipe characters:
-a header with its own background, one-pixel borders, cells you tab through.
-Rows and columns are added and removed around the caret. Markdown written when
-tables were only text is recovered — put the caret in such a block, press the
-table button, and it becomes a real table.
+a header with its own background, one-pixel borders, cells you tab through. They
+live under the **Tabella** menu in the bar: inserting one, and adding or
+removing rows and columns around the caret. Tables written as rows
+of pipe characters, back when they could only be text, are recovered — put the
+caret in such a block, choose *Inserisci tabella*, and it becomes a real table.
+
+**Drawings, images and charts live in the text.** The last three buttons in the
+bar drop a framed box where the caret is: a sheet you draw on with the mouse,
+an image from a file, or a chart built from a few numbers you type. A frame is
+as wide as it needs to be and **text wraps around it**, line after line and
+Enter included, returning to full width once the frame ends; put a second one
+next to the first and they split the line evenly, tops aligned. Drag the bottom
+edge for height and the right edge for width — the width stops at the page. Pasting a screenshot with Ctrl+V inserts it as
+an image instead of leaving behind something that would vanish on reopening.
+
+A chart stays editable: it keeps the lines you wrote (`gateway 3`, one per line,
+with `tipo:` for bars, lines or a pie and `titolo:` for its name), so you change
+a number rather than redrawing a picture. Bars, line and pie take their colours
+from the theme. A drawing keeps its own paper and ink — a sketch made at night
+is still legible by day. Every frame is stored beside the page inside the note
+container: ink as strokes, an image as its original bytes, a chart as its text.
 
 **Network scanner.** Ping, TTL and operating-system guess, reverse DNS,
 NetBIOS, mDNS, SSDP/UPnP, SNMP v2c, MAC and vendor (IEEE OUI database), open
@@ -151,8 +168,8 @@ release binary is published with the release.
 
 ### Note view — **Note**
 
-You write as you would in a Markdown file — and what you get is the result, not
-the source. Addresses go wherever they land: **IPv4, IPv6 and domain names are
+You write, select, and press a button in the bar; the keyboard shortcuts work
+too. Addresses go wherever they land: **IPv4, IPv6 and domain names are
 collected from the whole text**, mid-sentence included, as many per line as you
 like.
 
@@ -184,10 +201,10 @@ The sidebar switches between **Host** and **Struttura**, with a filter box over
 each. Picking a heading scrolls the note to its line — it travels there rather
 than jumping, so you can see where you came from.
 
-**Struttura is a tree of pages.** A page is named by the first `#` heading it
-opens with, and under it are **its `##` sections** — nothing else: the first
-level is already the page's name and the third is detail inside a section, which
-in the structure would only be noise. Two levels, read at a glance.
+**Struttura is a tree of pages.** Under each page are its `#` headings, and
+under each of those the `##` headings that follow it — an `##` with no `#` above
+it hangs straight off the page. `###` is detail inside a section and would only
+be noise in the structure, so it is left out.
 
 Tree lines show what leads where: a vertical for every branch that continues
 below, an elbow into each entry. Folding is animated both ways, and what you
@@ -201,10 +218,11 @@ count appears only when a search found the word inside a page's body.
 **Pressing a page takes you back to the top of it**, onto its title, even when
 it was already the open one. Pressing a section takes you to its line.
 
-**A page can be named by hand.** The `+` button makes one; right-click renames —
-the name is written in a field on its own row, no dialog — and from then on it
-wins even if the heading changes. Right-click also removes a page, except the
-last.
+**A page is named by hand, and only by hand.** The `+` button makes one;
+right-click → *Imposta titolo* writes the name in a field on its own row, no
+dialog. A page with no name reads *Senza titolo*: nothing in the text renames
+it, because a page that renames itself as you write is a page you cannot keep
+track of. Right-click also removes a page, except the last.
 
 **The filter searches every page** — names, headings, and the text inside: a
 page whose body contains the word stays in the list and says how many times.

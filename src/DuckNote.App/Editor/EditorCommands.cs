@@ -16,9 +16,9 @@ public enum Mark
     Link
 }
 
-public sealed record LinkChoice(string Address, bool Removed);
+public sealed record LinkChoice(string Address, string Text, bool Removed);
 
-public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, MarkdownRenderer renderer, CodeBlocks blocks)
+public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, Dresser renderer, CodeBlocks blocks)
 {
     public event Action<string>? Refused;
 
@@ -109,7 +109,7 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
 
         editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty, renderer.Palette.CodeBackground);
         editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, renderer.Palette.CodeForeground);
-        editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(MarkdownRenderer.MonoFonts));
+        editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(Dresser.MonoFonts));
     }
 
     private void Address()
@@ -122,12 +122,6 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
         Hyperlink? here = editor.Selection.IsEmpty
             ? LinkAt(editor.Selection.Start)
             : Covering(editor.Selection);
-
-        if (here is null && editor.Selection.IsEmpty)
-        {
-            Refused?.Invoke("Seleziona il testo da collegare.");
-            return;
-        }
 
         if (here is null && editor.Selection.Start.Paragraph != editor.Selection.End.Paragraph)
         {
@@ -182,12 +176,53 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
             return;
         }
 
-        Hyperlink fresh = new(editor.Selection.Start, editor.Selection.End)
+        if (editor.Selection.IsEmpty)
         {
-            NavigateUri = new Uri(choice.Address),
-            ToolTip = choice.Address,
-            Foreground = renderer.Palette.Link
-        };
+            Wrote(choice);
+            return;
+        }
+
+        Dressed(new Hyperlink(editor.Selection.Start, editor.Selection.End), choice);
+    }
+
+    /// <summary>
+    /// Niente di selezionato: il testo da mostrare arriva dalla finestra e
+    /// viene scritto dove sta il cursore, poi vestito da collegamento.
+    /// </summary>
+    private void Wrote(LinkChoice choice)
+    {
+        if (choice.Text.Length == 0
+            || editor.CaretPosition is not { Paragraph: { } row } caret)
+        {
+            return;
+        }
+
+        // Il pezzo di testo si costruisce e si mette dov'e' il cursore: contare
+        // i caratteri per ritrovarne la fine sbaglia di uno, perche' entrare in
+        // un Run conta come un passo.
+        Run word = new(choice.Text);
+
+        if (caret.GetAdjacentElement(LogicalDirection.Backward) is Inline before)
+        {
+            row.Inlines.InsertAfter(before, word);
+        }
+        else if (row.Inlines.FirstInline is { } first)
+        {
+            row.Inlines.InsertBefore(first, word);
+        }
+        else
+        {
+            row.Inlines.Add(word);
+        }
+
+        Dressed(new Hyperlink(word.ContentStart, word.ContentEnd), choice);
+    }
+
+    private void Dressed(Hyperlink fresh, LinkChoice choice)
+    {
+        fresh.NavigateUri = new Uri(choice.Address);
+        fresh.ToolTip = choice.Address;
+        fresh.Foreground = renderer.Palette.Link;
 
         editor.Selection.Select(fresh.ContentStart, fresh.ContentEnd);
     }
@@ -337,8 +372,14 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
                 renderer.Dress(rule, Look.Rule);
                 where.InsertAfter(last, rule);
 
-                Paragraph after = NoteDocument.Row();
-                where.InsertAfter(rule, after);
+                // Una riga vuota in piu' sotto la separazione le sbilancia lo
+                // spazio: se c'e' gia' una riga dove andare, si va in quella.
+                if (rule.NextBlock is not Paragraph after)
+                {
+                    after = NoteDocument.Row();
+                    where.InsertAfter(rule, after);
+                }
+
                 editor.CaretPosition = after.ContentStart;
             }
             finally
@@ -390,8 +431,27 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
         }
 
         editor.CaretPosition = next.ContentEnd;
+        WritesPlain(next);
 
         return true;
+    }
+
+    /// <summary>
+    /// Il cursore lasciato subito dopo un marcatore eredita il suo pennello, e
+    /// quel grigio in mono e' del segno dell'elenco, non di quello che la
+    /// persona sta per scrivere. Su una selezione vuota ApplyPropertyValue
+    /// scrive proprio quel che il prossimo carattere userà.
+    /// </summary>
+    private void WritesPlain(Paragraph row)
+    {
+        if (Looks.MarkLength(row) == 0 || !editor.Selection.IsEmpty)
+        {
+            return;
+        }
+
+        editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, renderer.Palette.Text);
+        editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(NoteDocument.UiFonts));
+        editor.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty, null);
     }
 
     public void ClearFormatting()
@@ -519,18 +579,12 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
         if (rows.Length == 1)
         {
             editor.CaretPosition = rows[0].ContentEnd;
+            WritesPlain(rows[0]);
             return;
         }
 
         editor.Selection.Select(rows[0].ContentStart, rows[^1].ContentEnd);
     }
 
-    private static BlockCollection? Siblings(Paragraph row) => row.Parent switch
-    {
-        FlowDocument document => document.Blocks,
-        TableCell cell => cell.Blocks,
-        ListItem item => item.Blocks,
-        Section section => section.Blocks,
-        _ => null
-    };
+    private static BlockCollection? Siblings(Paragraph row) => NoteDocument.Siblings(row);
 }
