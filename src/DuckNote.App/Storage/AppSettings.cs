@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -11,7 +11,6 @@ public sealed class AppSettings
 
     public bool AutosaveEnabled { get; set; } = true;
     public int AutosaveDebounceMs { get; set; } = 1200;
-    public bool LiveFormatting { get; set; } = true;
     public int FormatDebounceMs { get; set; } = 350;
     public int HostDebounceMs { get; set; } = 5000;
 

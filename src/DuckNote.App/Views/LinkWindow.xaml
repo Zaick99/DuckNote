@@ -37,10 +37,7 @@
       <StackPanel Grid.Row="1" Margin="22,18,22,4">
         <TextBlock Text="Testo" FontSize="12" Margin="2,0,0,7"
                    Foreground="{DynamicResource LabelSecondary}"/>
-        <Border CornerRadius="8" Background="{DynamicResource SheetScrim}" Padding="11,8">
-          <TextBlock x:Name="LText" FontSize="13" TextTrimming="CharacterEllipsis"
-                     Foreground="{DynamicResource Label}"/>
-        </Border>
+        <TextBox x:Name="LText" Style="{DynamicResource Field}" Height="34" Padding="10,0" FontSize="13"/>
 
         <TextBlock Text="Indirizzo" FontSize="12" Margin="2,16,0,7"
                    Foreground="{DynamicResource LabelSecondary}"/>

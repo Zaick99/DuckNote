@@ -105,7 +105,7 @@ public sealed class HostPaint(
     {
         run.Tag = Mark + host;
         run.Foreground = brushes.ForHost(host, states());
-        run.FontFamily = new FontFamily(MarkdownRenderer.MonoFonts);
+        run.FontFamily = new FontFamily(Dresser.MonoFonts);
     }
 
     private static Inline Insert(Paragraph row, Inline after, Run piece)

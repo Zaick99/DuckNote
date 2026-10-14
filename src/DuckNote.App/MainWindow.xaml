@@ -358,8 +358,11 @@
                       Margin="-3" Opacity="0"/>
               <Border x:Name="b" CornerRadius="{StaticResource RField}" Background="{DynamicResource BgField}"
                       BorderBrush="{DynamicResource BorderControl}" BorderThickness="1">
-                <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}"
-                              VerticalAlignment="Center"/>
+                <!-- Senza margine: il rientro lo mette gia' il TextBox stesso
+                     col suo Padding. Messo anche qui, testo e cursore
+                     finivano nove pixel dentro, lontani dalla scritta
+                     d'aiuto che resta al suo posto. -->
+                <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
               </Border>
             </Grid>
             <ControlTemplate.Triggers>
@@ -506,7 +509,8 @@
         <TextBox x:Name="rename" Grid.Column="3" Text="{Binding Title, Mode=OneWay}"
                  Visibility="{Binding EditVis}" Style="{StaticResource Field}"
                  Height="21" FontSize="11.5" Margin="2,0,0,0" Padding="5,0"
-                 KeyDown="OnPageRenameKey" LostFocus="OnPageRenameDone"/>
+                 KeyDown="OnPageRenameKey" LostFocus="OnPageRenameDone"
+                 PreviewMouseLeftButtonDown="OnPageRenameClick"/>
 
         <Border Grid.Column="4" Visibility="{Binding BadgeVis}" Margin="5,0,1,0" Padding="5,0"
                 VerticalAlignment="Center" CornerRadius="{StaticResource RControl}"
@@ -1080,8 +1084,10 @@
 
             <Border Grid.Row="0" Background="Transparent"
                     BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,0,0,1" Padding="12,7">
-              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-              <StackPanel Orientation="Horizontal">
+              <!-- Va a capo invece di scorrere: un tasto che esiste si deve
+                   vedere, e cercarlo trascinando una barra e' peggio che
+                   lasciarle prendere una riga in piu'. -->
+              <WrapPanel Orientation="Horizontal" ItemHeight="28">
                 <Button x:Name="FmtUndo" Style="{StaticResource Toolbtn}" ToolTip="Annulla (Ctrl+Z)">
                   <Path Data="M7,4 L2,8.5 L7,13 M2.5,8.5 H11 A4.5,4.5 0 0 1 11,17.5 H7" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                         StrokeThickness="1.4" Width="16" Height="15" Stretch="Uniform" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
@@ -1090,14 +1096,14 @@
                   <Path Data="M13,4 L18,8.5 L13,13 M17.5,8.5 H9 A4.5,4.5 0 0 0 9,17.5 H13" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                         StrokeThickness="1.4" Width="16" Height="15" Stretch="Uniform" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                 </Button>
-                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
+                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0" VerticalAlignment="Center"/>
                 <Button x:Name="FmtH1" Style="{StaticResource Toolbtn}" Content="H1" FontWeight="Bold"
                         FontSize="15" VerticalContentAlignment="Bottom" Padding="6,0,6,5" ToolTip="Titolo"/>
                 <Button x:Name="FmtH2" Style="{StaticResource Toolbtn}" Content="H2" FontWeight="Bold"
                         FontSize="12.5" VerticalContentAlignment="Bottom" Padding="6,0,6,5" ToolTip="Sottotitolo"/>
                 <Button x:Name="FmtH3" Style="{StaticResource Toolbtn}" Content="H3" FontWeight="Bold"
                         FontSize="10.5" VerticalContentAlignment="Bottom" Padding="6,0,6,5" ToolTip="Intestazione"/>
-                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
+                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0" VerticalAlignment="Center"/>
                 <Button x:Name="FmtBold"   Style="{StaticResource Toolbtn}" Content="B" FontWeight="Bold" ToolTip="Grassetto (Ctrl+B)"/>
                 <Button x:Name="FmtItalic" Style="{StaticResource Toolbtn}" Content="I" FontStyle="Italic" ToolTip="Corsivo (Ctrl+I)"/>
                 <Button x:Name="FmtUnder"  Style="{StaticResource Toolbtn}" Content="U" ToolTip="Sottolineato (Ctrl+U)"/>
@@ -1111,7 +1117,7 @@
                     </DataTemplate>
                   </Button.ContentTemplate>
                 </Button>
-                <Button x:Name="FmtMark" Style="{StaticResource Toolbtn}" ToolTip="Evidenzia (==testo==)">
+                <Button x:Name="FmtMark" Style="{StaticResource Toolbtn}" ToolTip="Evidenzia">
                   <Border Background="{DynamicResource Highlight}" CornerRadius="2" Padding="4,1">
                     <TextBlock Text="A" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource HighlightFg}"/>
                   </Border>
@@ -1121,7 +1127,7 @@
                   <Path Data="M6,3 L1,9 L6,15 M12,3 L17,9 L12,15" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
                         StrokeThickness="1.4" Width="16" Height="14" Stretch="Uniform" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
                 </Button>
-                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
+                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0" VerticalAlignment="Center"/>
                 <Button x:Name="FmtBullet" Style="{StaticResource Toolbtn}" ToolTip="Elenco puntato (Ctrl+Shift+8)">
                   <Canvas Width="17" Height="13">
                     <Ellipse Canvas.Left="0" Canvas.Top="1"   Width="3" Height="3" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
@@ -1155,17 +1161,33 @@
                 <Button x:Name="FmtRule" Style="{StaticResource Toolbtn}" ToolTip="Riga orizzontale">
                   <Rectangle Width="16" Height="1.6" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
                 </Button>
-                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
-                <Button x:Name="TblNew" Style="{StaticResource Toolbtn}" ToolTip="Inserisci tabella">
-                  <Path Data="M1,2 H17 V16 H1 Z M1,6.6 H17 M1,11.3 H17 M6.3,2 V16 M11.6,2 V16"
-                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
-                        StrokeThickness="1.2" Width="16" Height="14" Stretch="Uniform"/>
+                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0" VerticalAlignment="Center"/>
+                <!-- I cinque comandi della tabella sono una famiglia, e quattro
+                     servono solo col cursore dentro una tabella: stanno sotto
+                     un menu invece di occupare la barra per sempre. -->
+                <Button x:Name="TblMenu" Style="{StaticResource Toolbtn}" ToolTip="Tabella">
+                  <StackPanel Orientation="Horizontal">
+                    <Path Data="M1,2 H17 V16 H1 Z M1,6.6 H17 M1,11.3 H17 M6.3,2 V16 M11.6,2 V16"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.2" Width="16" Height="14" Stretch="Uniform"
+                          VerticalAlignment="Center"/>
+                    <Path Data="M0,0 L4,4 L8,0" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.3" Width="8" Height="4" Margin="5,1,0,0"
+                          VerticalAlignment="Center" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                  </StackPanel>
+                  <Button.ContextMenu>
+                    <ContextMenu x:Name="TblDrop">
+                      <MenuItem x:Name="TblNew" Header="Inserisci tabella"/>
+                      <Separator/>
+                      <MenuItem x:Name="TblRowAdd" Header="Aggiungi riga sotto"/>
+                      <MenuItem x:Name="TblColAdd" Header="Aggiungi colonna a destra"/>
+                      <Separator/>
+                      <MenuItem x:Name="TblRowDel" Header="Elimina la riga"/>
+                      <MenuItem x:Name="TblColDel" Header="Elimina la colonna"/>
+                    </ContextMenu>
+                  </Button.ContextMenu>
                 </Button>
-                <Button x:Name="TblRowAdd" Style="{StaticResource Toolbtn}" Content="+ riga"  FontSize="11" ToolTip="Aggiungi riga sotto"/>
-                <Button x:Name="TblColAdd" Style="{StaticResource Toolbtn}" Content="+ col"   FontSize="11" ToolTip="Aggiungi colonna a destra"/>
-                <Button x:Name="TblRowDel" Style="{StaticResource Toolbtn}" Content="- riga"  FontSize="11" ToolTip="Elimina riga corrente"/>
-                <Button x:Name="TblColDel" Style="{StaticResource Toolbtn}" Content="- col"   FontSize="11" ToolTip="Elimina colonna corrente"/>
-                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0"/>
+                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0" VerticalAlignment="Center"/>
                 <Button x:Name="FmtLink" Style="{StaticResource Toolbtn}" ToolTip="Inserisci collegamento">
                   <Path Data="M7.5,11.5 A3.5,3.5 0 0 1 7.5,6.5 L10,4 A3.5,3.5 0 0 1 15,9 L13.8,10.2 M10.5,6.5 A3.5,3.5 0 0 1 10.5,11.5 L8,14 A3.5,3.5 0 0 1 3,9 L4.2,7.8"
                         Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.3" Width="17" Height="15" Stretch="Uniform"
@@ -1177,8 +1199,27 @@
                         StrokeStartLineCap="Round"/>
                 </Button>
                 <Button x:Name="FmtClear" Style="{StaticResource Toolbtn}" Content="Aa" FontSize="11" ToolTip="Rimuovi formattazione"/>
-              </StackPanel>
-              </ScrollViewer>
+                <Rectangle Width="1" Height="18" Fill="{DynamicResource Separator}" Margin="7,0" VerticalAlignment="Center"/>
+                <Button x:Name="InsDraw" Style="{StaticResource Toolbtn}" ToolTip="Riquadro da disegno">
+                  <Path Data="M2,16 L4.5,10.5 L12,3 A1.8,1.8 0 0 1 15,6 L7.5,13.5 Z M11,4.5 L13.5,7"
+                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                        StrokeThickness="1.3" Width="17" Height="16" Stretch="Uniform"
+                        StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                </Button>
+                <Button x:Name="InsPicture" Style="{StaticResource Toolbtn}" ToolTip="Immagine da file (o incolla con Ctrl+V)">
+                  <Path Data="M1,3 H17 V15 H1 Z M1,12 L6,7.5 L10,11 L12.5,8.5 L17,12.5 M12.5,6.2 A1.1,1.1 0 1 1 12.5,6.1"
+                        Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                        StrokeThickness="1.2" Width="17" Height="15" Stretch="Uniform"
+                        StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                </Button>
+                <Button x:Name="InsChart" Style="{StaticResource Toolbtn}" ToolTip="Grafico da qualche numero">
+                  <Canvas Width="17" Height="15">
+                    <Rectangle Canvas.Left="1"    Canvas.Top="8"   Width="3.4" Height="7"   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    <Rectangle Canvas.Left="6.8"  Canvas.Top="3.5" Width="3.4" Height="11.5" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                    <Rectangle Canvas.Left="12.6" Canvas.Top="6"   Width="3.4" Height="9"   Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                  </Canvas>
+                </Button>
+              </WrapPanel>
             </Border>
 
             <RichTextBox x:Name="Editor" Grid.Row="2"

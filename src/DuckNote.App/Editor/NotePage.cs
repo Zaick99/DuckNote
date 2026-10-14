@@ -12,7 +12,12 @@ public sealed class NotePage
 
     public string Name { get; set; } = string.Empty;
 
-    public string Title => Name.Length > 0 ? Name : Guessed();
+    /// <summary>
+    /// Il titolo lo mette una persona, col tasto destro: non si indovina dal
+    /// primo titolo scritto dentro. Quello e' un titolo del testo, e nella
+    /// struttura compare come tale.
+    /// </summary>
+    public string Title => Name.Length > 0 ? Name : Untitled;
 
     public string Text => string.Join('\n', LiveFormatter.RowsOf(Document).Select(Line));
 
@@ -23,29 +28,6 @@ public sealed class NotePage
 
     public static string Clean(string name) =>
         string.Concat(name.Where(letter => !char.IsControl(letter))).Trim();
-
-    private string Guessed()
-    {
-        Paragraph[] rows = LiveFormatter.RowsOf(Document);
-
-        foreach (Paragraph row in rows)
-        {
-            if (Looks.Is(row, Look.Heading1) && Line(row).Length > 0)
-            {
-                return Line(row);
-            }
-        }
-
-        foreach (Paragraph row in rows)
-        {
-            if (Line(row).Length > 0)
-            {
-                return Line(row);
-            }
-        }
-
-        return Untitled;
-    }
 
     private static string Line(Paragraph row) => LiveFormatter.TextOf(row).Trim('\r', '\n', ' ');
 }

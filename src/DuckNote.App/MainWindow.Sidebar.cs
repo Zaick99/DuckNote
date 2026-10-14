@@ -115,7 +115,7 @@ public partial class MainWindow
         MenuItem fresh = new() { Header = "Nuova pagina" };
         fresh.Click += (_, _) => AddPage();
 
-        MenuItem rename = new() { Header = "Rinomina pagina" };
+        MenuItem rename = new() { Header = "Imposta titolo" };
         rename.Click += (_, _) => RenamePage();
 
         MenuItem drop = new() { Header = "Elimina pagina" };
@@ -323,7 +323,7 @@ public partial class MainWindow
         ShowPage(page);
         SaveNote();
 
-        StatusText.Text = $"Pagina nuova: scrivi un titolo con # e si chiamera' cosi'. {_book.Count} pagine.";
+        StatusText.Text = $"Pagina nuova: tasto destro, Imposta titolo, per darle un nome. {_book.Count} pagine.";
         Editor.Focus();
     }
 
@@ -331,7 +331,7 @@ public partial class MainWindow
     {
         if (SideList.SelectedItem is not SideNode node || !node.IsPage)
         {
-            StatusText.Text = "Scegli una pagina nella struttura, poi rinominala.";
+            StatusText.Text = "Scegli una pagina nella struttura, poi imposta il titolo.";
             return;
         }
 
@@ -368,6 +368,23 @@ public partial class MainWindow
 
     private void OnPageRenameDone(object sender, RoutedEventArgs e) => Keep(sender as TextBox);
 
+    /// <summary>
+    /// Il primo clic dentro la casella del titolo serve solo a prenderla: senza
+    /// fermarlo qui finisce alla riga della barra laterale, che si prende il
+    /// fuoco, e la casella si chiude mentre ci si stava scrivendo. Dal secondo
+    /// clic in poi passa, cosi' il cursore si mette fra le lettere.
+    /// </summary>
+    private void OnPageRenameClick(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not TextBox field || field.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        field.Focus();
+        e.Handled = true;
+    }
+
     private void Keep(TextBox? field)
     {
         if (_renaming is null || field is null || _book.ById(_renaming.PageId) is not { } page)
@@ -384,8 +401,8 @@ public partial class MainWindow
             _noteDirty = true;
             SaveNote();
             StatusText.Text = wanted.Length > 0
-                ? $"Pagina rinominata: {wanted}."
-                : "Nome tolto: la pagina si presenta col suo primo titolo.";
+                ? $"Titolo impostato: {wanted}."
+                : $"Titolo tolto: la pagina torna \"{NotePage.Untitled}\".";
         }
 
         Forget();

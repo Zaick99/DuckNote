@@ -15,13 +15,26 @@ public sealed class EditorBrushes
     public SolidColorBrush Down { get; } = new();
     public SolidColorBrush Unknown { get; } = new();
     public SolidColorBrush TableLine { get; } = new();
+    public SolidColorBrush Hairline { get; } = new();
+    public SolidColorBrush Accent { get; } = new();
     public SolidColorBrush TableHeader { get; } = new();
     public SolidColorBrush MarkBackground { get; } = new();
     public SolidColorBrush MarkForeground { get; } = new();
     public SolidColorBrush Done { get; } = new();
 
+    /// <summary>I colori delle serie di un grafico, in ordine di comparsa.</summary>
+    public SolidColorBrush[] Series { get; } = [new(), new(), new(), new(), new(), new(), new()];
+
+    private static readonly string[] SeriesTokens =
+        ["Blue", "Green", "Orange", "Purple", "Teal", "Pink", "Yellow"];
+
     public void Sync(string theme)
     {
+        for (int i = 0; i < Series.Length; i++)
+        {
+            Series[i].Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, SeriesTokens[i]));
+        }
+
         Text.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "Label"));
         Secondary.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "LabelSecondary"));
         Tertiary.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "LabelTertiary"));
@@ -32,6 +45,8 @@ public sealed class EditorBrushes
         Down.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "Red"));
         Unknown.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "LabelQuaternary"));
         TableLine.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "TableBorder"));
+        Hairline.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "Separator"));
+        Accent.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "Accent"));
         TableHeader.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "TableHeaderBg"));
         MarkBackground.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "Highlight"));
         MarkForeground.Color = ThemeTokens.Parse(ThemeTokens.Colour(theme, "HighlightFg"));

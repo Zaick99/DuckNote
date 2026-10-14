@@ -287,6 +287,7 @@ public partial class MainWindow : Window
         _theme = theme;
         ThemeTokens.Apply(Resources, theme);
         _editorBrushes.Sync(theme);
+        RecolourInsets();
 
         try
         {

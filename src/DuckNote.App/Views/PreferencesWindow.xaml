@@ -93,10 +93,7 @@
                 <ComboBoxItem Content="Scuro"  Tag="dark"/>
               </ComboBox>
             </Grid>
-            <Rectangle Style="{StaticResource Rule}"/>
-            <Grid Style="{StaticResource Line}">
-              <CheckBox x:Name="PLiveFmt" Content="Formattazione Markdown dal vivo" VerticalAlignment="Center"/>
-            </Grid>
+
           </StackPanel>
         </Border>
 

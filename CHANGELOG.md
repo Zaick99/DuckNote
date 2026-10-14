@@ -2,6 +2,193 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.11] - 2026-10-13
+
+### Removed
+
+- **The Markdown layer is gone.** Formatting was reported as a nightmare, and
+  the nightmare had one source: a parser running on every keystroke. It read the
+  line under the caret, decided whether a marker had closed, and rewrote the
+  line — replacing the text runs the caret was sitting in. Every caret jump,
+  every swallowed character, every marker that fired when it should not have
+  come from there. The toolbar buttons never went through it; they already
+  styled the selection directly.
+
+  So the parser is deleted — `MarkdownRenderer`, `InputRules` and `LineParser`,
+  three files and the live-formatting setting with them. What is left only
+  *dresses* a paragraph into a look (`Dresser`), and the live formatter now does
+  two things: colour addresses and keep custody of the caret while it does.
+  Asterisks, backticks and `#` are ordinary characters now. Notes written under
+  the old rules open exactly as they were — the markers were never stored.
+
+### Added
+
+- **Drawings, images and charts inside the text.** The last three buttons in the
+  bar put a framed box where the caret is, and the bottom edge of the frame
+  drags to set its height.
+
+  - A **drawing** is an ink sheet: six colours, three nib widths, an eraser.
+    Its paper and ink do not follow the theme, because a sketch made in the
+    dark theme has to stay legible in the light one.
+  - An **image** comes from a file, or from Ctrl+V. Pasting an image used to
+    produce an `InlineUIContainer`, which does not survive being saved: the
+    picture would have disappeared on reopening. The paste is intercepted and
+    becomes a frame instead.
+  - A **chart** is built from a few typed lines — `gateway 3`, one per line,
+    with `tipo:` choosing bars, line or pie and `titolo:` naming it. It stays
+    text, so a wrong number is corrected rather than redrawn, and the dialog
+    shows the chart live beside what you type. Colours come from the theme.
+
+  How it is stored was settled by measurement, not by preference. A
+  `BlockUIContainer` does **not** survive `TextRange.Save` — it comes back as an
+  empty paragraph, which would mean losing a drawing in silence. A
+  `Hyperlink.NavigateUri` does survive. So on screen a frame is a live control,
+  and on disk it is a placeholder carrying `ducknote://riquadro/<id>` with its
+  kind and height, while the bytes sit beside the page in the note container:
+  ink as strokes, an image as its original bytes, a chart as its text. The swap
+  is reversible and puts **the same** frames back, so a save while you are
+  drawing does not interrupt you. A frame whose bytes are missing says so in the
+  text rather than appearing as an empty box.
+
+### Changed
+
+- **A frame is as wide as it needs to be, and text wraps around it.** Drawings,
+  images and charts used to take the whole column. Each now floats at the left
+  of the line at its own width, and the text flows past it **line after line**,
+  Enter included — a new paragraph beside a frame starts beside it too, and the
+  text returns to full width once the frame ends. Measured: a 300×180 frame with
+  three lines of text beside it, and a following paragraph starting at x=314
+  against a frame ending at x=306.
+
+  Two things had to be right for that. A floater anchored in a paragraph that
+  **already has text** does not make it wrap: it settles on the next line and
+  the words stay above it, which is what "I can't write beside the image" was —
+  measured, the typed word landed at x=72 while the frame spanned 39 to 399. So
+  a frame takes a line of its own when the caret's line has words in it, and
+  frames always go at the **head** of their line, before any text.
+
+  Each frame has a grip on its bottom edge for height and one on its right edge
+  for width, and **the width stops at the page**: dragging 5000 px out lands on
+  684 in a 684 px line, because past that the frame would hang off the page and
+  the text would have nowhere left to wrap.
+- **Two frames next to each other share the line.** Put a second one beside the
+  first and they split the column evenly, tops aligned. Measured: 405 px each,
+  both at the same height. Two things had to be true for that: they have to live
+  in the **same paragraph** — in separate paragraphs each is anchored to its own
+  line and they come out at different heights, which is what made them look
+  crooked — and the line's usable width has to be asked of the control that
+  scrolls the document rather than guessed by subtracting pixels from the
+  window, leaving a few spare because a line filled to the last pixel wraps.
+- **A page's title is set by hand, from the right-click menu.** It used to be
+  guessed from the first large heading in the text, which meant a page renamed
+  itself as you wrote. *Imposta titolo* is now the only way in, and a page with
+  no name is *Senza titolo*.
+- **Large headings are mapped in the structure.** The tree shows `#` headings
+  under their page and `##` headings under the `#` that precedes them; an `##`
+  with no `#` before it stays directly under the page. A heading written in the
+  text is a heading of the text, and now appears as one instead of being
+  silently promoted to the page's name.
+- The chart's numbers button is a purple dot showing three small bars, matching
+  the red dot that removes the frame.
+
+### Fixed
+
+- **Text typed on a new list item came out grey.** Press a list button, press
+  Enter, type: the first line was right and everything after it was grey in a
+  monospaced font. The caret was left immediately after the list marker, and a
+  caret inherits the formatting of the run it sits in — that grey belongs to the
+  bullet, not to what you are about to write. The pending formatting is now set
+  explicitly where a marker is involved, which is what WPF applies to the next
+  character typed.
+- **A link written from the dialog lost its last letter** — "il sito" came out
+  as "il sit". Finding the end of freshly inserted text by counting characters
+  is off by one, because entering a run counts as a step; the run is now built
+  and placed as an object, so there is nothing to count.
+- **A selected frame disappeared under the selection veil.** Selecting text
+  that spans a drawing or a chart put a translucent accent layer over it, so the
+  thing you were about to look at was the thing you could no longer see.
+  Measured: the drawing's paper went from `#F7F8FA` to `#BB9971` the moment the
+  selection covered it. The veil is an **adorner** — it renders above the
+  element and its children by construction, and a `Floater` does not escape it
+  either (measured: veiled the same). The only lever WPF offers is
+  `SelectionOpacity`, so that is the lever: when the selection takes in a frame
+  the veil goes off and the frames say for themselves that they are selected,
+  with an accent ring. Selecting plain text keeps the veil it always had.
+
+- **The separation line had all its space on one side.** A paragraph's border is
+  the last thing drawn in it, so padding could only ever put space *above* the
+  line, leaving it glued to the text below — measured 30 px above, 10 below. The
+  line's breathing now lives in its margins, which is the one paragraph in the
+  note allowed to have any, and `Flatten` leaves it alone. Measured after:
+  13 above, 10 below, the 3 px being the descent of the glyphs above it. It also
+  no longer leaves a spare empty line behind it: if there is already a line to
+  put the caret in, it goes there.
+
+- **Turning a ticked checkbox into another kind of list kept its grey.** A done
+  checkbox is the only look that paints the *text* rather than the paragraph —
+  grey and struck through, on the runs. Undressing a paragraph did not take that
+  off, so converting ticked rows to a bullet list left them grey while the first
+  row stayed normal. Measured by rendering: rows at `#5F6369` against `#8E8E92`.
+  Now undressing removes what ticking painted.
+
+- **The chart's bars hung below their baseline, and the labels landed on top of
+  them.** The bars were drawn down to the bottom of the plot while the baseline
+  sits 18 px higher, which is exactly where the category labels go — so grey
+  text ended up over green, blue and orange. One baseline is now computed once
+  and everything measures from it, bars and line points included, and the labels
+  took the full-contrast ink. The pie's legend is centred beside the pie and
+  ellipsised instead of running off the frame.
+
+- **A frame in the note broke the editor with a cascade of error dialogs.**
+  Pressing the pencil or the chart button and waiting for the autosave filled
+  the screen with error windows. The cause was not in the drawing or the chart:
+  removing a UIElement from a live `RichTextBox` makes WPF build an undo record,
+  and to build it **it hands the element to `XamlWriter`**. `InsetBox` carried a
+  public `Func<string, string?>`; XamlWriter refuses generic types, the
+  exception escaped while the text container was mid-edit, and from then on
+  every layout pass threw again — forever.
+
+  Measured, in this order: a *null* property of that type serialises fine, a
+  *filled* one throws, and `[DesignerSerializationVisibility(Hidden)]` makes it
+  pass. So the frame's two non-saved properties are hidden from serialisation,
+  which is what they always were in meaning. `ChartView.Plan` turned out not to
+  need it — a sabotage with the attribute removed left the harness green — so it
+  does not carry one: every guard in the code is a guard some sabotage proves
+  necessary.
+
+  The gap in the tests is worth naming: the insets harness worked on *detached*
+  documents, where there is no undo stack and the fault cannot appear. The new
+  harness opens the real window, presses the real buttons and waits for the
+  autosave — that is where it reproduced, 1296 red checks' worth.
+
+- **The toolbar did not fit.** 28 buttons wanted 962 px in 883, so it scrolled
+  sideways and the last three — the new drawing, image and chart — were the ones
+  off the edge. The five table commands now live under one **Tabella** menu:
+  they are a family, and four of them only mean anything with the caret inside a
+  table. 24 buttons on one row, nothing cut off, nothing to drag. The row also
+  wraps instead of clipping if the window is made genuinely narrow.
+
+- **The caret in the find box sat where the text was not.** Measured: caret at
+  x=21 while the placeholder started at x=10. The field template applied
+  `Padding` as the content host's margin, and the TextBox inset its text by
+  `Padding` again — the same nine pixels twice. One is enough: the caret is now
+  at 12, next to the writing. Every field in the app was affected.
+
+- **The link button did nothing without a selection.** It wrote "select the
+  text to link" in the status line at the bottom of the window, which is not
+  something anyone notices. Now the dialog opens either way: with a selection
+  the text is shown and read-only, without one it is a field to type, and
+  accepting writes the link where the caret is.
+
+### Changed
+
+- The button that removes a frame is the same red dot that closes a window,
+  showing its cross when the pointer is on it, instead of the word *togli*.
+- One walk through the document instead of two. `NoteDocument.Deep` descends
+  lists, tables and sections once, and everything that looks for paragraphs,
+  frames or a block's siblings filters that.
+- Locking now zeroes the bytes of every frame along with the rest.
+
 ## [0.0.10] - 2026-10-11
 
 The version is pinned here on purpose: work accumulates under 0.0.10 until there

@@ -144,7 +144,6 @@ public static class Looks
         Look.Quote => new Thickness(12, 0, 0, 0),
         Look.Bullet or Look.Number or Look.Todo => new Thickness(14, 0, 0, 0),
         Look.Code => new Thickness(12, 8, 12, 8),
-        Look.Rule => new Thickness(0, 0, 0, 7),
         _ => default
     };
 
