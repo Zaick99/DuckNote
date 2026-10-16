@@ -167,14 +167,27 @@ public partial class MainWindow : Window
         }
     }
 
-    private static Models.SideNode? BranchUnder(DependencyObject? source)
+    /// <summary>
+    /// Il ramo sotto il clic, se il clic non e' finito nel triangolino o nella
+    /// casella del titolo. Un clic in una casella di testo arriva da un pezzo
+    /// interno del suo modello, non dalla casella: va cercato risalendo,
+    /// altrimenti vale come "ho scelto il ramo" e la pagina si riapre sotto le
+    /// mani di chi sta scrivendo il nome.
+    /// </summary>
+    private static Models.SideNode? BranchUnder(DependencyObject? source) =>
+        Within(source, "toggle", "rename") ? null : Ancestor<ListBoxItem>(source)?.DataContext as Models.SideNode;
+
+    private static bool Within(DependencyObject? source, params string[] names)
     {
-        if (source is FrameworkElement { Name: "toggle" or "rename" })
+        for (DependencyObject? step = source; step is not null; step = VisualTreeHelper.GetParent(step))
         {
-            return null;
+            if (step is FrameworkElement { Name: { Length: > 0 } name } && names.Contains(name))
+            {
+                return true;
+            }
         }
 
-        return Ancestor<ListBoxItem>(source)?.DataContext as Models.SideNode;
+        return false;
     }
 
     private static string? ItemUnder(DependencyObject? source) =>
@@ -355,12 +368,29 @@ public partial class MainWindow : Window
         ScanProgress.Visibility = _session.IsRunning ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private void SyncNoteHosts()
+    /// <summary>
+    /// Allinea la tabella agli indirizzi scritti nelle note. Con
+    /// <paramref name="settled"/> a true conta anche quello che il cursore sta
+    /// scrivendo: la riga si considera finita.
+    /// </summary>
+    private void SyncNoteHosts(bool settled = false)
     {
-        IReadOnlyList<string> written = NoteHosts();
+        // Per aggiungere una riga si aspetta che la parola sia finita, per non
+        // inseguire i nomi a meta'. Per toglierne una no: quel che e' scritto
+        // nella nota e' scritto, anche se il cursore gli sta addosso. Pulendo
+        // con l'elenco che nasconde la parola in corso, la riga appena nata
+        // veniva buttata via un tic dopo -- e con lei l'esito dell'analisi.
+        IReadOnlyList<string> written = NoteHosts(settled: true);
+        IReadOnlyList<string> finished = settled ? written : NoteHosts();
 
-        _session.EnsurePending(written);
         _session.Prune(written);
+
+        IReadOnlyList<string> fresh = _session.EnsurePending(finished);
+
+        if (fresh.Count > 0)
+        {
+            CheckSoon();
+        }
     }
 
     private void RefreshCounts()

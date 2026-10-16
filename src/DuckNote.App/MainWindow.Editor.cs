@@ -27,6 +27,7 @@ public partial class MainWindow
     private CodeBlocks _blocks = null!;
 
     private DispatcherTimer? _formatTimer;
+    private DispatcherTimer? _settleTimer;
     private DispatcherTimer? _saveTimer;
     private bool _noteDirty;
     private bool _fresh;
@@ -43,7 +44,8 @@ public partial class MainWindow
         _blocks = new CodeBlocks(Editor, _renderer);
         _formatter = new LiveFormatter(
             Editor,
-            new HostPaint(_editorBrushes, () => _hostStates, _session.IsIgnored));
+            new HostPaint(_editorBrushes, () => _hostStates, _session.IsIgnored),
+            new CodePaint(_editorBrushes, Editor));
         _commands = new EditorCommands(Editor, _formatter, _renderer, _blocks);
         _commands.Refused += message => StatusText.Text = message;
         _commands.AskForLink = AskForLink;
@@ -73,6 +75,18 @@ public partial class MainWindow
             RefreshSideList();
         };
 
+        // Si smette di scrivere: quel che era una parola a meta' e' un indirizzo
+        // finito, e va trattato come tale.
+        _settleTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _settleTimer.Tick += (_, _) =>
+        {
+            _settleTimer!.Stop();
+            _formatter.Settle();
+
+            SyncNoteHosts(settled: true);
+            RefreshSideList();
+        };
+
         _saveTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(4) };
         _saveTimer.Tick += (_, _) =>
         {
@@ -96,6 +110,8 @@ public partial class MainWindow
         RestDucks();
         _formatTimer?.Stop();
         _formatTimer?.Start();
+        _settleTimer?.Stop();
+        _settleTimer?.Start();
         _saveTimer?.Stop();
         _saveTimer?.Start();
     }
@@ -222,17 +238,32 @@ public partial class MainWindow
 
     private void RecolourHosts() => _formatter?.RecolourAll();
 
-    private IReadOnlyList<string> NoteHosts()
+    /// <summary>
+    /// Gli indirizzi scritti nella nota. Quello che il cursore sta ancora
+    /// scrivendo non conta: "nb.zaick" non deve comparire in tabella mentre si
+    /// va verso "nb.zaick.net".
+    /// </summary>
+    private IReadOnlyList<string> NoteHosts(bool settled = false)
     {
         List<string> hosts = [];
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+        Paragraph? writing = settled ? null : _formatter.CaretParagraph;
+        int caret = writing is null ? -1 : LiveFormatter.OffsetOf(writing, Editor.CaretPosition);
 
         foreach (NotePage page in _book.Pages)
         {
             foreach (Paragraph row in LiveFormatter.RowsOf(page.Document))
             {
+                bool here = ReferenceEquals(row, writing);
+
                 foreach (HostToken token in HostTokens.Find(LiveFormatter.TextOf(row)))
                 {
+                    if (here && caret >= 0 && HostTokens.Touches(token, caret))
+                    {
+                        continue;
+                    }
+
                     if (seen.Add(token.Value) && !_session.IsIgnored(token.Value))
                     {
                         hosts.Add(token.Value);
@@ -354,7 +385,27 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// Salvare non e' scrivere. Per salvare, le cornici dei riquadri escono dal
+    /// documento e tornano: per WPF e' una modifica come un'altra, e contata
+    /// come tale rimetteva la nota fra quelle da salvare -- un salvataggio ogni
+    /// quattro secondi per sempre -- e faceva ripartire gli orologi che
+    /// aspettano che si smetta di scrivere.
+    /// </summary>
     private void SaveNote()
+    {
+        _swapping = true;
+        try
+        {
+            Store();
+        }
+        finally
+        {
+            _swapping = false;
+        }
+    }
+
+    private void Store()
     {
         if (!_noteDirty || Editor.IsReadOnly || _vault.IsDamaged)
         {

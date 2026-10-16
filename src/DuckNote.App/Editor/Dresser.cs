@@ -9,7 +9,12 @@ public sealed class Dresser(EditorBrushes brushes)
 {
     public const string MonoFonts = "SF Mono, Cascadia Mono, Consolas, Menlo, Courier New";
 
-    private const double RuleAir = 9;
+    /// <summary>
+    /// Lo spazio sopra e sotto il filo della separazione. Sommato al filo fa
+    /// l'altezza di una riga di testo: una separazione occupa una riga, come
+    /// tutto il resto di quel che si scrive.
+    /// </summary>
+    private const double RuleAir = 6.5;
 
     private static readonly DependencyProperty[] Worn =
     [
@@ -24,6 +29,7 @@ public sealed class Dresser(EditorBrushes brushes)
         Block.PaddingProperty,
         Block.LineHeightProperty,
         Block.LineStackingStrategyProperty,
+        Paragraph.ClearFloatersProperty,
         Paragraph.TextIndentProperty
     ];
 
@@ -79,6 +85,10 @@ public sealed class Dresser(EditorBrushes brushes)
             // quindi col solo padding lo spazio finisce tutto sopra e la riga
             // resta incollata al testo che segue. La riga vuota sotto non
             // serve, quindi l'altezza di riga va messa a uno.
+            // Il bordo di un paragrafo si disegna per tutta la sua larghezza,
+            // riquadri che galleggiano compresi: una separazione lasciata
+            // accanto a un'immagine la taglierebbe a meta'. ClearFloaters la
+            // manda sotto, dove una separazione ha senso.
             case Look.Rule:
                 row.Inlines.Clear();
                 row.BorderBrush = brushes.Hairline;
@@ -86,6 +96,7 @@ public sealed class Dresser(EditorBrushes brushes)
                 row.LineHeight = 1;
                 row.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
                 row.Margin = new Thickness(0, RuleAir, 0, RuleAir);
+                row.ClearFloaters = WrapDirection.Both;
                 break;
 
             case Look.Bullet:

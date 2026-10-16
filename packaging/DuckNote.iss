@@ -1,6 +1,6 @@
 ; Installer di DuckNote. Si compila con ISCC.exe di Inno Setup 6.
 ;
-;   ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.11 /DSourceExe=..\dist\DuckNote.exe
+;   ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.12 /DSourceExe=..\dist\DuckNote.exe
 ;
 ; SourceExe e' relativo a questo file, non alla cartella da cui si lancia ISCC.
 ;
@@ -9,7 +9,7 @@
 ; dove vivere, i collegamenti e la voce per disinstallare.
 
 #ifndef AppVersion
-  #define AppVersion "0.0.11"
+  #define AppVersion "0.0.12"
 #endif
 
 #ifndef SourceExe

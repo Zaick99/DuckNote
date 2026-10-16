@@ -368,17 +368,15 @@ public sealed class EditorCommands(RichTextBox editor, LiveFormatter formatter, 
             editor.BeginChange();
             try
             {
+                // La separazione va sulla riga subito sotto a quella che si sta
+                // scrivendo, e si continua a capo: una riga nuova, non l'inizio
+                // di quel che c'era gia' li' sotto.
                 Paragraph rule = NoteDocument.Row();
                 renderer.Dress(rule, Look.Rule);
                 where.InsertAfter(last, rule);
 
-                // Una riga vuota in piu' sotto la separazione le sbilancia lo
-                // spazio: se c'e' gia' una riga dove andare, si va in quella.
-                if (rule.NextBlock is not Paragraph after)
-                {
-                    after = NoteDocument.Row();
-                    where.InsertAfter(rule, after);
-                }
+                Paragraph after = NoteDocument.Row();
+                where.InsertAfter(rule, after);
 
                 editor.CaretPosition = after.ContentStart;
             }

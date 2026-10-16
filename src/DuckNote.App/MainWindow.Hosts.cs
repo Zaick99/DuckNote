@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Threading;
 using DuckNote.App.Editor;
 using DuckNote.App.Models;
 
@@ -126,6 +127,54 @@ public partial class MainWindow
 
         return found.Count == 1 && found[0].Length == text.Trim().Length ? found[0].Value : null;
     }
+
+    /// <summary>
+    /// Un indirizzo appena scritto non deve restare grigio fino al prossimo
+    /// giro del monitoraggio, che puo' essere un minuto dopo: si controlla da
+    /// se', appena si smette di scrivere. L'attesa serve a non inseguire le
+    /// parole a meta': "nb.zaick.ne" e' un nome valido tanto quanto il suo
+    /// seguito, e non vale la pena analizzarlo.
+    /// </summary>
+    private void CheckSoon()
+    {
+        _freshTimer ??= Fresh();
+
+        _freshTimer.Stop();
+        _freshTimer.Start();
+    }
+
+    private DispatcherTimer Fresh()
+    {
+        DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(1600) };
+
+        timer.Tick += async (_, _) =>
+        {
+            timer.Stop();
+
+            if (_session.IsRunning || _locked)
+            {
+                return;
+            }
+
+            // Qui la riga in tabella c'e' gia', e in tabella ci entra solo un
+            // indirizzo finito: la regola della parola in corso di scrittura ha
+            // gia' fatto il suo lavoro prima. Riapplicarla adesso terrebbe
+            // fuori dal primo controllo proprio l'indirizzo con il cursore
+            // addosso -- quello che si e' appena scritto -- e resterebbe grigio
+            // fino al giro del monitoraggio, un minuto dopo.
+            IReadOnlyList<string> waiting = _session.NeverChecked(NoteHosts(settled: true));
+            if (waiting.Count == 0)
+            {
+                return;
+            }
+
+            await ScanAsync(string.Join(',', waiting), keepExisting: true);
+        };
+
+        return timer;
+    }
+
+    private DispatcherTimer? _freshTimer;
 
     private async void AnalyseNow(string? host)
     {
