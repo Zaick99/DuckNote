@@ -509,7 +509,7 @@
         <TextBox x:Name="rename" Grid.Column="3" Text="{Binding Title, Mode=OneWay}"
                  Visibility="{Binding EditVis}" Style="{StaticResource Field}"
                  Height="21" FontSize="11.5" Margin="2,0,0,0" Padding="5,0"
-                 KeyDown="OnPageRenameKey" LostFocus="OnPageRenameDone"
+                 KeyDown="OnPageRenameKey" LostKeyboardFocus="OnPageRenameDone"
                  PreviewMouseLeftButtonDown="OnPageRenameClick"/>
 
         <Border Grid.Column="4" Visibility="{Binding BadgeVis}" Margin="5,0,1,0" Padding="5,0"

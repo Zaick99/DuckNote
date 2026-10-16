@@ -115,7 +115,7 @@ public partial class MainWindow
         MenuItem fresh = new() { Header = "Nuova pagina" };
         fresh.Click += (_, _) => AddPage();
 
-        MenuItem rename = new() { Header = "Imposta titolo" };
+        MenuItem rename = new() { Header = "Modifica titolo" };
         rename.Click += (_, _) => RenamePage();
 
         MenuItem drop = new() { Header = "Elimina pagina" };
@@ -323,7 +323,7 @@ public partial class MainWindow
         ShowPage(page);
         SaveNote();
 
-        StatusText.Text = $"Pagina nuova: tasto destro, Imposta titolo, per darle un nome. {_book.Count} pagine.";
+        StatusText.Text = $"Pagina nuova: tasto destro, Modifica titolo, per darle un nome. {_book.Count} pagine.";
         Editor.Focus();
     }
 
@@ -331,7 +331,7 @@ public partial class MainWindow
     {
         if (SideList.SelectedItem is not SideNode node || !node.IsPage)
         {
-            StatusText.Text = "Scegli una pagina nella struttura, poi imposta il titolo.";
+            StatusText.Text = "Scegli una pagina nella struttura, poi modificane il titolo.";
             return;
         }
 
@@ -345,10 +345,31 @@ public partial class MainWindow
         node.LabelVis = "Collapsed";
         _renaming = node;
 
+        // Un clic in qualunque altro punto dell'applicazione vuol dire "ho
+        // finito": il fuoco della tastiera non basta a saperlo, perche' molte
+        // cose su cui si clicca non lo prendono affatto.
+        PreviewMouseDown += OnClickWhileRenaming;
+
         Dispatcher.BeginInvoke(() => Field(node)?.Focus(), DispatcherPriority.Input);
     }
 
     private SideNode? _renaming;
+
+    private void OnClickWhileRenaming(object sender, MouseButtonEventArgs e)
+    {
+        if (_renaming is null || Field(_renaming) is not { } field)
+        {
+            return;
+        }
+
+        // Sul testo del titolo no: li' il clic si comporta da testo.
+        if (e.OriginalSource is DependencyObject where && Inside(field, where))
+        {
+            return;
+        }
+
+        Keep(field);
+    }
 
     private void OnPageRenameKey(object sender, KeyEventArgs e)
     {
@@ -366,22 +387,75 @@ public partial class MainWindow
         }
     }
 
-    private void OnPageRenameDone(object sender, RoutedEventArgs e) => Keep(sender as TextBox);
+    /// <summary>
+    /// Il nome si salva quando il fuoco lascia la casella: cliccare da
+    /// qualunque altra parte vuol dire "ho finito", la riga della barra
+    /// compresa. Il fuoco che si sposta DENTRO la casella -- fra i pezzi del
+    /// suo modello -- non e' un'uscita e non salva niente.
+    ///
+    /// Un clic sul testo del titolo non arriva mai qui: lo ferma
+    /// <see cref="OnPageRenameClick"/>, perche' li' il testo si deve comportare
+    /// da testo.
+    /// </summary>
+    private void OnPageRenameDone(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is not TextBox field)
+        {
+            return;
+        }
+
+        if (e.NewFocus is DependencyObject gone && Inside(field, gone))
+        {
+            return;
+        }
+
+        Keep(field);
+    }
+
+    /// <summary>Questo pezzo e' la casella stessa, o sta dentro di lei?</summary>
+    private static bool Inside(TextBox field, DependencyObject other)
+    {
+        for (DependencyObject? step = other; step is not null; step = Above(step))
+        {
+            if (ReferenceEquals(step, field))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? Above(DependencyObject step) =>
+        step is Visual ? VisualTreeHelper.GetParent(step) : LogicalTreeHelper.GetParent(step);
 
     /// <summary>
-    /// Il primo clic dentro la casella del titolo serve solo a prenderla: senza
-    /// fermarlo qui finisce alla riga della barra laterale, che si prende il
-    /// fuoco, e la casella si chiude mentre ci si stava scrivendo. Dal secondo
-    /// clic in poi passa, cosi' il cursore si mette fra le lettere.
+    /// Un clic dentro la casella del titolo non deve arrivare alla riga della
+    /// barra laterale: la riga si prenderebbe il fuoco, la casella lo
+    /// perderebbe, e il nome verrebbe salvato invece di lasciarti scrivere. Il
+    /// clic si ferma qui e il cursore lo mettiamo noi, dove e' stato cliccato;
+    /// due clic scelgono tutto, come ci si aspetta. Cliccando fuori il nome si
+    /// salva, che e' giusto.
     /// </summary>
     private void OnPageRenameClick(object sender, MouseButtonEventArgs e)
     {
-        if (sender is not TextBox field || field.IsKeyboardFocusWithin)
+        if (sender is not TextBox field)
         {
             return;
         }
 
         field.Focus();
+
+        if (e.ClickCount > 1)
+        {
+            field.SelectAll();
+        }
+        else if (field.GetCharacterIndexFromPoint(e.GetPosition(field), snapToText: true) is var at and >= 0)
+        {
+            field.CaretIndex = at;
+            field.SelectionLength = 0;
+        }
+
         e.Handled = true;
     }
 
@@ -401,7 +475,7 @@ public partial class MainWindow
             _noteDirty = true;
             SaveNote();
             StatusText.Text = wanted.Length > 0
-                ? $"Titolo impostato: {wanted}."
+                ? $"Titolo: {wanted}."
                 : $"Titolo tolto: la pagina torna \"{NotePage.Untitled}\".";
         }
 
@@ -410,6 +484,8 @@ public partial class MainWindow
 
     private void Forget()
     {
+        PreviewMouseDown -= OnClickWhileRenaming;
+
         if (_renaming is { } node)
         {
             node.EditVis = "Collapsed";

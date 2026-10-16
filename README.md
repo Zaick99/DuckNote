@@ -1,11 +1,79 @@
-<img src="assets/logo.png" alt="DuckNote" width="490">
+<div align="center">
 
-Technical notes and a network scanner in the same window. Write an address in
-the note and DuckNote checks it; scan a subnet and the results come back into
-the note. One executable, nothing to install.
+<img src="assets/logo.png" alt="DuckNote" width="420">
+
+**Technical notes and a network scanner in the same window.**
+Write an address in the note and DuckNote checks it; scan a subnet and the
+results come back into the note. One executable, nothing to install.
+
+[![Latest release](https://img.shields.io/github/v/release/Zaick99/DuckNote?style=flat-square&label=release&color=f5a524)](https://github.com/Zaick99/DuckNote/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/Zaick99/DuckNote/total?style=flat-square&label=downloads&color=2ea043)](https://github.com/Zaick99/DuckNote/releases)
+[![Stars](https://img.shields.io/github/stars/Zaick99/DuckNote?style=flat-square&label=stars&color=d29922)](https://github.com/Zaick99/DuckNote/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/Zaick99/DuckNote?style=flat-square&color=8957e5)](https://github.com/Zaick99/DuckNote/commits)
+![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
+![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-132%20green-2ea043?style=flat-square)
+
+[**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
+[What it does](#what-it-does) ·
+[How to use it](#how-to-use-it) ·
+[Encryption](#encryption) ·
+[Changelog](CHANGELOG.md)
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-dark.png">
+  <img src="docs/images/ducknote-light.png" alt="DuckNote: a note with coloured addresses, a code block and a chart" width="900">
+</picture>
+
+</div>
 
 > The application's interface is in Italian. Every label is quoted here exactly
 > as it appears on screen, with its meaning in English.
+
+---
+
+## In one picture
+
+**Addresses live in the text.** Write `nb.zaick.net` or `10.0.0.7` in a note and
+it is checked on its own a moment after you stop typing — green reachable, red
+down, grey never checked — and the colour updates as results arrive, without the
+text moving.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-host-dark.png">
+  <img src="docs/images/ducknote-host-light.png" alt="Addresses coloured by state inside the text" width="760">
+</picture>
+
+**A code block is coloured by the language it speaks** — guessed from the code
+itself, because there are no fences to write. Keywords, strings, numbers,
+comments and the names of functions, each in its own colour.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-codice-dark.png">
+  <img src="docs/images/ducknote-codice-light.png" alt="A Python block coloured by role" width="760">
+</picture>
+
+**And the same window is a scanner.** Everything the scan collected — hostname,
+MAC and vendor, response time, the operating system it looks like, open ports —
+in one table, with the rows written by your notes alongside the ones you scanned
+by range.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-rete-dark.png">
+  <img src="docs/images/ducknote-rete-light.png" alt="The network view with the host table" width="900">
+</picture>
+
+---
+
+## Download
+
+| File | What it is |
+|---|---|
+| [`DuckNote.exe`](https://github.com/Zaick99/DuckNote/releases/latest) | portable, 62 MB — the .NET runtime, WPF and the application in one file. Nothing to install. |
+| [`DuckNote-setup.exe`](https://github.com/Zaick99/DuckNote/releases/latest) | installer, 58 MB — installs for the current user, no elevation, with shortcuts and an uninstall entry. |
+
+Windows 10 or 11, 64-bit. Neither binary is signed, so SmartScreen warns on the
+first run — the SHA-256 of both files is in every release.
 
 ---
 
@@ -73,9 +141,23 @@ to open and close inside one line. Underline and strikethrough can coexist. A
 line's look replaces the one it had, the numbered list counts, and the code
 block takes exactly what you selected.
 
-**Enter knows where it is.** Inside a code block it adds a line to the block;
-on a list item it starts the next one; on an empty item it ends the list; after
-a heading it goes back to writing normally.
+**A code block is coloured by the language it speaks.** The words the language
+keeps for itself, text between quotes, numbers, comments and the names of
+functions, each in its own colour. Nothing says which language it is — there are
+no fences — so it is guessed from the signs a language leaves lying around: C#,
+Python, JavaScript, Rust, PowerShell, SQL and shell. When the signs are not
+enough the block stays as it was, because colouring at random is worse than not
+colouring. Inside a block an address is code, not a host.
+
+**A separator takes one line.** It goes on the line right under the one you are
+writing, what was below stays where it was, and you carry on on a line of its
+own beneath it.
+
+**Enter knows where it is.** Inside a code block it adds a line to the block,
+and on an empty line at the end of the block it closes it and leaves you on a
+normal line below — Shift+Enter adds a line without leaving. On a list item it
+starts the next one; on an empty item it ends the list; after a heading it goes
+back to writing normally.
 
 **Links keep their address.** The link button opens a small window in the same
 dress as the rest: the selected text on one side, the address on the other,
@@ -125,9 +207,15 @@ ports with service recognition, HTTP/SSH/FTP/SMTP banners, TLS certificate,
 SMB shares.
 
 **The two talk to each other.** Addresses written in the note become the list
-of hosts to check, appearing in the network table as *mai controllato* (never
-checked) until something looks at them; the results colour the addresses back
-in the note without the text moving.
+of hosts to check, and a new one is **checked on its own a moment after you
+stop typing** — not at the next sweep of the monitor, which can be a minute
+away. The wait is deliberate: on the way to `nb.zaick.net` you pass through
+`nb.zaick.ne`, as valid a name as its continuation and not worth looking up.
+The address under the caret is still a word being written: it becomes a host
+when the caret leaves it — a space, Enter, a click elsewhere — or five seconds
+after the last key. Delete it and its row goes with it; rows from a scan by
+range stay, because no note was claiming them. The results colour the addresses
+back in the note without the text moving.
 
 **Host card.** Clicking a host — in the table or in the sidebar — opens a card
 docked to the side of the window with everything the scan collected, in
@@ -219,8 +307,10 @@ count appears only when a search found the word inside a page's body.
 it was already the open one. Pressing a section takes you to its line.
 
 **A page is named by hand, and only by hand.** The `+` button makes one;
-right-click → *Imposta titolo* writes the name in a field on its own row, no
-dialog. A page with no name reads *Senza titolo*: nothing in the text renames
+right-click → *Modifica titolo* writes the name in a field on its own row, no
+dialog. Inside that field the text behaves like text — clicking it places the
+caret, double-clicking selects it all — and the name is saved when you click
+anywhere else. A page with no name reads *Senza titolo*: nothing in the text renames
 it, because a page that renames itself as you write is a page you cannot keep
 track of. Right-click also removes a page, except the last.
 
@@ -342,7 +432,7 @@ and the application. No dependencies to install on the target machine.
 src/DuckNote.Core    cryptography and the encrypted container, no UI
 src/DuckNote.Scan    the scan engine and the wire protocols, no UI
 src/DuckNote.App     the WPF application
-tests/               126 tests, including compatibility with PowerShell fixtures
+tests/               132 tests, including compatibility with PowerShell fixtures
 packaging/           the Inno Setup script that builds the installer
 _old/                the PowerShell original: 10,143 lines, its launcher and
                      its build script — the only copy of what came before
@@ -365,3 +455,20 @@ open by mistake.
 Network scanning belongs **on your own networks, or where you are authorised**:
 SNMP probes and share enumeration are intrusive activities, and on someone
 else's network they can be unlawful.
+
+---
+
+## Stars over time
+
+<div align="center">
+
+<a href="https://star-history.com/#Zaick99/DuckNote&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Zaick99/DuckNote&type=Date&theme=dark">
+    <img src="https://api.star-history.com/svg?repos=Zaick99/DuckNote&type=Date" alt="Star history of Zaick99/DuckNote" width="640">
+  </picture>
+</a>
+
+</div>
+
+The chart is drawn when the page is opened, so it is never out of date.

@@ -3,7 +3,7 @@ using System.Windows.Documents;
 
 namespace DuckNote.App.Editor;
 
-public sealed class LiveFormatter(RichTextBox editor, HostPaint hosts)
+public sealed class LiveFormatter(RichTextBox editor, HostPaint hosts, CodePaint code)
 {
     private readonly HashSet<Paragraph> _dirty = [];
 
@@ -21,7 +21,7 @@ public sealed class LiveFormatter(RichTextBox editor, HostPaint hosts)
         }
     }
 
-    public void Flush()
+    public void Flush(bool settled = false)
     {
         if (Suspended)
         {
@@ -34,11 +34,27 @@ public sealed class LiveFormatter(RichTextBox editor, HostPaint hosts)
 
         foreach (Paragraph row in pending)
         {
-            Format(row);
+            Format(row, settled);
         }
     }
 
-    public void Format(Paragraph? row)
+    /// <summary>
+    /// La riga dove sta il cursore si considera finita: anche l'indirizzo
+    /// appena scritto diventa un host.
+    /// </summary>
+    public void Settle()
+    {
+        MarkDirty(CaretParagraph);
+        Flush(settled: true);
+    }
+
+    /// <summary>
+    /// Ridipinge una riga. Con <paramref name="settled"/> a false l'indirizzo
+    /// che il cursore sta ancora scrivendo resta testo: diventa un host quando
+    /// il cursore se ne va -- uno spazio, un invio, un clic altrove -- o quando
+    /// si smette di scrivere e la riga si considera finita.
+    /// </summary>
+    public void Format(Paragraph? row, bool settled = false)
     {
         if (row is null || Suspended || row.Parent is null)
         {
@@ -48,9 +64,17 @@ public sealed class LiveFormatter(RichTextBox editor, HostPaint hosts)
         IsFormatting = true;
         try
         {
+            // Dentro un blocco di codice un indirizzo e' codice, non un host:
+            // li' comanda la lingua, e si tiene il cursore da se'.
+            if (Looks.Is(row, Look.Code))
+            {
+                code.Paint(row);
+                return;
+            }
+
             int caret = OffsetOf(row, editor.CaretPosition);
 
-            hosts.Paint(row);
+            hosts.Paint(row, settled ? -1 : caret);
 
             Land(row, caret);
         }
@@ -92,11 +116,26 @@ public sealed class LiveFormatter(RichTextBox editor, HostPaint hosts)
         }
     }
 
+    /// <summary>
+    /// Ridipingere non e' scrivere. Un esito di scansione che arriva cambia il
+    /// colore degli indirizzi, e senza questa guardia per WPF e' una modifica
+    /// come un'altra: faceva ripartire da zero l'orologio che aspetta che si
+    /// smetta di scrivere -- con una scansione in corso non scadeva mai -- e
+    /// rimetteva la nota fra quelle da salvare.
+    /// </summary>
     public void RecolourAll()
     {
-        foreach (Paragraph row in Rows())
+        IsFormatting = true;
+        try
         {
-            hosts.Recolour(row);
+            foreach (Paragraph row in Rows())
+            {
+                hosts.Recolour(row);
+            }
+        }
+        finally
+        {
+            IsFormatting = false;
         }
     }
 

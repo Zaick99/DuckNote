@@ -2,6 +2,146 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.12] - 2026-10-16
+
+### Added
+
+- **A code block is coloured by the language it speaks.** Five roles instead of
+  one flat grey: the words the language keeps for itself, text between quotes,
+  numbers, comments, and the names of functions — a name up against an open
+  bracket, called or declared, which for a reader is the same thing.
+
+  Nothing says which language it is. There are no fences any more, so it is
+  guessed from the signs a language leaves lying around — a `def `, an `fn `, a
+  `$name`, a `SELECT`: C#, Python, JavaScript, Rust, PowerShell, SQL and shell.
+  When the signs are not enough the answer is *no language*, and the block stays
+  as it was: colouring at random is worse than not colouring.
+
+  Open a comment and leave it open and the next line carries on in it; a quote
+  left open does not, because a line being typed always has one and it must not
+  tint the whole block. Inside a block an address is code, not a host.
+
+  Measured in the real window, because repainting a paragraph is exactly how a
+  caret gets lost: typing a letter in the middle of a block repaints it and the
+  caret stays after the letter. It did jump a line at first — a line break is
+  crossed in two steps and counting both skips a line.
+
+### Changed
+
+- **The separation line takes exactly one line, and leaves you on a new one.**
+  It used to take a line and a bit — 23 against a text line's 18 — and the caret
+  landed at the start of whatever was written below, so you carried on inside
+  that text. The rule now goes on the line right under the one you are writing,
+  what was below stays untouched, and you carry on on a line of its own beneath
+  it. Measured: a band of 18 against a text line of 18.
+
+### Fixed
+
+- **An address you had just written stayed grey.** Writing `nb.zaick.net` put a
+  row in the host table as *mai controllato* and then **nothing checked it** —
+  the first look came from the monitor, up to a minute later. The whole chain
+  was sound (measured end to end: the name is recognised, resolves to
+  57.131.13.192, answers in 9 ms with TTL 54, three ports open, and the table
+  row goes green); what was missing was anyone asking. A new address is now
+  checked on its own 1.6 s after you stop typing, which is also why it waits:
+  `nb.zaick.ne` is as valid a name as its continuation, and is not worth
+  looking up.
+
+  FQDN recognition was measured on twelve shapes while hunting for this, since
+  it was the first suspect: long names, many labels, hyphens, mixed case, a
+  trailing dot, `.museum`, punycode, a port suffix, inside a URL. All correct —
+  and an email address is still not a host.
+
+- **There was no way out of a code block.** Enter added a line to the block,
+  always, so once inside you stayed inside. Enter on an empty line at the end of
+  the block now closes it and leaves you on a normal line below — the usual way
+  a block ends — and the empty line that asked for it is not kept. Shift+Enter
+  still adds a line without leaving. A block emptied this way does not stay
+  behind as a frame around nothing.
+
+- **A separation line cut straight through an image.** A paragraph's border is
+  drawn across its whole width, floating frames included, so a rule beside an
+  image sliced it in half. The rule now clears floating frames and passes below
+  them, where a separation means something. Measured: the line at y=185 against
+  a frame ending at y=183.
+
+- **Clicking the text while renaming a page saved the name.** The click reached
+  the sidebar row, the row took the keyboard focus, the field lost it, and
+  losing focus is what commits.
+
+  There is one rule now, and it turns on where you click. **On the title text**
+  the click stops in the field and behaves like text: the caret goes where you
+  clicked, a double-click selects it all. **Anywhere else** — the sidebar row
+  included — means you are done, and the name is saved.
+
+  Both halves are measured: the click inside the field is stopped and the field
+  stays open with the half-written name intact, and moving the focus to the row
+  closes it with the page named as typed. Finding this took understanding why
+  the harness could not reproduce it before — **a synthetic event raised on a
+  control template's child is not routed to the templated parent**, so the
+  simulated click never reached the handler that was supposed to stop it.
+
+  Losing the focus was the only thing that committed the name, and a click does
+  not always move the focus. A click anywhere in the window now commits it
+  directly, and the menu entry says **Modifica titolo** — it edits a title, it
+  does not set one for the first time.
+
+- **An address was turned into a host half-way through typing it.** Writing
+  `nb.zaick.net` goes through `nb.zaick`, which is a perfectly good name: it was
+  coloured, scanned and listed under your fingers, and the row for the address
+  you actually meant arrived next to it. The address under the caret is now
+  still a word being written: it becomes a host when the caret leaves it — a
+  space, Enter, a click elsewhere — or **five seconds after the last key**,
+  because stopping is also a way of finishing.
+
+- **An address was coloured in half.** `welcome.zaick` went grey as a host and
+  the `.net` typed after it stayed white, two looks for one address. The painter
+  read one text run at a time, and the letters you type after a dressed address
+  are born in a *new* run: nothing ever put the two back together again, so the
+  address stayed cut where you had paused. It now reads a **stretch** of the
+  line — adjacent pieces dressed alike — because an address is a word of the
+  line, not a word of a piece of the line. It goes grey whole, then green or
+  red whole.
+
+  Measured in the real window, typing through the keyboard's own door: stop at
+  `welcome.zaick` and it is a host; carry on with `.net` and the whole thing is
+  text again, in one piece; stop again and the whole `welcome.zaick.net` is the
+  host. The harness used to insert text straight into the run under the caret,
+  which is not what typing does — that is why it had never seen this.
+
+  An address does keep its colour when the caret merely sits in front of it: it
+  arrives there from outside, by a click or an arrow key, and is not writing.
+
+- **The row for the address you had just written was torn out of the table, so
+  it never went green or red.** The rule about the word under the caret had
+  leaked into two places it had no business in. The table was *pruned* with the list that hides that word, so
+  the row born five seconds after you stopped typing was thrown away one tick
+  later, and the scan result with it. And the first check *filtered* its
+  candidates with the same list, so the one address you had just written —
+  the one with the caret still on it — was the only one never looked up: it
+  waited for the monitor's sweep, up to a minute away.
+
+  The rule belongs to adding a row and to colouring the text. Removing a row
+  and deciding what to check both read the note as it is written, caret or no
+  caret. Measured with the address typed at the end of a line and the caret
+  left on it: the piece is painted with the *reachable* brush and the table
+  row reads `Online`.
+
+- **Deleting an address left its row in the table.** The table is a mirror of
+  what the notes say, and a row that outlives the text speaks of a host that is
+  not there any more. Rows born from a note now follow their note: delete the
+  address and the row goes, while rows you scanned by range stay, because
+  nothing in a note was claiming them.
+
+- **Repainting counted as writing.** Each scan result recolours the addresses in
+  the text, and WPF reports that as an edit like any other. Two clocks were
+  listening: the one that waits five seconds of silence never got there while a
+  scan was running, and the one that saves four seconds after an edit kept
+  firing — a save every four seconds, for ever, each save feeding the next,
+  since taking the frames out of the document to save them is also an edit.
+  Neither repainting nor saving is writing now. Measured by counting the ticks
+  that arrive: one, where there were none.
+
 ## [0.0.11] - 2026-10-13
 
 ### Removed

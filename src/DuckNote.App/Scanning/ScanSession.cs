@@ -62,6 +62,12 @@ public sealed class ScanSession : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Allinea la tabella a quel che la nota dice adesso. Una riga nata da un
+    /// indirizzo scritto nella nota la segue: cancellato l'indirizzo, via la
+    /// riga, anche se era stata analizzata. Una riga nata da un intervallo non
+    /// c'entra con la nota e resta, purche' abbia un risultato.
+    /// </summary>
     public void Prune(IEnumerable<string> written)
     {
         HashSet<string> keep = new(written, StringComparer.OrdinalIgnoreCase);
@@ -71,7 +77,7 @@ public sealed class ScanSession : INotifyPropertyChanged
         {
             ScanRow row = Rows[i];
 
-            if (row.StatusRank < ScanRow.NeverChecked || Names(row).Any(keep.Contains))
+            if (Keeps(row, keep))
             {
                 continue;
             }
@@ -119,6 +125,11 @@ public sealed class ScanSession : INotifyPropertyChanged
         Notify(nameof(DownCount));
     }
 
+    private static bool Keeps(ScanRow row, HashSet<string> written) =>
+        row.NoteKey.Length > 0
+            ? written.Contains(row.NoteKey)
+            : row.StatusRank < ScanRow.NeverChecked;
+
     private static IEnumerable<string> Names(ScanRow row) =>
         ((string[])[row.IP, row.NoteKey, row.Hostname]).Where(name => name.Length > 0);
 
@@ -159,14 +170,23 @@ public sealed class ScanSession : INotifyPropertyChanged
 
     public int DownCount => Rows.Count(r => r.StatusRank is > 1 and < ScanRow.NeverChecked);
 
-    public void EnsurePending(IEnumerable<string> hosts)
+    /// <summary>
+    /// Mette in tabella gli host che ancora non ci sono, in attesa di essere
+    /// analizzati, e torna quelli appena arrivati: sono loro che meritano un
+    /// controllo subito, senza aspettare il giro del monitoraggio.
+    /// </summary>
+    public IReadOnlyList<string> EnsurePending(IEnumerable<string> hosts)
     {
+        List<string> fresh = [];
+
         foreach (string host in hosts)
         {
             if (host.Length == 0 || _index.ContainsKey(host) || _ignored.Contains(host))
             {
                 continue;
             }
+
+            fresh.Add(host);
 
             ScanRow row = new()
             {
@@ -180,6 +200,22 @@ public sealed class ScanSession : INotifyPropertyChanged
             _index[host] = row;
             Insert(row);
         }
+
+        return fresh;
+    }
+
+    /// <summary>Gli host in tabella che nessuno ha ancora controllato.</summary>
+    public IReadOnlyList<string> NeverChecked(IEnumerable<string> among)
+    {
+        HashSet<string> asked = new(among, StringComparer.OrdinalIgnoreCase);
+
+        return
+        [
+            .. Rows
+                .Where(row => row.StatusRank >= ScanRow.NeverChecked)
+                .Select(row => row.NoteKey.Length > 0 ? row.NoteKey : row.IP)
+                .Where(name => name.Length > 0 && asked.Contains(name))
+        ];
     }
 
     public async Task RunAsync(string range, ScanOptions options, bool keepExisting = false)

@@ -195,6 +195,7 @@ public partial class MainWindow
         _saveTimer?.Stop();
         _formatTimer?.Stop();
         _monitorTimer?.Stop();
+        _freshTimer?.Stop();
         _idleTimer?.Stop();
         _session.Stop();
 

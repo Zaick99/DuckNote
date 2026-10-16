@@ -59,6 +59,19 @@ public static partial class HostTokens
             || suffix.Equals(suffix.ToUpperInvariant(), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Il cursore sta dentro questo indirizzo, o appena dopo l'ultima lettera?
+    /// Finche' ci sta, l'indirizzo e' una parola in corso di scrittura: "nb.zaick"
+    /// e' un nome valido, ma chi lo sta scrivendo sta andando verso
+    /// "nb.zaick.net" e non vuole vederlo diventare un host a meta' strada.
+    ///
+    /// Davanti alla prima lettera no: li' il cursore e' arrivato da fuori --
+    /// un clic, una freccia -- e un indirizzo che c'e' gia' non si spoglia
+    /// solo perche' gli si passa accanto.
+    /// </summary>
+    public static bool Touches(HostToken token, int caret) =>
+        caret > token.Start && caret <= token.Start + token.Length;
+
     public static IReadOnlyList<HostToken> Find(string? text)
     {
         if (string.IsNullOrWhiteSpace(text))

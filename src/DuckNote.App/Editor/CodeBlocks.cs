@@ -50,11 +50,22 @@ public sealed class CodeBlocks(RichTextBox editor, Dresser renderer)
     public static IEnumerable<string> Lines(Paragraph block) =>
         LiveFormatter.TextOf(block).Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
 
+    /// <summary>
+    /// L'invio dentro un blocco di codice aggiunge una riga al blocco. Su una
+    /// riga vuota in fondo invece esce: e' il modo in cui si chiude un blocco
+    /// in qualunque editor, e senza una via d'uscita dal blocco non si torna
+    /// piu' a scrivere testo normale. Shift+invio resta sempre dentro.
+    /// </summary>
     public bool Break()
     {
-        if (!Looks.Is(editor.CaretPosition?.Paragraph, Look.Code))
+        if (editor.CaretPosition?.Paragraph is not { } block || !Looks.Is(block, Look.Code))
         {
             return false;
+        }
+
+        if (Closing(block) && Leave(block))
+        {
+            return true;
         }
 
         editor.CaretPosition = editor.CaretPosition!.InsertLineBreak();
@@ -62,15 +73,59 @@ public sealed class CodeBlocks(RichTextBox editor, Dresser renderer)
         return true;
     }
 
+    /// <summary>Il cursore e' in fondo al blocco, su una riga vuota.</summary>
+    private bool Closing(Paragraph block)
+    {
+        if (editor.CaretPosition is not { } caret
+            || new TextRange(caret, block.ContentEnd).Text.Trim('\r', '\n').Length > 0)
+        {
+            return false;
+        }
+
+        string[] lines = [.. Lines(block)];
+
+        return lines.Length > 0 && lines[^1].Trim().Length == 0;
+    }
+
+    private bool Leave(Paragraph block)
+    {
+        if (NoteDocument.Siblings(block) is not { } where)
+        {
+            return false;
+        }
+
+        Trim(block);
+
+        Paragraph after = NoteDocument.Row();
+        where.InsertAfter(block, after);
+
+        // Un blocco svuotato non resta a fare da cornice vuota.
+        if (LiveFormatter.TextOf(block).Trim().Length == 0)
+        {
+            where.Remove(block);
+        }
+
+        editor.CaretPosition = after.ContentStart;
+
+        return true;
+    }
+
+    /// <summary>Via la riga vuota in fondo: era solo il modo di chiedere di uscire.</summary>
+    private static void Trim(Paragraph block)
+    {
+        while (block.Inlines.LastInline is Run { Text.Length: 0 } empty)
+        {
+            block.Inlines.Remove(empty);
+        }
+
+        if (block.Inlines.LastInline is LineBreak tail)
+        {
+            block.Inlines.Remove(tail);
+        }
+    }
+
     private static string Line(Paragraph row) =>
         LiveFormatter.TextOf(row).Replace("\r", string.Empty).Replace("\n", string.Empty);
 
-    private static BlockCollection? Siblings(Paragraph row) => row.Parent switch
-    {
-        FlowDocument document => document.Blocks,
-        TableCell cell => cell.Blocks,
-        ListItem item => item.Blocks,
-        Section section => section.Blocks,
-        _ => null
-    };
+    private static BlockCollection? Siblings(Paragraph row) => NoteDocument.Siblings(row);
 }
