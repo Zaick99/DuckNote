@@ -13,6 +13,7 @@ results come back into the note. One executable, nothing to install.
 ![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-132%20green-2ea043?style=flat-square)
+[![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
 [What it does](#what-it-does) ·
@@ -472,3 +473,9 @@ else's network they can be unlawful.
 </div>
 
 The chart is drawn when the page is opened, so it is never out of date.
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE). Use it, change it, ship it; keep the copyright notice.
