@@ -1,0 +1,220 @@
+<UserControl x:Class="DuckNote.App.Pages.NetworkPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:DuckNote.App.Ui">
+  <!-- Rete: comandi in una riga, filtri con i conteggi dentro, la tabella a sinistra e la scheda
+       dell'host sempre a destra. Scorrono solo la tabella e la scheda, ognuna nella sua card. -->
+  <Grid Margin="20,2,20,14">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="14"/>
+      <ColumnDefinition Width="340"/>
+    </Grid.ColumnDefinitions>
+
+    <!-- ===================== comandi ===================== -->
+    <Grid Grid.ColumnSpan="3" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <Image Source="/Assets/art/network.png" Width="44" Height="44" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+      <StackPanel Grid.Column="1" Margin="12,0,22,0" VerticalAlignment="Center">
+        <TextBlock Text="Rete" Style="{StaticResource PageTitle}" FontSize="21"/>
+        <TextBlock x:Name="Summary" Style="{StaticResource TxtCaption}"/>
+      </StackPanel>
+      <TextBox x:Name="RangeBox" Grid.Column="2" Style="{StaticResource HintMono}" Height="34" MaxWidth="340"
+               HorizontalAlignment="Stretch" VerticalAlignment="Center" Tag="192.168.1.0/24  oppure  .1-254" KeyDown="OnRangeKey"
+               ToolTip="CIDR, da-a, .1-254 oppure piu' indirizzi separati da virgole"/>
+      <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+        <Button x:Name="BtnScan" Style="{StaticResource PrimaryBtn}" Height="34" Click="OnScanRange">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="11"/>
+            <TextBlock Text="Analizza" Margin="7,0,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button x:Name="BtnNote" Style="{StaticResource SoftBtn}" Height="34" Margin="8,0,0,0" Click="OnScanNote"
+                ToolTip="Solo gli indirizzi scritti nelle pagine della nota">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE8A5;" Style="{StaticResource Icon}" FontSize="11"/>
+            <TextBlock Text="Host della nota" Margin="7,0,0,0"/>
+          </StackPanel>
+        </Button>
+        <Button x:Name="BtnStop" Style="{StaticResource QuietBtn}" Height="34" Margin="8,0,0,0" Click="OnStop" IsEnabled="False"
+                ToolTip="Ferma la scansione in corso">
+          <TextBlock Text="&#xE71A;" Style="{StaticResource Icon}" FontSize="11"/>
+        </Button>
+      </StackPanel>
+      <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
+        <Rectangle Style="{StaticResource ToolSep}"/>
+        <Button Style="{StaticResource Toolbtn}" Height="34" Width="34" Click="OnExport" ToolTip="Esporta in CSV gli host mostrati">
+          <TextBlock Text="&#xE896;" Style="{StaticResource Icon}"/>
+        </Button>
+        <Button Style="{StaticResource Toolbtn}" Height="34" Width="34" Click="OnToNote" ToolTip="Porta nella nota, come tabella, gli host mostrati">
+          <TextBlock Text="&#xE70F;" Style="{StaticResource Icon}"/>
+        </Button>
+      </StackPanel>
+    </Grid>
+
+    <!-- ===================== filtri ===================== -->
+    <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="Auto"/>
+      </Grid.ColumnDefinitions>
+      <Border Style="{StaticResource WellBox}" ui:Seg.Slide="True" Padding="3" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal">
+          <RadioButton x:Name="ShowAll" Style="{StaticResource SegSlideSmall}" GroupName="state" IsChecked="True" Checked="OnFilter">
+            <TextBlock><Run Text="Tutti "/><Run x:Name="CountAll" Text="0" FontWeight="Bold"/></TextBlock>
+          </RadioButton>
+          <RadioButton x:Name="ShowUp" Style="{StaticResource SegSlideSmall}" GroupName="state" Checked="OnFilter">
+            <TextBlock><Run Text="Attivi "/><Run x:Name="CountUp" Text="0" FontWeight="Bold"/></TextBlock>
+          </RadioButton>
+          <RadioButton x:Name="ShowDown" Style="{StaticResource SegSlideSmall}" GroupName="state" Checked="OnFilter">
+            <TextBlock><Run Text="Spenti "/><Run x:Name="CountDown" Text="0" FontWeight="Bold"/></TextBlock>
+          </RadioButton>
+          <RadioButton x:Name="ShowWait" Style="{StaticResource SegSlideSmall}" GroupName="state" Checked="OnFilter">
+            <TextBlock><Run Text="Da controllare "/><Run x:Name="CountWait" Text="0" FontWeight="Bold"/></TextBlock>
+          </RadioButton>
+        </StackPanel>
+      </Border>
+      <!-- da dove viene l'host: tutti, scritti nella nota, trovati dalla ricerca per intervallo -->
+      <Border Grid.Column="1" Style="{StaticResource WellBox}" ui:Seg.Slide="True" Padding="3" Margin="10,0,0,0" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal">
+          <RadioButton x:Name="FromAll" Style="{StaticResource SegSlideSmall}" GroupName="source" IsChecked="True" Checked="OnFilter"
+                       Content="Tutti" ToolTip="Gli host della nota e quelli trovati dalla ricerca"/>
+          <RadioButton x:Name="OnlyNote" Style="{StaticResource SegSlideSmall}" GroupName="source" Checked="OnFilter"
+                       Content="Nota" ToolTip="Solo gli host scritti nei fogli"/>
+          <RadioButton x:Name="OnlySearch" Style="{StaticResource SegSlideSmall}" GroupName="source" Checked="OnFilter"
+                       Content="Ricerca" ToolTip="Solo gli host trovati dalla ricerca per intervallo"/>
+        </StackPanel>
+      </Border>
+      <TextBox x:Name="FilterBox" Grid.Column="3" Style="{StaticResource SearchField}" Height="32" Width="280"
+               VerticalAlignment="Center" Tag="Cerca: testo, ip: nome: porta: os:" TextChanged="OnFilter"
+               ToolTip="Testo libero, oppure per campo: ip: nome: mac: porta: os: tipo: produttore: gruppo: web: nota: stato:"/>
+      <Button x:Name="BtnHidden" Grid.Column="4" Style="{StaticResource QuietBtn}" Height="32" Margin="10,0,0,0" Click="OnHiddenMenu"
+              ToolTip="Gli host che non entrano in nessuna scansione">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="10"/>
+          <TextBlock x:Name="HiddenText" Text="Messi da parte" Margin="6,0,0,0"/>
+        </StackPanel>
+        <Button.ContextMenu>
+          <ContextMenu x:Name="HiddenMenu"/>
+        </Button.ContextMenu>
+      </Button>
+    </Grid>
+
+    <!-- ===================== tabella ===================== -->
+    <Border Grid.Row="2" Style="{StaticResource GroupCard}">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <DataGrid x:Name="Table" Style="{StaticResource HostGrid}" SelectionChanged="OnPick">
+          <DataGrid.Columns>
+            <DataGridTemplateColumn Header="Indirizzo" Width="1.3*" MinWidth="120" SortMemberPath="SortKey">
+              <DataGridTemplateColumn.CellTemplate>
+                <DataTemplate>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- davanti all'indirizzo: verde online, arancio da verificare, rosso offline -->
+                    <Ellipse Width="9" Height="9" Margin="2,0,9,0" VerticalAlignment="Center" ui:Tok.Foreground="{Binding Tone}"
+                             ToolTip="{Binding ToneText}"/>
+                    <TextBlock Text="{Binding Address}" FontFamily="{StaticResource FMono}" FontSize="11.5" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="&#xE8A5;" Style="{StaticResource Icon}" FontSize="10" Margin="6,0,0,0" Foreground="{DynamicResource Accent}"
+                               Visibility="{Binding NoteVis}" ToolTip="Scritto nella nota"/>
+                  </StackPanel>
+                </DataTemplate>
+              </DataGridTemplateColumn.CellTemplate>
+            </DataGridTemplateColumn>
+            <DataGridTextColumn Header="Nome" Binding="{Binding Label}" Width="1.4*" MinWidth="80"/>
+            <DataGridTextColumn Header="Risposta" Binding="{Binding RoundTrip}" Width="0.8*" MinWidth="70" SortMemberPath="AverageMs"/>
+            <DataGridTextColumn Header="Sistema" Binding="{Binding Os}" Width="1.1*" MinWidth="70"/>
+            <DataGridTextColumn Header="Porte" Binding="{Binding OpenPorts}" Width="1.2*" MinWidth="70" SortMemberPath="PortCount"/>
+          </DataGrid.Columns>
+          <DataGrid.ContextMenu>
+            <ContextMenu Opened="OnRowMenu">
+              <MenuItem x:Name="RowAnalyse" Header="Analizza di nuovo" Click="OnRowAnalyse">
+                <MenuItem.Icon><TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Green}"/></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem x:Name="RowCopy" Header="Copia indirizzo" Click="OnRowCopy">
+                <MenuItem.Icon><TextBlock Text="&#xE8C8;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+              </MenuItem>
+              <Separator/>
+              <MenuItem x:Name="RowHide" Header="Metti da parte" Click="OnRowHide">
+                <MenuItem.Icon><TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Red}"/></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem x:Name="RowHiddenList" Header="Host messi da parte">
+                <MenuItem.Icon><TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Green}"/></MenuItem.Icon>
+              </MenuItem>
+            </ContextMenu>
+          </DataGrid.ContextMenu>
+        </DataGrid>
+
+        <StackPanel x:Name="Empty" HorizontalAlignment="Center" VerticalAlignment="Center" MaxWidth="380" IsHitTestVisible="False">
+          <Image Source="/Assets/art/empty_hosts.png" Width="120" Height="120" RenderOptions.BitmapScalingMode="HighQuality"/>
+          <TextBlock x:Name="EmptyTitle" Text="Nessun host da mostrare" Style="{StaticResource TxtSub}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+          <TextBlock x:Name="EmptyText" Style="{StaticResource TxtMuted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,1,0,0" Padding="14,8">
+          <Grid>
+            <TextBlock x:Name="Footer" Style="{StaticResource TxtCaption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,240,0"/>
+            <ProgressBar x:Name="Progress" Width="220" HorizontalAlignment="Right" VerticalAlignment="Center" Maximum="1" Visibility="Collapsed"/>
+          </Grid>
+        </Border>
+      </Grid>
+    </Border>
+
+    <!-- ===================== scheda dell'host ===================== -->
+    <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource GroupCard}">
+      <Grid>
+        <!-- niente di scelto -->
+        <StackPanel x:Name="CardEmpty" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="24">
+          <Image Source="/Assets/art/hosts.png" Width="96" Height="96" RenderOptions.BitmapScalingMode="HighQuality"/>
+          <TextBlock Text="Scegli un host" Style="{StaticResource TxtSub}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+          <TextBlock Style="{StaticResource TxtMuted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0"
+                     Text="Qui compare tutto quello che la scansione ha raccolto: nomi, MAC e produttore, servizi, certificato, SNMP."/>
+        </StackPanel>
+
+        <Grid x:Name="Card" Visibility="Collapsed">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <Border Padding="16,14" BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,0,0,1">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Border Width="44" Height="44" CornerRadius="22" Background="{DynamicResource BgFieldAlt}" VerticalAlignment="Center">
+                <Ellipse x:Name="CardDot" Width="14" Height="14"/>
+              </Border>
+              <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                <TextBlock x:Name="CardTitle" Style="{StaticResource TxtSub}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="CardSub" Style="{StaticResource TxtCaption}" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource FMono}"/>
+                <Border x:Name="CardChip" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="8,1">
+                  <TextBlock x:Name="CardStatus" FontSize="10.5" FontWeight="SemiBold"/>
+                </Border>
+              </StackPanel>
+            </Grid>
+          </Border>
+          <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="CardBody" Margin="16,0,16,14"/>
+          </ScrollViewer>
+        </Grid>
+      </Grid>
+    </Border>
+  </Grid>
+</UserControl>

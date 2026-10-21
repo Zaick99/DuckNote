@@ -1,0 +1,418 @@
+<UserControl x:Class="DuckNote.App.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:DuckNote.App.Ui">
+  <!-- Generato da gen_settings.py. Un blocco centrato, largo al massimo 1100, con i gruppi su
+       due colonne: a finestra normale nessuna scheda deve scorrere. Ogni riga ha il testo a
+       sinistra e il controllo a destra (SetRow). Ogni modifica vale subito: niente tasto Salva.
+       La scheda Cassaforte ospita la VaultPage senza la sua intestazione. -->
+  <Grid Margin="20,2,20,16">
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="*"/>
+      <ColumnDefinition Width="30*" MaxWidth="1100"/>
+      <ColumnDefinition Width="*"/>
+    </Grid.ColumnDefinitions>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <Grid Grid.Column="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto"/>
+        <ColumnDefinition Width="*"/>
+      </Grid.ColumnDefinitions>
+      <Image x:Name="SectionArt" Source="/Assets/art/settings.png" Width="52" Height="52" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality"/>
+      <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+        <TextBlock x:Name="SectionTitle" Style="{StaticResource TxtOverline}" Foreground="{DynamicResource Accent}"/>
+        <TextBlock Text="Impostazioni" Style="{StaticResource PageTitle}"/>
+        <TextBlock x:Name="SectionSub" Style="{StaticResource PageSub}"/>
+      </StackPanel>
+    </Grid>
+
+    <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource WellBox}" ui:Seg.Slide="True" Padding="3" HorizontalAlignment="Left" Margin="0,12,0,2">
+      <StackPanel Orientation="Horizontal">
+        <RadioButton x:Name="SecLook" Style="{StaticResource SegSlide}" Content="Aspetto" GroupName="sec" IsChecked="True" Checked="OnSection"/>
+        <RadioButton x:Name="SecNote" Style="{StaticResource SegSlide}" Content="Nota" GroupName="sec" Checked="OnSection"/>
+        <RadioButton x:Name="SecScan" Style="{StaticResource SegSlide}" Content="Scansione" GroupName="sec" Checked="OnSection"/>
+        <RadioButton x:Name="SecProbe" Style="{StaticResource SegSlide}" Content="Raccolta" GroupName="sec" Checked="OnSection"/>
+        <RadioButton x:Name="SecVault" Style="{StaticResource SegSlide}" Content="Cassaforte" GroupName="sec" Checked="OnSection"/>
+        <RadioButton x:Name="SecSystem" Style="{StaticResource SegSlide}" Content="Sistema" GroupName="sec" Checked="OnSection"/>
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="2" Grid.Column="1" ClipToBounds="True">
+      <ScrollViewer x:Name="PanelLook" VerticalScrollBarVisibility="Auto">
+        <Grid Margin="0,0,4,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="18"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+        <TextBlock Text="TEMA" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <StackPanel Margin="16,12">
+              <TextBlock Style="{StaticResource SetLabel}" Text="Aspetto"/>
+              <TextBlock Style="{StaticResource SetNote}" Text="Come Windows segue il sistema anche a finestra aperta."/>
+              <Border Style="{StaticResource WellBox}" ui:Seg.Slide="True" Padding="3" HorizontalAlignment="Left" Margin="0,10,0,0">
+                <StackPanel Orientation="Horizontal">
+                  <RadioButton x:Name="ThemeSystem" Style="{StaticResource SegSlideSmall}" Content="Come Windows" GroupName="theme" Checked="OnTheme"/>
+                  <RadioButton x:Name="ThemeLight" Style="{StaticResource SegSlideSmall}" Content="Chiaro" GroupName="theme" Checked="OnTheme"/>
+                  <RadioButton x:Name="ThemeDark" Style="{StaticResource SegSlideSmall}" Content="Scuro" GroupName="theme" Checked="OnTheme"/>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+        <TextBlock Text="PAPERE SULLO SFONDO" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Ducks" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnDucks">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Papere che nuotano dietro alle pagine"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Si fermano mentre scrivi."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="DuckCount" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="80" TextAlignment="Right" Tag="22"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnDuckNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Quante"/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="DuckOpacity" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="80" TextAlignment="Right" Tag="4"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnDuckNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Intensita' (%)"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Al 4% sono forti quanto una filigrana."/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <ScrollViewer x:Name="PanelNote" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+        <Grid Margin="0,0,4,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="18"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+        <TextBlock Text="SALVATAGGIO" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Autosave" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Salvataggio automatico"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Senza, la nota si salva comunque alla chiusura e al blocco."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="AutosaveMs" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="1200"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Attesa prima di salvare (ms)"/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+        <TextBlock Text="INDIRIZZI NEL TESTO" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="HostMs" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="5000"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Una parola diventa host dopo (ms)"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="L'indirizzo sotto il cursore e' una parola che si sta scrivendo: diventa host quando il cursore se ne va o dopo questa attesa."/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <ScrollViewer x:Name="PanelScan" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+        <Grid Margin="0,0,4,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="18"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+        <TextBlock Text="MONITORAGGIO" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Monitor" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Controlla da solo gli host della nota"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Senza notifiche: il risultato si vede nei colori degli indirizzi."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="MonitorSec" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="60"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Ogni quanti secondi"/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="PORTE" Style="{StaticResource SetHeader}"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <StackPanel Margin="16,12">
+              <TextBlock Style="{StaticResource SetLabel}" Text="Porte da provare su ogni host"/>
+              <TextBox x:Name="Ports" Style="{StaticResource HintArea}" Height="64" TextWrapping="Wrap" Tag="22, 80, 443" Margin="0,8,0,0" LostFocus="OnPorts"/>
+              <TextBlock x:Name="PortsInfo" Style="{StaticResource SetNote}" Margin="0,6,0,0"/>
+            </StackPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="DeadHosts" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Analizza anche chi non risponde al ping"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Molti firewall scartano il ping ma rispondono sulle porte: piu' lento, piu' completo."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+        <TextBlock Text="RITMO" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="Threads" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="256"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Host analizzati insieme"/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="Sockets" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="900"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Connessioni aperte insieme"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Windows ha un numero finito di porte: alzare gli host senza alzare le connessioni non rende."/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="PingCount" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="2"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Ping per host"/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="PingMs" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="800"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Attesa del ping (ms)"/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="PortMs" DockPanel.Dock="Right" Style="{StaticResource HintField}" Width="90" TextAlignment="Right" Tag="500"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnNumbers"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Attesa di una porta (ms)"/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <ScrollViewer x:Name="PanelProbe" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+        <Grid Margin="0,0,4,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="18"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+        <TextBlock Text="NOMI" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Dns" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Nome host via DNS inverso"/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="DnsServer" DockPanel.Dock="Right" Style="{StaticResource HintMono}" Width="150" Tag="1.1.1.1"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnTexts"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Server DNS"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Vuoto: quello di sistema."/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="NetBios" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Nome, gruppo e MAC via NetBIOS"/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Mdns" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Nome via mDNS (Bonjour)"/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="PRODUTTORI DEI MAC" Style="{StaticResource SetHeader}"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <Button x:Name="BtnOui" DockPanel.Dock="Right" Style="{StaticResource SoftBtn}" Content="Aggiorna" VerticalAlignment="Center" Margin="16,0,0,0" Click="OnOui"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Database IEEE"/>
+                <TextBlock x:Name="OuiInfo" Style="{StaticResource SetNote}"/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+        <TextBlock Text="SERVIZI" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Ssdp" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Descrizione via SSDP/UPnP"/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Banners" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Banner, titolo web e certificato TLS"/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Snmp" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Interrogazione SNMP v2c"/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <TextBox x:Name="Community" DockPanel.Dock="Right" Style="{StaticResource HintMono}" Width="150" Tag="public"
+                       VerticalAlignment="Center" Margin="16,0,0,0" LostFocus="OnTexts"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Community SNMP"/>
+              </StackPanel>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Shares" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Condivisioni SMB"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Piu' lento."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="Wmi" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Inventario via WMI/WinRM"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Credenziali dell'utente corrente; fuori dominio serve un account locale."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <ScrollViewer x:Name="PanelSystem" VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+        <Grid Margin="0,0,4,8">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="18"/>
+            <ColumnDefinition Width="*"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+        <TextBlock Text="DATI" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <Button DockPanel.Dock="Right" Style="{StaticResource SoftBtn}" Content="Apri" VerticalAlignment="Center" Margin="16,0,0,0" Click="OnOpenFolder"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Cartella dei dati"/>
+                <TextBlock x:Name="DataFolder" Style="{StaticResource SetNote}" FontFamily="{StaticResource FMono}"/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+        <TextBlock Style="{StaticResource SetFooter}" Text="La variabile DUCKNOTE_HOME sposta tutto altrove, per esempio su una chiavetta accanto all'eseguibile."/>
+        <TextBlock Text="DISINSTALLAZIONE" Style="{StaticResource SetHeader}"/>
+        <Border Style="{StaticResource GroupCard}" BorderBrush="{DynamicResource RedBorder}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <Button DockPanel.Dock="Right" Style="{StaticResource DangerBtn}" Content="Cancella tutto..." VerticalAlignment="Center" Margin="16,0,0,0" Click="OnWipe"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Cancella tutti i dati"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Nota, copie, impostazioni, scansioni e cassaforte: i byte vengono sovrascritti, poi i file rimossi. Non si torna indietro."/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+          <StackPanel Grid.Column="2">
+        <TextBlock Text="VERIFICA DEL CODICE" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <StackPanel Margin="16,12">
+              <TextBlock Style="{StaticResource SetLabel}" Text="SHA-256 dell'eseguibile in uso"/>
+              <TextBlock Style="{StaticResource SetNote}" Text="Da confrontare con le somme pubblicate con ogni release."/>
+              <TextBox x:Name="Fingerprint" Style="{StaticResource ReadOnlyValue}" FontFamily="{StaticResource FMono}" FontSize="11" Margin="0,8,0,0" TextWrapping="Wrap"/>
+              <TextBlock x:Name="FingerprintPath" Style="{StaticResource SetNote}" FontFamily="{StaticResource FMono}"/>
+            </StackPanel>
+          </StackPanel>
+        </Border>
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <ContentControl x:Name="PanelVault" Focusable="False" Visibility="Collapsed"/>
+    </Grid>
+  </Grid>
+</UserControl>

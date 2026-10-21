@@ -1,0 +1,242 @@
+<UserControl x:Class="DuckNote.App.Pages.NotesPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:DuckNote.App.Ui">
+  <!-- La pagina e' il foglio, a tutta larghezza. L'indice dei fogli (con i titoli H1 e H2) e i
+       comandi stanno nella sidebar della finestra: sono definiti qui sotto, per avere i gestori
+       e i nomi nella pagina, e il costruttore li stacca da SideParts perche' la finestra li
+       metta al loro posto (Navigator al centro della sidebar, Commands in basso). -->
+  <Grid>
+    <Grid x:Name="SideParts" Visibility="Collapsed">
+      <DockPanel x:Name="NavigatorPanel">
+        <Grid DockPanel.Dock="Top" Margin="20,10,12,2">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <TextBlock Text="Fogli" Style="{StaticResource TxtCaption}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+          <TextBlock x:Name="OutlineFoot" Grid.Column="1" Style="{StaticResource TxtCaption}" Foreground="{DynamicResource LabelTertiary}"
+                     VerticalAlignment="Center" Margin="6,0,0,0" TextTrimming="CharacterEllipsis"/>
+          <ToggleButton x:Name="BtnFind" Grid.Column="2" Style="{StaticResource ToolToggle}" Click="OnFilterToggle" ToolTip="Cerca nei fogli (Ctrl+Maiusc+F)">
+            <TextBlock Text="&#xE721;" Style="{StaticResource Icon}" FontSize="12"/>
+          </ToggleButton>
+          <Button Grid.Column="3" Style="{StaticResource Toolbtn}" Click="OnAddPage" ToolTip="Nuovo foglio" Margin="2,0,0,0">
+            <TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12"/>
+          </Button>
+        </Grid>
+        <TextBox x:Name="OutlineFilter" DockPanel.Dock="Top" Style="{StaticResource SearchField}" Height="30" Margin="12,4,12,6"
+                 Tag="Cerca nei fogli" TextChanged="OnOutlineFilter" KeyDown="OnFilterKey" Visibility="Collapsed"/>
+            <ListBox x:Name="OutlineList" VirtualizingPanel.IsVirtualizing="False" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="10,0,10,6"
+                     ItemContainerStyle="{StaticResource OutlineItem}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     PreviewMouseLeftButtonUp="OnOutlineClick" MouseDoubleClick="OnOutlineDoubleClick">
+              <ListBox.ContextMenu>
+                <ContextMenu>
+                  <MenuItem Header="Nuova pagina" Click="OnAddPage">
+                    <MenuItem.Icon><TextBlock Text="&#xE710;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+                  </MenuItem>
+                  <MenuItem Header="Modifica titolo" Click="OnRenamePage">
+                    <MenuItem.Icon><TextBlock Text="&#xE70F;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+                  </MenuItem>
+                  <Separator/>
+                  <MenuItem Header="Elimina pagina" Click="OnDropPage">
+                    <MenuItem.Icon><TextBlock Text="&#xE74D;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Red}"/></MenuItem.Icon>
+                  </MenuItem>
+                </ContextMenu>
+              </ListBox.ContextMenu>
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Grid Height="{Binding RowHeight}" Background="Transparent">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="14"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <Path Width="{Binding RailWidth}" Data="{Binding Rails}" Stroke="{DynamicResource Separator}"
+                          StrokeThickness="1" SnapsToDevicePixels="True" VerticalAlignment="Stretch"/>
+                    <TextBlock x:Name="toggle" Grid.Column="1" Text="{Binding Toggle}" Visibility="{Binding ToggleVis}"
+                               Style="{StaticResource Icon}" FontSize="8" HorizontalAlignment="Center" Cursor="Hand"
+                               Foreground="{DynamicResource LabelTertiary}" Background="Transparent" Padding="2,4"
+                               MouseLeftButtonDown="OnOutlineToggle"/>
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Visibility="{Binding LabelVis}" VerticalAlignment="Center">
+                      <Border Visibility="{Binding IconVis}" Background="{Binding Tile}" CornerRadius="6"
+                              Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
+                        <Image Source="/Assets/sheet.png" Width="17" Height="17" RenderOptions.BitmapScalingMode="HighQuality"/>
+                      </Border>
+                      <Border Visibility="{Binding LevelVis}" Background="{DynamicResource AccentSoft}" CornerRadius="4"
+                              Width="22" Height="15" Margin="0,0,7,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding LevelText}" FontSize="9" FontWeight="Bold" Foreground="{DynamicResource Accent}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Border>
+                      <TextBlock Text="{Binding Title}" FontSize="{Binding Size}" FontWeight="{Binding Weight}"
+                                 VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <TextBox x:Name="rename" Grid.Column="2" Text="{Binding Title, Mode=OneWay}" Visibility="{Binding EditVis}"
+                             Style="{StaticResource HintField}" Height="24" FontSize="12" Tag="Nome della pagina"
+                             KeyDown="OnRenameKey" LostKeyboardFocus="OnRenameDone"/>
+                    <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Border Style="{StaticResource Badge}" Visibility="{Binding BadgeVis}" Background="{DynamicResource AccentSoft}">
+                        <TextBlock Text="{Binding Badge}" FontSize="10" FontWeight="SemiBold" Foreground="{DynamicResource Accent}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                      </Border>
+                      <Ellipse Width="6" Height="6" Margin="6,0,4,0" Fill="{DynamicResource Accent}" Visibility="{Binding HereVis}"/>
+                    </StackPanel>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+      </DockPanel>
+
+      <Button x:Name="CommandsPanel" Style="{StaticResource Toolbtn}" Click="OnScanNote" Height="22" MinWidth="22" Padding="4,0"
+              ToolTip="Controlla adesso gli indirizzi scritti nei fogli">
+        <StackPanel Orientation="Horizontal">
+          <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="11"/>
+          <Border x:Name="HostsChip" Style="{StaticResource ChipBlue}" Padding="5,0" Margin="5,0,0,0" VerticalAlignment="Center">
+            <TextBlock x:Name="HostsChipText" FontSize="10" FontWeight="SemiBold"/>
+          </Border>
+        </StackPanel>
+      </Button>
+    </Grid>
+
+    <!-- ===================== foglio ===================== -->
+    <Grid Margin="20,2,20,14">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="*"/>
+      </Grid.RowDefinitions>
+
+      <!-- la barra degli strumenti, sopra al foglio: i pulsanti li crea NotesPage.Toolbar.cs dalla
+           sua tabella; qui solo il contenitore e il "⋯" per quello che non ci sta -->
+      <Border Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}" BorderThickness="1"
+              CornerRadius="12" Padding="6,5" Margin="0,0,0,10">
+        <Grid x:Name="ToolHost">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel x:Name="ToolStrip" Orientation="Horizontal" ClipToBounds="True"
+                      KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle"
+                      AutomationProperties.Name="Formattazione"/>
+          <Button x:Name="BtnMore" Grid.Column="1" Style="{StaticResource FmtBtn}" Click="OnMoreTools" Visibility="Collapsed"
+                  ToolTip="Altri comandi" AutomationProperties.Name="Altri comandi">
+            <TextBlock Text="&#xE712;" Style="{StaticResource FmtGlyph}"/>
+          </Button>
+        </Grid>
+      </Border>
+
+      <Border x:Name="Sheet" Grid.Row="1" Background="{DynamicResource NotePaper}" BorderBrush="{DynamicResource Separator}"
+              BorderThickness="1" CornerRadius="14" ClipToBounds="True">
+        <Border.Effect>
+          <DropShadowEffect BlurRadius="16" ShadowDepth="2" Direction="270" Opacity="0.08" Color="Black"/>
+        </Border.Effect>
+        <Grid>
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+
+          <!-- il margine colorato del quaderno -->
+          <Rectangle Grid.RowSpan="2" Width="2" HorizontalAlignment="Left" Margin="34,0,0,0" Fill="{DynamicResource NoteMargin}" Opacity="0.7"/>
+
+          <!-- titolo della pagina, scritto sul foglio -->
+          <StackPanel Margin="58,26,48,6">
+            <TextBox x:Name="TitleBox" Style="{StaticResource TitleField}" Tag="Senza titolo"
+                     KeyDown="OnTitleKey" LostKeyboardFocus="OnTitleDone" ToolTip="Il nome della pagina: lo decidi tu"/>
+            <TextBlock x:Name="Meta" Style="{StaticResource TxtCaption}" Margin="2,4,0,0"/>
+          </StackPanel>
+
+          <RichTextBox x:Name="Editor" Grid.Row="1" BorderThickness="0" Background="Transparent" Padding="56,4,48,40"
+                       AcceptsTab="True" IsDocumentEnabled="True" SpellCheck.IsEnabled="False"
+                       VerticalScrollBarVisibility="Auto" Foreground="{DynamicResource Label}"
+                       CaretBrush="{DynamicResource Accent}" SelectionBrush="{DynamicResource Accent}"
+                       FontFamily="{StaticResource FText}">
+            <RichTextBox.ContextMenu>
+              <ContextMenu x:Name="EditorMenu">
+                <MenuItem x:Name="MenuAnalyse" Click="OnMenuAnalyse">
+                  <MenuItem.Icon><TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Green}"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem x:Name="MenuDetails" Click="OnMenuDetails">
+                  <MenuItem.Icon><TextBlock Text="&#xE946;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem x:Name="MenuHide" Click="OnMenuHide">
+                  <MenuItem.Icon><TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem x:Name="MenuCopyHost" Click="OnMenuCopyHost">
+                  <MenuItem.Icon><TextBlock Text="&#xE8C8;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+                </MenuItem>
+                <MenuItem x:Name="MenuHiddenList" Header="Host messi da parte">
+                  <MenuItem.Icon><TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Green}"/></MenuItem.Icon>
+                </MenuItem>
+                <Separator x:Name="MenuHostSep"/>
+                <MenuItem x:Name="MenuDropBlock" Click="OnMenuDropBlock">
+                  <MenuItem.Icon><TextBlock Text="&#xE74D;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Red}"/></MenuItem.Icon>
+                </MenuItem>
+                <Separator x:Name="MenuBlockSep"/>
+                <MenuItem Header="Taglia" Command="ApplicationCommands.Cut" InputGestureText="Ctrl+X"/>
+                <MenuItem Header="Copia" Command="ApplicationCommands.Copy" InputGestureText="Ctrl+C"/>
+                <MenuItem Header="Incolla" Command="ApplicationCommands.Paste" InputGestureText="Ctrl+V"/>
+                <MenuItem Header="Incolla solo testo" Click="OnPastePlain" InputGestureText="Ctrl+Shift+V"/>
+                <Separator/>
+                <MenuItem Header="Seleziona tutto" Command="ApplicationCommands.SelectAll" InputGestureText="Ctrl+A"/>
+              </ContextMenu>
+            </RichTextBox.ContextMenu>
+          </RichTextBox>
+
+          <!-- pagina vuota: un invito, che sparisce alla prima lettera -->
+          <StackPanel x:Name="EmptyHint" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+                      MaxWidth="360" Visibility="Collapsed" Margin="0,0,0,60">
+            <Image Source="/Assets/art/empty_note.png" Width="110" Height="110" Opacity="0.85" RenderOptions.BitmapScalingMode="HighQuality"/>
+            <TextBlock Text="Una pagina bianca" Style="{StaticResource TxtSub}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+            <TextBlock Style="{StaticResource TxtMuted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0"
+                       Text="Scrivi qui. Titoli, elenchi, spunte e tabelle sono nella barra; gli indirizzi che scrivi vengono controllati da soli."/>
+          </StackPanel>
+
+          <!-- ricerca: scende sopra l'angolo in alto a destra del testo -->
+          <Border x:Name="FindBar" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,18,0"
+                  Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}" BorderThickness="1"
+                  CornerRadius="12" Padding="10,8" Visibility="Collapsed" Width="380">
+            <Border.Effect>
+              <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Opacity="0.18" Color="Black"/>
+            </Border.Effect>
+            <StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="FindBox" Style="{StaticResource SearchField}" Height="30" Tag="Cerca nella pagina"
+                         TextChanged="OnFindText" KeyDown="OnFindKey"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="6,0,0,0">
+                  <TextBlock x:Name="FindCount" Style="{StaticResource TxtCaption}" VerticalAlignment="Center" MinWidth="34" TextAlignment="Center"/>
+                  <Button Style="{StaticResource Toolbtn}" Click="OnFindPrev" ToolTip="Precedente (Maiusc+F3)"><TextBlock Text="&#xE70E;" Style="{StaticResource Icon}" FontSize="10"/></Button>
+                  <Button Style="{StaticResource Toolbtn}" Click="OnFindNext" ToolTip="Successiva (F3)"><TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="10"/></Button>
+                  <ToggleButton x:Name="FindCase" Style="{StaticResource ToolToggle}" ToolTip="Maiuscole e minuscole contano" Click="OnFindCase">
+                    <TextBlock Text="Aa" FontSize="11" FontWeight="SemiBold"/>
+                  </ToggleButton>
+                  <ToggleButton x:Name="FindSwap" Style="{StaticResource ToolToggle}" ToolTip="Sostituisci" Click="OnFindSwapToggle">
+                    <TextBlock Text="&#xE8AB;" Style="{StaticResource Icon}" FontSize="12"/>
+                  </ToggleButton>
+                  <Button Style="{StaticResource Toolbtn}" Click="OnFindClose" ToolTip="Chiudi (Esc)"><TextBlock Text="&#xE711;" Style="{StaticResource Icon}" FontSize="10"/></Button>
+                </StackPanel>
+              </Grid>
+              <Grid x:Name="SwapRow" Margin="0,8,0,0" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="SwapBox" Style="{StaticResource HintField}" Height="30" Tag="Sostituisci con"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="6,0,0,0">
+                  <Button Style="{StaticResource QuietBtn}" Content="Sostituisci" Click="OnSwapOne" Margin="0,0,6,0"/>
+                  <Button Style="{StaticResource QuietBtn}" Content="Tutte" Click="OnSwapAll"/>
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+          </Border>
+
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

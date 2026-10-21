@@ -1,13 +1,16 @@
+using System.Text;
 using System.Windows.Controls;
 using System.Windows.Documents;
 
 namespace DuckNote.App.Editor;
 
+/// <summary>
+/// Cerca nella pagina. Le occorrenze si trovano attraverso i pezzi di testo: una parola mezza
+/// in grassetto resta una parola sola.
+/// </summary>
 public sealed class Finder(RichTextBox editor)
 {
     private readonly List<TextRange> _hits = [];
-
-    private string _needle = string.Empty;
     private bool _exact;
     private int _at = -1;
 
@@ -15,11 +18,13 @@ public sealed class Finder(RichTextBox editor)
 
     public int Current => _at < 0 ? 0 : _at + 1;
 
-    public string Needle => _needle;
+    public string Needle { get; private set; } = string.Empty;
+
+    public IReadOnlyList<TextRange> Hits => _hits;
 
     public void Look(string needle, bool exact)
     {
-        _needle = needle;
+        Needle = needle;
         _exact = exact;
         _at = -1;
         _hits.Clear();
@@ -29,7 +34,7 @@ public sealed class Finder(RichTextBox editor)
             return;
         }
 
-        foreach (Paragraph row in LiveFormatter.RowsOf(editor.Document))
+        foreach (Paragraph row in Doc.Rows(editor.Document))
         {
             Gather(row);
         }
@@ -44,11 +49,12 @@ public sealed class Finder(RichTextBox editor)
 
         if (_at < 0)
         {
-            _at = direction >= 0 ? Nearest(from) : Previous(from);
-            return _hits[_at];
+            _at = direction >= 0 ? Next(from) : Previous(from);
         }
-
-        _at = ((_at + direction) % _hits.Count + _hits.Count) % _hits.Count;
+        else
+        {
+            _at = ((_at + direction) % _hits.Count + _hits.Count) % _hits.Count;
+        }
 
         return _hits[_at];
     }
@@ -63,7 +69,7 @@ public sealed class Finder(RichTextBox editor)
         }
 
         hit.Text = with;
-        Look(_needle, _exact);
+        Look(Needle, _exact);
 
         return true;
     }
@@ -77,100 +83,66 @@ public sealed class Finder(RichTextBox editor)
             all[i].Text = with;
         }
 
-        Look(_needle, _exact);
+        Look(Needle, _exact);
 
         return all.Length;
     }
 
-    private int Nearest(TextPointer? from)
+    private int Next(TextPointer? from)
     {
-        if (from is null)
-        {
-            return 0;
-        }
+        int found = from is null ? -1 : _hits.FindIndex(hit => hit.Start.CompareTo(from) >= 0);
 
-        for (int i = 0; i < _hits.Count; i++)
-        {
-            if (_hits[i].Start.CompareTo(from) >= 0)
-            {
-                return i;
-            }
-        }
-
-        return 0;
+        return Math.Max(0, found);
     }
 
     private int Previous(TextPointer? from)
     {
-        if (from is null)
-        {
-            return _hits.Count - 1;
-        }
+        int found = from is null ? -1 : _hits.FindLastIndex(hit => hit.End.CompareTo(from) <= 0);
 
-        for (int i = _hits.Count - 1; i >= 0; i--)
-        {
-            if (_hits[i].End.CompareTo(from) <= 0)
-            {
-                return i;
-            }
-        }
-
-        return _hits.Count - 1;
+        return found < 0 ? _hits.Count - 1 : found;
     }
 
     private void Gather(Paragraph row)
     {
-        List<Chunk> chunks = [];
-        System.Text.StringBuilder line = new();
+        List<(TextPointer Start, int At, int Length)> chunks = [];
+        StringBuilder line = new();
 
-        for (TextPointer? point = row.ContentStart;
-             point is not null && point.CompareTo(row.ContentEnd) < 0;
-             point = Advance(point))
+        for (TextPointer? point = row.ContentStart; point is not null && point.CompareTo(row.ContentEnd) < 0;)
         {
             if (point.GetPointerContext(LogicalDirection.Forward) != TextPointerContext.Text)
             {
+                point = point.GetNextContextPosition(LogicalDirection.Forward);
                 continue;
             }
 
             int length = point.GetTextRunLength(LogicalDirection.Forward);
-            if (length == 0)
-            {
-                continue;
-            }
-
-            chunks.Add(new Chunk(point, line.Length, length));
+            chunks.Add((point, line.Length, length));
             line.Append(point.GetTextInRun(LogicalDirection.Forward));
+            point = point.GetPositionAtOffset(length);
         }
 
         string text = line.ToString();
         StringComparison how = _exact ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
-        for (int at = text.IndexOf(_needle, how); at >= 0; at = text.IndexOf(_needle, at + 1, how))
+        for (int at = text.IndexOf(Needle, how); at >= 0; at = text.IndexOf(Needle, at + 1, how))
         {
-            if (Spot(chunks, at) is { } start && Spot(chunks, at + _needle.Length) is { } end)
+            if (Spot(chunks, at) is { } start && Spot(chunks, at + Needle.Length) is { } end)
             {
                 _hits.Add(new TextRange(start, end));
             }
         }
     }
 
-    private static TextPointer? Advance(TextPointer point) =>
-        point.GetPointerContext(LogicalDirection.Forward) == TextPointerContext.Text
-            ? point.GetPositionAtOffset(point.GetTextRunLength(LogicalDirection.Forward))
-            : point.GetNextContextPosition(LogicalDirection.Forward);
-
-    private static TextPointer? Spot(List<Chunk> chunks, int at)
+    private static TextPointer? Spot(List<(TextPointer Start, int At, int Length)> chunks, int at)
     {
-        foreach (Chunk chunk in chunks)
+        foreach ((TextPointer start, int from, int length) in chunks)
         {
-            if (at >= chunk.At && at <= chunk.At + chunk.Length)
+            if (at >= from && at <= from + length)
             {
-                return chunk.Start.GetPositionAtOffset(at - chunk.At);
+                return start.GetPositionAtOffset(at - from);
             }
         }
 
         return null;
     }
-
-    private sealed record Chunk(TextPointer Start, int At, int Length);
 }

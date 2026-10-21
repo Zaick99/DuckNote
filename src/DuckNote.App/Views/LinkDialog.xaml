@@ -1,0 +1,50 @@
+<Window x:Class="DuckNote.App.Views.LinkDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        SizeToContent="Height" Width="500" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        FontFamily="{StaticResource FText}" FontSize="12.5" Title="Collegamento">
+  <Border x:Name="Root" Margin="18" Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}"
+          BorderThickness="1" CornerRadius="{StaticResource RPanel}" Opacity="0" RenderTransformOrigin="0.5,0.5">
+    <Border.RenderTransform>
+      <TransformGroup><ScaleTransform/><TranslateTransform/></TransformGroup>
+    </Border.RenderTransform>
+    <Border.Effect>
+      <DropShadowEffect BlurRadius="28" ShadowDepth="8" Direction="270" Opacity="0.35" Color="Black"/>
+    </Border.Effect>
+    <Grid Margin="22,18,22,16">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+        <Border Style="{StaticResource ChipBlue}" Width="30" Height="30" CornerRadius="15" Padding="0">
+          <TextBlock Text="&#xE71B;" Style="{StaticResource Icon}" HorizontalAlignment="Center" Foreground="{DynamicResource Blue}"/>
+        </Border>
+        <TextBlock x:Name="Head" Style="{StaticResource TxtSub}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+      </StackPanel>
+
+      <StackPanel Grid.Row="1">
+        <TextBlock Text="TESTO" Style="{StaticResource GroupHeader}" Margin="2,0,0,6"/>
+        <TextBox x:Name="ShownBox" Style="{StaticResource HintField}" Height="34" Tag="Il testo da mostrare nella nota"/>
+        <TextBlock Text="INDIRIZZO" Style="{StaticResource GroupHeader}" Margin="2,14,0,6"/>
+        <TextBox x:Name="AddressBox" Style="{StaticResource HintMono}" Height="34" Tag="https://esempio.it oppure nome@esempio.it"/>
+        <TextBlock x:Name="Hint" Style="{StaticResource GroupFooter}" Margin="2,8,0,0"
+                   Text="Senza schema viene aggiunto https://. Nella nota si apre con Ctrl+clic."/>
+        <Border x:Name="Problem" Style="{StaticResource ErrorBox}" Margin="0,10,0,0" Visibility="Collapsed">
+          <TextBlock x:Name="ProblemText" TextWrapping="Wrap" Foreground="{DynamicResource Red}"/>
+        </Border>
+      </StackPanel>
+
+      <Grid Grid.Row="2" Margin="0,18,0,0">
+        <Button x:Name="BtnRemove" Style="{StaticResource DangerBtn}" Content="Togli il collegamento" HorizontalAlignment="Left"
+                Visibility="Collapsed" Click="OnRemove"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Style="{StaticResource QuietBtn}" Content="Annulla" Margin="0,0,8,0" IsCancel="True" Click="OnCancel"/>
+          <Button Style="{StaticResource PrimaryBtn}" Content="Salva" IsDefault="True" Click="OnSave"/>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

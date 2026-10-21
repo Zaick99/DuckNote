@@ -18,15 +18,14 @@ publish/
 DuckNote.*.ps1
 *.tmp
 
-# _old/ NON e' escluso: e' l'unica copia dell'era PowerShell, e va versionata.
-# Le regole sotto valgono solo per la radice, o coprirebbero anche quella copia.
+# Uscite di build e prove locali, solo nella radice
 /dist/
+*.patch
 /commenti-rimossi.txt
 
-# Carte di lavoro che restano qui ma non si pubblicano: il documento della
-# migrazione, l'audit della copertura, il changelog dell'era PowerShell, lo
-# strumento da riga di comando e il fascio con la vecchia storia git.
+# Carte di lavoro locali che non si pubblicano
 /_archivio/
+.vscode/
 
 # Versioni di prova: l'eseguibile si rigenera con dotnet publish, e va in dist/
 _testversion/

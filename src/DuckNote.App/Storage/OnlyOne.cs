@@ -1,16 +1,18 @@
 using System.IO;
+using DuckNote.Notes.Settings;
 
 namespace DuckNote.App.Storage;
 
+/// <summary>
+/// Una copia sola per volta: due copie scriverebbero la stessa cassaforte, e chiudere a chiave
+/// l'una lascerebbe aperta l'altra. Il file resta aperto in esclusiva finche' l'app vive e
+/// sparisce da se' quando si chiude, anche se si chiude male.
+/// </summary>
 public sealed class OnlyOne : IDisposable
 {
     private readonly FileStream _held;
 
-    private bool _let;
-
     private OnlyOne(FileStream held) => _held = held;
-
-    public static string Path => System.IO.Path.Combine(AppPaths.Folder, "aperto.lock");
 
     public static OnlyOne? Claim()
     {
@@ -19,7 +21,7 @@ public sealed class OnlyOne : IDisposable
             AppPaths.Ensure();
 
             return new OnlyOne(new FileStream(
-                Path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose));
+                AppPaths.Lock, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None, 1, FileOptions.DeleteOnClose));
         }
         catch (Exception busy) when (busy is IOException or UnauthorizedAccessException)
         {
@@ -27,14 +29,5 @@ public sealed class OnlyOne : IDisposable
         }
     }
 
-    public void Dispose()
-    {
-        if (_let)
-        {
-            return;
-        }
-
-        _let = true;
-        _held.Dispose();
-    }
+    public void Dispose() => _held.Dispose();
 }

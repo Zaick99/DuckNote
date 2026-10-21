@@ -5,28 +5,29 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>DuckNote.App</RootNamespace>
     <AssemblyName>DuckNote</AssemblyName>
-    <ApplicationIcon>..\..\assets\duck.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\duck.ico</ApplicationIcon>
 
     <!--
       WPF non regge la modalita' invariante: la cache dei font costruisce
-      CultureInfo("en") all'avvio e in quella modalita' non esiste, quindi la
-      finestra muore alla prima misura di testo. Le librerie la tengono accesa
-      per avere formattazioni deterministiche; qui va spenta.
+      CultureInfo("en") all'avvio e in quella modalita' non esiste.
     -->
     <InvariantGlobalization>false</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Theme\tokens.json" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Resource Include="..\..\assets\duck.png" Link="Assets\duck.png" />
+    <!-- palette giorno/notte letta da ThemeManager con questo nome logico -->
+    <EmbeddedResource Include="Theme\tokens.extended.json" LogicalName="Theme.tokens.extended.json" />
+    <Resource Include="Assets\*.png" />
+    <Resource Include="Assets\art\*.png" />
+    <Resource Include="Assets\avatars\*.png" />
+    <Resource Include="Assets\duck.ico" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DuckNote.Core\DuckNote.Core.csproj" />
     <ProjectReference Include="..\DuckNote.Scan\DuckNote.Scan.csproj" />
+    <ProjectReference Include="..\DuckNote.Notes\DuckNote.Notes.csproj" />
   </ItemGroup>
 
 </Project>

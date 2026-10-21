@@ -1,530 +1,294 @@
-using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
-using System.Windows.Shapes;
-using DuckNote.App.Scanning;
-using DuckNote.App.Storage;
+using System.Windows.Threading;
+using DuckNote.App.Dialogs;
+using DuckNote.App.Pages;
 using DuckNote.App.Theme;
-using DuckNote.App.Views;
-using DuckNote.Scan;
+using DuckNote.App.Ui;
+using Shape = System.Windows.Shapes.Shape;
 
 namespace DuckNote.App;
 
+/// <summary>
+/// Shell Duck. Le pagine si registrano in <see cref="RegisterPages"/>: chiave, titolo, glifo
+/// Segoe Fluent, token del colore della tile, fabbrica e pannello della sidebar (o nessuno). Le pagine vengono
+/// create una volta sola, preparate a priorita' bassa dopo l'avvio (Prewarm) e riusate.
+/// </summary>
 public partial class MainWindow : Window
 {
-    private const string DarkGlyph =
-        "M6,10 A4,4 0 1 1 14,10 A4,4 0 1 1 6,10 Z M10,0.8 V3 M10,17 V19.2 M0.8,10 H3 M17,10 H19.2 " +
-        "M3.5,3.5 L5,5 M15,15 L16.5,16.5 M16.5,3.5 L15,5 M5,15 L3.5,16.5";
+    private const string AppTitle = "DuckNote";
+    private const string Moon = "M 10,2 A 8,8 0 1 0 18,10 A 6,6 0 1 1 10,2 Z";
+    private const string Sun = "M6,10 A4,4 0 1 1 14,10 A4,4 0 1 1 6,10 Z M10,0.8 V3 M10,17 V19.2 M0.8,10 H3 M17,10 H19.2 " +
+                               "M3.5,3.5 L5,5 M15,15 L16.5,16.5 M16.5,3.5 L15,5 M5,15 L3.5,16.5";
 
-    private const string LightGlyph = "M 10,2 A 8,8 0 1 0 18,10 A 6,6 0 1 1 10,2 Z";
+    private sealed record PageInfo(string Key, string Title, Func<FrameworkElement> Factory, Button? Button);
 
-    private readonly ScanSession _session = new();
-    private readonly AppSettings _settings;
-    private readonly bool _encryptAfterLoad;
-    private string _theme;
+    private readonly List<PageInfo> _pages = [];
+    private readonly Dictionary<string, FrameworkElement> _cache = [];
+    private readonly Dictionary<string, Dictionary<string, (Border Box, TextBlock Text)>> _badges = [];
+    private readonly DuckFlock _flock;
+    private string? _current;
+    private string? _previous;
 
-    public MainWindow(AppSettings settings, string theme, Vault.VaultSession vault, bool encryptAfterLoad)
+    /// <summary>Clic sul riquadro account (login/logout a cura dell'app).</summary>
+    public event Action? AccountClicked;
+
+    /// <summary>Chiusura: restituire false per annullarla (es. lavori in corso).</summary>
+    public Func<bool>? CanClose { get; set; }
+
+    private readonly Workspace _ws;
+    private readonly DispatcherTimer _duckRest = new() { Interval = TimeSpan.FromMilliseconds(900) };
+
+    public MainWindow(Workspace ws)
     {
-        _settings = settings;
-        _theme = theme;
-        _vault = vault;
-        _encryptAfterLoad = encryptAfterLoad;
-
+        _ws = ws;
         InitializeComponent();
+        Toast.Attach(ToastHost);
+        _flock = new DuckFlock(DuckLayer);
+        ThemeManager.Changed += OnThemeChanged;
+        OnThemeChanged(ThemeManager.Effective);
 
-        RecallIgnored();
+        RegisterPages();
+        WireWorkspace();
 
-        NetGrid.ItemsSource = _session.Rows;
-        _session.PropertyChanged += OnSessionChanged;
-        _session.Rows.CollectionChanged += (_, _) => RefreshCounts();
-
-        Wire();
-        Loaded += OnLoaded;
-    }
-
-    private void Wire()
-    {
-        BtnMin.Click += OnMinimise;
-        BtnZoom.Click += OnZoom;
-        BtnClose.Click += OnClose;
-        BtnTheme.Click += OnToggleTheme;
-
-        TabNote.Checked += OnTabNote;
-        TabNet.Checked += OnTabNet;
-
-        BtnScan.Click += OnScanNote;
-        BtnScanNote.Click += OnScanNote;
-        BtnScanRange.Click += OnScanRange;
-        BtnStop.Click += OnStop;
-        RangeBox.KeyDown += OnRangeKeyDown;
-
-        BindHint(RangeBox, RangeHint);
-        BindHint(SideSearch, SideSearchHint);
-        BindHint(GridFilter, GridFilterHint);
-        BindHint(FindBox, FindHint);
-        BindHint(ReplBox, ReplHint);
-
-        WireDetail();
-    }
-
-    private DetailDock? _detail;
-
-    private void WireDetail()
-    {
-        _detail = new DetailDock(this, Resources) { Width = _settings.InspectorWidth };
-
-        NetGrid.SelectionChanged += (_, _) =>
+        ThemeManager.TranslucentChanged += _ => ApplyGlass();
+        SourceInitialized += (_, _) => ApplyGlass();
+        Loaded += (_, _) =>
         {
-            if (NetGrid.SelectedItem is not Models.ScanRow row)
-            {
-                return;
-            }
-
-            Reveal(row);
+            RebuildDucks();
+            Start();
+            Prewarm();
         };
-
-        SideList.SelectionChanged += (_, _) =>
-        {
-            if (_syncingSelection)
-            {
-                return;
-            }
-
-            if (SideList.SelectedItem is Models.SideNode branch)
-            {
-                OpenBranch(branch);
-                return;
-            }
-
-            if (SideList.SelectedItem is not Models.SideItem item || item.IP.Length == 0)
-            {
-                return;
-            }
-
-            Models.ScanRow? row = _session.Rows.FirstOrDefault(candidate => candidate.IP == item.IP);
-            if (row is null)
-            {
-                return;
-            }
-
-            _syncingSelection = true;
-            try
-            {
-                NetGrid.SelectedItem = row;
-                NetGrid.ScrollIntoView(row);
-            }
-            finally
-            {
-                _syncingSelection = false;
-            }
-
-            Reveal(row);
-        };
-
-        NetGrid.PreviewMouseLeftButtonDown += (_, e) => ToggleIfSame(RowUnder(e.OriginalSource as DependencyObject));
-        SideList.PreviewMouseLeftButtonDown += (_, e) =>
-        {
-            DependencyObject? source = e.OriginalSource as DependencyObject;
-
-            ToggleIfSame(ItemUnder(source));
-            ReopenIfSame(BranchUnder(source));
-        };
-
-        BtnInspect.Click += (_, _) =>
-        {
-            _detail.Toggle();
-            UpdateInspectGlyph();
-        };
-
-        LocationChanged += (_, _) =>
-        {
-            _detail.Follow();
-            RequestSettle();
-        };
-
-        SizeChanged += (_, _) =>
-        {
-            _detail.Follow();
-            RequestSettle();
-        };
-
-        StateChanged += (_, _) => _detail.Follow();
-    }
-
-    private bool _syncingSelection;
-
-    private static string? RowUnder(DependencyObject? source) =>
-        (Ancestor<DataGridRow>(source))?.Item is Models.ScanRow row ? row.IP : null;
-
-    private void ReopenIfSame(Models.SideNode? branch)
-    {
-        if (branch is not null && ReferenceEquals(SideList.SelectedItem, branch))
-        {
-            OpenBranch(branch);
-        }
     }
 
     /// <summary>
-    /// Il ramo sotto il clic, se il clic non e' finito nel triangolino o nella
-    /// casella del titolo. Un clic in una casella di testo arriva da un pezzo
-    /// interno del suo modello, non dalla casella: va cercato risalendo,
-    /// altrimenti vale come "ho scelto il ramo" e la pagina si riapre sotto le
-    /// mani di chi sta scrivendo il nome.
+    /// Unico punto da modificare per aggiungere pagine. Rete sta in cima alla sidebar; la nota
+    /// si apre dai fogli al centro, le Impostazioni dall'ingranaggio in alto a destra.
     /// </summary>
-    private static Models.SideNode? BranchUnder(DependencyObject? source) =>
-        Within(source, "toggle", "rename") ? null : Ancestor<ListBoxItem>(source)?.DataContext as Models.SideNode;
-
-    private static bool Within(DependencyObject? source, params string[] names)
+    private void RegisterPages()
     {
-        for (DependencyObject? step = source; step is not null; step = VisualTreeHelper.GetParent(step))
+        AddPage("network", "Rete", "\uE774", "Blue", () => new NetworkPage(_ws), NavTop);
+        AddPage("notes", "Note", "\uE70F", "Orange", () => new NotesPage(_ws), null);
+        AddPage("settings", "Impostazioni", "\uE713", "Gray", () => new SettingsPage(_ws), null);
+    }
+
+    // ---------------------------------------------------------------- registrazione
+    /// <param name="tileToken">Token di colore della tile (Orange, Blue, Purple, Teal, Green, Red, Pink, Gray...).</param>
+    /// <param name="host">Dove mettere la voce; null = pagina senza voce nella sidebar.</param>
+    /// <param name="iconOnly">Solo la tessera, col titolo nel tooltip (niente testo, niente contatore).</param>
+    public void AddPage(string key, string title, string glyph, string tileToken, Func<FrameworkElement> factory, Panel? host, bool iconOnly = false)
+    {
+        if (host is null)
         {
-            if (step is FrameworkElement { Name: { Length: > 0 } name } && names.Contains(name))
+            _pages.Add(new PageInfo(key, title, factory, null));
+            return;
+        }
+
+        var tile = new Border { Style = (Style)FindResource("IconTile") };
+        tile.SetResourceReference(Border.BackgroundProperty, tileToken);
+        tile.Child = new TextBlock { Text = glyph, Style = (Style)FindResource("TileGlyph") };
+        if (iconOnly)
+        {
+            tile.Margin = new Thickness(0);
+            tile.Width = tile.Height = 28;
+            ((TextBlock)tile.Child).FontSize = 14;
+            var square = new Button
             {
-                return true;
+                Style = (Style)FindResource("IconNavItem"), Content = tile, ToolTip = title,
+            };
+            square.Click += (_, _) => Navigate(key);
+            _pages.Add(new PageInfo(key, title, factory, square));
+            host.Children.Add(square);
+            return;
+        }
+
+        var label = new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center };
+
+        // contatori a destra della voce, uno per tono (Red, Green...), nascosti a zero
+        var counters = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
+        var tones = new Dictionary<string, (Border Box, TextBlock Text)>();
+        foreach (var tone in new[] { "Red", "Green", "Blue", "Orange" })
+        {
+            var badgeText = new TextBlock { FontSize = 10.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            badgeText.SetResourceReference(TextBlock.ForegroundProperty, tone);
+            var badge = new Border { Style = (Style)FindResource("Badge"), Visibility = Visibility.Collapsed, Child = badgeText, Margin = new Thickness(4, 0, 0, 0) };
+            badge.SetResourceReference(Border.BackgroundProperty, tone + "Soft");
+            tones[tone] = (badge, badgeText);
+            counters.Children.Add(badge);
+        }
+        _badges[key] = tones;
+
+        var content = new Grid();
+        content.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { tile, label } });
+        content.Children.Add(counters);
+
+        var b = new Button { Style = (Style)FindResource("NavItem"), Content = content };
+        b.Click += (_, _) => Navigate(key);
+        _pages.Add(new PageInfo(key, title, factory, b));
+        host.Children.Add(b);
+    }
+
+    /// <summary>Un contatore sulla voce (0 = nascosto). tone: Red | Green | Blue | Orange; i toni convivono.</summary>
+    public void SetBadge(string key, int count, string tone = "Blue", string? tooltip = null)
+    {
+        if (!_badges.TryGetValue(key, out var tones) || !tones.TryGetValue(tone, out var bd)) return;
+        bd.Box.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        bd.Text.Text = count > 999 ? "999+" : count.ToString(System.Globalization.CultureInfo.CurrentCulture);
+        bd.Box.ToolTip = tooltip;
+    }
+
+    // ---------------------------------------------------------------- navigazione
+    /// <summary>La pagina per quella chiave, creata alla prima richiesta e poi riusata.</summary>
+    private FrameworkElement Open(string key)
+    {
+        if (!_cache.TryGetValue(key, out var page))
+        {
+            _cache[key] = page = _pages.First(p => p.Key == key).Factory();
+        }
+
+        return page;
+    }
+
+    public void Navigate(string key)
+    {
+        if (_pages.FirstOrDefault(p => p.Key == key) is not { } info) return;
+        if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is NotesPage leaving) leaving.OnHidden();
+
+        _current = key;
+        foreach (var p in _pages)
+        {
+            if (p.Button is not null) p.Button.Tag = p.Key == key ? "Active" : null;
+        }
+
+        var page = Open(key);
+        Title = $"{AppTitle} - {info.Title}";
+        PageHost.Content = page;
+        var order = _pages.Select(p => p.Key).ToList();
+        // direzionale: verso il basso della sidebar entra da destra, verso l'alto da sinistra
+        Fx.PageIn(page, _previous is null || order.IndexOf(key) >= order.IndexOf(_previous) ? 1 : -1);
+        _previous = key;
+        if (page is IDuckPage p2) p2.OnShown();
+    }
+
+    /// <summary>
+    /// Costruisce e misura fuori schermo le pagine non ancora aperte, una per volta, a priorita'
+    /// ApplicationIdle: la prima apertura non paga la creazione del XAML durante l'animazione.
+    /// </summary>
+    private void Prewarm()
+    {
+        var pending = _pages.Select(p => p.Key).Where(k => !_cache.ContainsKey(k)).ToList();
+        void Next()
+        {
+            if (pending.Count == 0) return;
+            var key = pending[0];
+            pending.RemoveAt(0);
+            if (!_cache.ContainsKey(key))
+            {
+                try
+                {
+                    var page = Open(key);
+                    page.Measure(new Size(PageHost.ActualWidth, PageHost.ActualHeight));
+                    page.Arrange(new Rect(0, 0, PageHost.ActualWidth, PageHost.ActualHeight));
+                }
+                catch (Exception ex)
+                {
+                    // mai bloccare l'avvio: la pagina verra' ricostruita al primo clic
+                    _cache.Remove(key);
+                    System.Diagnostics.Debug.WriteLine($"Prewarm '{key}': {ex}");
+                }
             }
+            Dispatcher.BeginInvoke(Next, DispatcherPriority.ApplicationIdle);
         }
-
-        return false;
+        Dispatcher.BeginInvoke(Next, DispatcherPriority.ApplicationIdle);
     }
 
-    private static string? ItemUnder(DependencyObject? source) =>
-        (Ancestor<ListBoxItem>(source))?.DataContext is Models.SideItem { IP.Length: > 0 } item ? item.IP : null;
-
-    private static T? Ancestor<T>(DependencyObject? source) where T : DependencyObject
+    // ---------------------------------------------------------------- stato, account
+    /// <summary>Riga di stato in basso (ultimo evento) e testo piccolo in alto a destra (versione...).</summary>
+    public void SetStatus(string text, string? right = null)
     {
-        while (source is not null and not T)
-        {
-            source = VisualTreeHelper.GetParent(source);
-        }
-
-        return source as T;
+        StatusText.Text = text;
+        if (right is not null) StatusRight.Text = right;
     }
 
-    private void ToggleIfSame(string? host)
+    /// <summary>Scheda in fondo alla sidebar. progress: 0..1 oppure null per nasconderla. dotToken: Green | Blue | Orange | Red.</summary>
+    public void SetStatusCard(string title, string text, double? progress, string dotToken = "Green", string right = "", bool pulse = false)
     {
-        if (host is null || _detail is null || NetGrid.SelectedItem is not Models.ScanRow shown
-            || !string.Equals(shown.IP, host, StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        if (_detail.IsOpen)
-        {
-            _detail.Close();
-            UpdateInspectGlyph();
-            return;
-        }
-
-        Reveal(shown);
+        StatusCard.Visibility = Visibility.Visible;
+        CardTitle.Text = title;
+        CardText.Text = text;
+        CardRight.Text = right;
+        CardProgress.Visibility = progress is null ? Visibility.Collapsed : Visibility.Visible;
+        CardProgress.Value = progress ?? 0;
+        CardDot.SetResourceReference(Shape.FillProperty, dotToken);
+        Fx.Pulse(CardDot, pulse);
     }
 
-    private void Reveal(Models.ScanRow row)
+    private void OnAccount(object sender, RoutedEventArgs e) => AccountClicked?.Invoke();
+
+    public bool DucksAnimate { get => _flock.Animate; set => _flock.Animate = value; }
+
+    // ---------------------------------------------------------------- tema
+    private void OnTheme(object sender, RoutedEventArgs e) => ThemeManager.Toggle();
+    private void OnSettings(object sender, RoutedEventArgs e) => Navigate("settings");
+    private void OnThemeSystem(object sender, MouseButtonEventArgs e) { ThemeManager.Set("system"); e.Handled = true; }
+
+    private void OnThemeChanged(string theme)
     {
-        if (_detail is null)
-        {
-            return;
-        }
-
-        _detail.Show(row);
-        if (!_detail.IsOpen)
-        {
-            _detail.Open();
-        }
-
-        UpdateInspectGlyph();
-    }
-
-    private void UpdateInspectGlyph()
-    {
-        if (_detail is null)
-        {
-            return;
-        }
-
-        if (_detail.IsOpen)
-        {
-            GlyphInspect.SetResourceReference(Shape.StrokeProperty, "Accent");
-            GlyphInspect.StrokeThickness = 1.8;
-            return;
-        }
-
-        GlyphInspect.SetResourceReference(Shape.StrokeProperty, "LabelSecondary");
-        GlyphInspect.StrokeThickness = 1.4;
-    }
-
-    private static void BindHint(TextBox field, TextBlock hint)
-    {
-        void Sync() =>
-            hint.Visibility = field.Text.Length > 0 ? Visibility.Collapsed : Visibility.Visible;
-
-        field.TextChanged += (_, _) => Sync();
-        Sync();
-    }
-
-    private void OnLoaded(object sender, RoutedEventArgs e)
-    {
-        _sidebarWidth = _settings.SidebarWidth;
-        RangeBox.Text = _settings.LastRange;
-
-        ApplyTheme(_theme);
-        TabNote.IsChecked = true;
-        ShowView(network: false, immediate: true);
-
-        SetUpChrome();
-        SetUpEditor();
-
-        if (_encryptAfterLoad && _vault.CommitPending(Editor.Document is null
-                ? []
-                : NoteXaml()))
-        {
-            _noteDirty = false;
-            StatusText.Text = "Cifratura attiva: la nota vive nel contenitore, i file in chiaro sono stati rimossi.";
-        }
-
-        SetUpSidebar();
-        SetUpHostMenus();
-        SetUpFind();
-        SyncNoteHosts();
-        SetUpVault();
-        StartMonitor();
-        RefreshCounts();
-
-        _settings.Save();
-    }
-
-    private void ApplyTheme(string theme)
-    {
-        _theme = theme;
-        ThemeTokens.Apply(Resources, theme);
-        _editorBrushes.Sync(theme);
-        RecolourInsets();
-
-        try
-        {
-            ThemeGlyph.Data = Geometry.Parse(theme == "dark" ? DarkGlyph : LightGlyph);
-        }
-        catch (FormatException)
-        {
-            return;
-        }
-
-        SolidColorBrush ink = ThemeTokens.Brush(ThemeTokens.Colour(theme, "LabelSecondary"));
         if (theme == "dark")
         {
+            ThemeGlyph.Data = Geometry.Parse(Sun);
             ThemeGlyph.Fill = null;
-            ThemeGlyph.Stroke = ink;
+            ThemeGlyph.SetResourceReference(Shape.StrokeProperty, "LabelSecondary");
             ThemeGlyph.StrokeThickness = 1.3;
         }
         else
         {
+            ThemeGlyph.Data = Geometry.Parse(Moon);
             ThemeGlyph.Stroke = null;
-            ThemeGlyph.Fill = ink;
+            ThemeGlyph.SetResourceReference(Shape.FillProperty, "LabelSecondary");
         }
     }
 
-    private void OnToggleTheme(object sender, RoutedEventArgs e)
-    {
-        _settings.FollowSystemTheme = false;
-        _settings.Theme = _theme == "dark" ? "light" : "dark";
-
-        ApplyTheme(_settings.Theme);
-        UpdateMonitorChip();
-        RefreshSideList();
-        _settings.Save();
-    }
-
-    private void ShowView(bool network, bool immediate = false)
-    {
-        Motion.MovePill(SegPillT, SegPillS, network ? 92 : 0, immediate);
-
-        if (network)
-        {
-            ViewNotes.Visibility = Visibility.Collapsed;
-            ViewNet.Visibility = Visibility.Visible;
-            Motion.Enter(ViewNet, ViewNetT, from: 18);
-            return;
-        }
-
-        ViewNet.Visibility = Visibility.Collapsed;
-        ViewNotes.Visibility = Visibility.Visible;
-        Motion.Enter(ViewNotes, ViewNotesT, from: -18);
-    }
-
-    private void OnTabNote(object sender, RoutedEventArgs e) => ShowView(network: false);
-
-    private void OnTabNet(object sender, RoutedEventArgs e) => ShowView(network: true);
-
-    private void OnSessionChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        StatusText.Text = _session.Message;
-        BtnScanRange.IsEnabled = _session.IsIdle;
-        BtnScan.IsEnabled = _session.IsIdle;
-        BtnStop.IsEnabled = _session.IsRunning;
-        RangeBox.IsEnabled = _session.IsIdle;
-        ScanProgress.Value = _session.Progress;
-        ScanProgress.Visibility = _session.IsRunning ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    /// <summary>
-    /// Allinea la tabella agli indirizzi scritti nelle note. Con
-    /// <paramref name="settled"/> a true conta anche quello che il cursore sta
-    /// scrivendo: la riga si considera finita.
-    /// </summary>
-    private void SyncNoteHosts(bool settled = false)
-    {
-        // Per aggiungere una riga si aspetta che la parola sia finita, per non
-        // inseguire i nomi a meta'. Per toglierne una no: quel che e' scritto
-        // nella nota e' scritto, anche se il cursore gli sta addosso. Pulendo
-        // con l'elenco che nasconde la parola in corso, la riga appena nata
-        // veniva buttata via un tic dopo -- e con lei l'esito dell'analisi.
-        IReadOnlyList<string> written = NoteHosts(settled: true);
-        IReadOnlyList<string> finished = settled ? written : NoteHosts();
-
-        _session.Prune(written);
-
-        IReadOnlyList<string> fresh = _session.EnsurePending(finished);
-
-        if (fresh.Count > 0)
-        {
-            CheckSoon();
-        }
-    }
-
-    private void RefreshCounts()
-    {
-        StatHosts.Text = _session.Rows.Count.ToString();
-        StatUp.Text = _session.UpCount.ToString();
-        StatDown.Text = _session.DownCount.ToString();
-        CountText.Text = _session.Rows.Count == 0
-            ? string.Empty
-            : $"{_session.Rows.Count} host";
-
-        foreach (Models.ScanRow row in _session.Rows)
-        {
-            if (row.StatusRank >= Models.ScanRow.NeverChecked)
-            {
-                continue;
-            }
-
-            _hostStates[row.IP] = row.StatusRank <= 1;
-            if (row.NoteKey.Length > 0)
-            {
-                _hostStates[row.NoteKey] = row.StatusRank <= 1;
-            }
-        }
-
-        RecolourHosts();
-        RefreshSideList();
-    }
-
-    private async void OnScanRange(object sender, RoutedEventArgs e) => await ScanAsync(showNetwork: true);
-
-    private async void OnRangeKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter && _session.IsIdle)
-        {
-            await ScanAsync();
-        }
-    }
-
-    private async void OnScanNote(object sender, RoutedEventArgs e)
-    {
-        IReadOnlyList<string> hosts = NoteHosts();
-        if (hosts.Count == 0)
-        {
-            StatusText.Text = "Nella nota non ci sono indirizzi da analizzare.";
-            return;
-        }
-
-        await ScanAsync(string.Join(',', hosts));
-    }
-
-    private async Task ScanAsync(string? targets = null, bool showNetwork = false, bool keepExisting = false)
-    {
-        if (showNetwork)
-        {
-            TabNet.IsChecked = true;
-        }
-
-        if (targets is null)
-        {
-            _settings.LastRange = RangeBox.Text;
-            _settings.Save();
-        }
-
-        await _session.RunAsync(targets ?? RangeBox.Text, _settings.ToScanOptions(), keepExisting);
-
-        SyncNoteHosts();
-        RefreshCounts();
-    }
-
-    private void OnStop(object sender, RoutedEventArgs e) => _session.Stop();
-
-    private void OnMinimise(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
-
-    private void OnZoom(object sender, RoutedEventArgs e) =>
-        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
-
-    private bool _leaving;
-
+    // ---------------------------------------------------------------- finestra
     private void OnClose(object sender, RoutedEventArgs e)
     {
-        if (_leaving)
-        {
-            return;
-        }
-        _leaving = true;
-
-        _detail?.Dispose();
-
-        ScaleTransform shrink = Motion.Scalable(RootBorder);
-        IEasingFunction ease = Motion.Ease(mode: EasingMode.EaseIn);
-
-        Motion.Grow(shrink, 0.97, 150);
-
-        DoubleAnimation fade = Motion.Slide(1, 0, 150, ease);
-        fade.Completed += (_, _) => Close();
-        RootBorder.BeginAnimation(OpacityProperty, fade);
+        if (CanClose?.Invoke() == false) return;
+        Close();
     }
 
-    internal bool RescueNote()
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
-        try
-        {
-            SaveNote();
-            _vault.Dispose();
-            return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    protected override void OnClosing(CancelEventArgs e)
-    {
-        _monitorTimer?.Stop();
-        _idleTimer?.Stop();
-        _session.Stop();
-        SaveNote();
-        _vault.Dispose();
-
-        if (ColSidebar.ActualWidth > 1)
-        {
-            _settings.SidebarWidth = (int)ColSidebar.ActualWidth;
-        }
-
-        if (_detail is { Width: > 1 })
-        {
-            _settings.InspectorWidth = (int)_detail.Width;
-        }
-        _detail?.Dispose();
-
-        _settings.Save();
-
+        _flock.Animate = false;
+        _ws.Shutdown();
         base.OnClosing(e);
+    }
+
+    private void OnMin(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+    private void OnMax(object sender, RoutedEventArgs e) => WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    /// <summary>Vetro: sfocatura di Windows dietro la finestra + angoli compatibili con quelli di DWM.</summary>
+    private void ApplyGlass()
+    {
+        var on = ThemeManager.Translucent && Backdrop.Apply(this, true);
+        if (!ThemeManager.Translucent) Backdrop.Apply(this, false);
+        _glass = on;
+        OnStateChanged(EventArgs.Empty);
+    }
+
+    private bool _glass;
+
+    /// <summary>Raggio degli angoli: con il vetro segue quelli di Windows (8 su Win11, dritti su Win10).</summary>
+    private CornerRadius Corners => WindowState == WindowState.Maximized ? new CornerRadius(0)
+        : _glass ? new CornerRadius(Backdrop.IsWindows11 ? 8 : 0) : new CornerRadius(12);
+
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        // massimizzata senza bordo: Windows sborda di ~6 px, angoli dritti
+        RootBorder.CornerRadius = Corners;
+        Lock.Corners = new CornerRadius(Math.Max(0, Corners.TopLeft - 1));
+        RootBorder.Margin = WindowState == WindowState.Maximized ? new Thickness(6) : new Thickness(0);
     }
 }

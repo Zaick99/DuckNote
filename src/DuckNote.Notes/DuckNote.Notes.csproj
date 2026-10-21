@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tutto quello che DuckNote sa fare senza una finestra: riconoscere gli
+    indirizzi, leggere il codice, i grafici e le pagine salvate, filtrare ed
+    esportare i risultati. Niente WPF qui dentro, cosi' i test girano ovunque.
+  -->
+  <PropertyGroup>
+    <RootNamespace>DuckNote.Notes</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DuckNote.Scan\DuckNote.Scan.csproj" />
+  </ItemGroup>
+
+</Project>

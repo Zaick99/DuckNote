@@ -3,66 +3,32 @@
 <img src="assets/logo.png" alt="DuckNote" width="420">
 
 **Technical notes and a network scanner in the same window.**
-Write an address in the note and DuckNote checks it; scan a subnet and the
+Write an address in a sheet and DuckNote checks it; scan a subnet and the
 results come back into the note. One executable, nothing to install.
 
 [![Latest release](https://img.shields.io/github/v/release/Zaick99/DuckNote?style=flat-square&label=release&color=f5a524)](https://github.com/Zaick99/DuckNote/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/Zaick99/DuckNote/total?style=flat-square&label=downloads&color=2ea043)](https://github.com/Zaick99/DuckNote/releases)
-[![Stars](https://img.shields.io/github/stars/Zaick99/DuckNote?style=flat-square&label=stars&color=d29922)](https://github.com/Zaick99/DuckNote/stargazers)
-[![Last commit](https://img.shields.io/github/last-commit/Zaick99/DuckNote?style=flat-square&color=8957e5)](https://github.com/Zaick99/DuckNote/commits)
 ![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-132%20green-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-181-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
-[What it does](#what-it-does) ·
-[How to use it](#how-to-use-it) ·
+[The window](#the-window) ·
+[Writing](#writing) ·
+[Network](#network--rete) ·
 [Encryption](#encryption) ·
+[Building](#building) ·
 [Changelog](CHANGELOG.md)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-dark.png">
-  <img src="docs/images/ducknote-light.png" alt="DuckNote: a note with coloured addresses, a code block and a chart" width="900">
-</picture>
+<br>
+
+<img src="assets/readme/sections.png" alt="The four parts of DuckNote: sheets, network, vault, settings" width="900">
 
 </div>
 
-> The application's interface is in Italian. Every label is quoted here exactly
-> as it appears on screen, with its meaning in English.
-
----
-
-## In one picture
-
-**Addresses live in the text.** Write `nb.zaick.net` or `10.0.0.7` in a note and
-it is checked on its own a moment after you stop typing — green reachable, red
-down, grey never checked — and the colour updates as results arrive, without the
-text moving.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-host-dark.png">
-  <img src="docs/images/ducknote-host-light.png" alt="Addresses coloured by state inside the text" width="760">
-</picture>
-
-**A code block is coloured by the language it speaks** — guessed from the code
-itself, because there are no fences to write. Keywords, strings, numbers,
-comments and the names of functions, each in its own colour.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-codice-dark.png">
-  <img src="docs/images/ducknote-codice-light.png" alt="A Python block coloured by role" width="760">
-</picture>
-
-**And the same window is a scanner.** Everything the scan collected — hostname,
-MAC and vendor, response time, the operating system it looks like, open ports —
-in one table, with the rows written by your notes alongside the ones you scanned
-by range.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/ducknote-rete-dark.png">
-  <img src="docs/images/ducknote-rete-light.png" alt="The network view with the host table" width="900">
-</picture>
+> The interface is in Italian. Labels are quoted here exactly as they appear on
+> screen, with their meaning in English.
 
 ---
 
@@ -70,253 +36,140 @@ by range.
 
 | File | What it is |
 |---|---|
-| [`DuckNote.exe`](https://github.com/Zaick99/DuckNote/releases/latest) | portable, 62 MB — the .NET runtime, WPF and the application in one file. Nothing to install. |
-| [`DuckNote-setup.exe`](https://github.com/Zaick99/DuckNote/releases/latest) | installer, 58 MB — installs for the current user, no elevation, with shortcuts and an uninstall entry. |
+| `DuckNote.exe` | portable, about 64 MB — the .NET runtime, WPF and the application in one file. Nothing to install. |
+| `DuckNote-<version>-setup.exe` | installer — installs for the current user, no elevation, with shortcuts and an uninstall entry. |
 
 Windows 10 or 11, 64-bit. Neither binary is signed, so SmartScreen warns on the
-first run — the SHA-256 of both files is in every release.
+first run: the SHA-256 of both files is published with every release, and the
+running executable shows its own in **Impostazioni › Sistema**.
 
 ---
 
-## The change of direction
+## The window
 
-**DuckNote used to be a single PowerShell script — 10,143 lines of it. Since
-0.0.4 it is a C# application on .NET 10.**
+Since 0.0.12 the interface is rebuilt from scratch on the **Duck** design kit:
+macOS-style window with traffic lights, a sidebar, orange accent, day/night
+themes that crossfade and can follow Windows, illustrations in the style of the
+duck, toasts, and ducks swimming behind the pages.
 
-The script had reached the point where every new feature cost more than it was
-worth. WPF built by hand from XAML strings, two different scan engines to
-support both PowerShell 5.1 and 7, Argon2id implemented in a language without
-unsigned 64-bit arithmetic, and no way to test any of it without launching the
-whole window.
-
-What the rewrite bought:
-
-| | PowerShell | C# / .NET 10 |
-|---|---|---|
-| Scan engine | two, one per PowerShell version | one, `Channel` + `IAsyncEnumerable` |
-| Tests | none that could run headless | 132, run in about a second |
-| Startup | script extraction, BOM dance, hash check | a single executable |
-| Argon2id | hand-rolled 64-bit arithmetic | same algorithm, verified against RFC 9106 §5.3 |
-| Type errors | at runtime, in front of the user | at compile time |
-
-**Containers written by the PowerShell version still open.** A set of fixtures
-generated by the original script is committed to the repository, and a test
-suite opens them with the new code on every build. The file format did not
-change.
-
-The original script is not in this repository: it belongs to the history that
-ended here. What survives of it are the fixtures under `tests/`, generated by
-it, which keep the new code honest about the file format.
-
-### What is not ported yet
-
-The rewrite is not finished. These exist in the interface — the XAML is the
-original one — but have no code behind them yet:
-
-- table filter and search, and the status dropdown
-- CSV export, and sending scan results into the note as a table
-- zoom
-- highlighting every match of a search, not only the current one
-
-Everything else in this page is implemented and works. The missing pieces are
-wired into the interface and waiting for their code.
-
----
-
-## What it does
-
-**You type text and press a button — there is no markup to remember.** Headings,
-bold, italic, underline, strikethrough, highlight, inline code, code blocks,
-lists, numbered lists, quotes, checkboxes, links, separators. A separator is a
-line, not three dashes. A code block is one block, not a fence above and a fence
-below. A bullet is a bullet, not a hyphen. Asterisks, backticks and `#` are
-characters like any other: `2 * 3 * 4` stays as written.
-
-Markdown used to be the way in, and it was the wrong one — a parser watching
-every keystroke, deciding when a marker had closed, and rewriting the line under
-the caret. Notes written that way are read exactly as before; nothing is lost.
-
-**Every button works on the selection.** Select three lines, press any button,
-and all three change: a style sits on the text, so there is no syntax that has
-to open and close inside one line. Underline and strikethrough can coexist. A
-line's look replaces the one it had, the numbered list counts, and the code
-block takes exactly what you selected.
-
-**A code block is coloured by the language it speaks.** The words the language
-keeps for itself, text between quotes, numbers, comments and the names of
-functions, each in its own colour. Nothing says which language it is — there are
-no fences — so it is guessed from the signs a language leaves lying around: C#,
-Python, JavaScript, Rust, PowerShell, SQL and shell. When the signs are not
-enough the block stays as it was, because colouring at random is worse than not
-colouring. Inside a block an address is code, not a host.
-
-**A separator takes one line.** It goes on the line right under the one you are
-writing, what was below stays where it was, and you carry on on a line of its
-own beneath it.
-
-**Enter knows where it is.** Inside a code block it adds a line to the block,
-and on an empty line at the end of the block it closes it and leaves you on a
-normal line below — Shift+Enter adds a line without leaving. On a list item it
-starts the next one; on an empty item it ends the list; after a heading it goes
-back to writing normally.
-
-**Links keep their address.** The link button opens a small window in the same
-dress as the rest: the selected text on one side, the address on the other,
-and a way to take the link off that leaves the text behind. A link is a real
-hyperlink, so the address survives the note being closed and reopened, and
-Ctrl+click opens it. Anything that is not http, https or mailto is refused.
-
-**Find works like Ctrl+F elsewhere.** A small panel slides down over the top
-right of the note: type and it jumps to the first match and counts them, Enter
-and the arrows walk them, F3 and Shift+F3 too, Esc closes. Matches are found
-across runs, so a word half in bold is still one word. Replace sits behind a
-toggle so the panel stays small.
-
-**Right-click knows what it is looking at.** On an address in the note:
-analyse it now — which adds it to the host table — set it aside so it is never
-scanned again, or copy it. On anything else those entries do not appear. A host
-set aside stays out of single scans, ranges and the monitor, and is remembered
-between runs; the host list's menu lists the ones set aside, one click to take
-them back.
-
-**Real tables.** The table buttons build a grid, not rows of pipe characters:
-a header with its own background, one-pixel borders, cells you tab through. They
-live under the **Tabella** menu in the bar: inserting one, and adding or
-removing rows and columns around the caret. Tables written as rows
-of pipe characters, back when they could only be text, are recovered — put the
-caret in such a block, choose *Inserisci tabella*, and it becomes a real table.
-
-**Drawings, images and charts live in the text.** The last three buttons in the
-bar drop a framed box where the caret is: a sheet you draw on with the mouse,
-an image from a file, or a chart built from a few numbers you type. A frame is
-as wide as it needs to be and **text wraps around it**, line after line and
-Enter included, returning to full width once the frame ends; put a second one
-next to the first and they split the line evenly, tops aligned. Drag the bottom
-edge for height and the right edge for width — the width stops at the page. Pasting a screenshot with Ctrl+V inserts it as
-an image instead of leaving behind something that would vanish on reopening.
-
-A chart stays editable: it keeps the lines you wrote (`gateway 3`, one per line,
-with `tipo:` for bars, lines or a pie and `titolo:` for its name), so you change
-a number rather than redrawing a picture. Bars, line and pie take their colours
-from the theme. A drawing keeps its own paper and ink — a sketch made at night
-is still legible by day. Every frame is stored beside the page inside the note
-container: ink as strokes, an image as its original bytes, a chart as its text.
-
-**Network scanner.** Ping, TTL and operating-system guess, reverse DNS,
-NetBIOS, mDNS, SSDP/UPnP, SNMP v2c, MAC and vendor (IEEE OUI database), open
-ports with service recognition, HTTP/SSH/FTP/SMTP banners, TLS certificate,
-SMB shares.
-
-**The two talk to each other.** Addresses written in the note become the list
-of hosts to check, and a new one is **checked on its own a moment after you
-stop typing** — not at the next sweep of the monitor, which can be a minute
-away. The wait is deliberate: on the way to `nb.zaick.net` you pass through
-`nb.zaick.ne`, as valid a name as its continuation and not worth looking up.
-The address under the caret is still a word being written: it becomes a host
-when the caret leaves it — a space, Enter, a click elsewhere — or five seconds
-after the last key. Delete it and its row goes with it; rows from a scan by
-range stay, because no note was claiming them. The results colour the addresses
-back in the note without the text moving.
-
-**Host card.** Clicking a host — in the table or in the sidebar — opens a card
-docked to the side of the window with everything the scan collected, in
-sections. It follows the window when it moves and switches side when it runs
-out of room. Clicking the same host again closes it.
-
-**Ducks.** They swim behind the editor, bump into each other and bounce off the
-edges, at whatever opacity you set in the settings — 4% by default, which is
-about as loud as a watermark. They stop while you type.
-
-**Locked, if you want it.** A password turns the note, its backup, the last
-scan and the excluded hosts into one encrypted container: Argon2id over 256 MiB
-for the key, AES-256 for the content, padding so the file size says nothing.
-The key leaves memory after 15 idle minutes and the note asks for the password
-again. It is offered at the first start, and the padlock in the toolbar turns
-it on at any time later.
-
-## Requirements
-
-| | |
+| Where | What is there |
 |---|---|
-| System | Windows 10 / 11, 64-bit |
-| Anything else | nothing: the runtime is inside the executable |
+| top right | the version, the **padlock** (lock now, or set up encryption), the **Impostazioni** gear, day/night |
+| sidebar, top | **DuckNote**, then the user: the Windows account's full name, `user on PC`, a picture chosen among 26 dressed-up ducks by the first letter of the name, and a badge with the vault state. A click opens a menu: lock the note or quit — without encryption, it offers to set it up |
+| sidebar | **Rete**, with the number of hosts down (red) and up (green) |
+| sidebar, middle | **Fogli**: the sheets, each on a tile of its own colour, with their H1/H2 titles always at hand; 🔍 searches them, + adds one |
+| sidebar, bottom | the monitoring card, with the button that checks the hosts written in the sheets |
+| the rest | the open sheet, full width, or the **Rete** / **Impostazioni** page |
+
+While locked, the whole window is one colour and asks for the password in
+place; only the version and day/night stay on top.
+
+<div align="center">
+
+<img src="assets/readme/sheets.png" alt="The sheets in the sidebar, each on its own colour, with their H1/H2 titles" width="380">
+
+*The sheets in the sidebar: each on a tile of its own colour, with its H1/H2 titles.*
+
+<img src="assets/readme/avatars.png" alt="The 26 dressed-up ducks, one per initial" width="900">
+
+*The user's picture: one duck per initial, A to Z.*
+
+</div>
 
 ---
 
-## Starting it
+## Writing
 
-Download `DuckNote.exe` from the release and double-click it, or run the
-installer. The executable is self-contained: no .NET installation required.
+**A sheet is a page of paper**: its title is written on it and renames it, and
+under the title the words, the page number, the time of the last save, the
+zoom and whether the note is encrypted.
 
-It is not signed, so SmartScreen warns on the first run. The SHA-256 of every
-release binary is published with the release.
+**The bar formats, the keyboard too.** The formatting bar is built from one
+table in [`NotesPage.Toolbar.cs`](src/DuckNote.App/Pages/NotesPage.Toolbar.cs):
+every command is a row with its icon, name, shortcut, group and state, so it is
+changed in one place.
+
+- toggles (bold, titles, lists, quote, code...) **stay pressed** where the
+  cursor is, and look different from hover;
+- what cannot be used is **greyed out**, not hidden;
+- every tooltip gives the **name and the shortcut**;
+- the bar never wraps: what does not fit goes into the **⋯** menu;
+- with nothing selected, a mark applies to the **word under the cursor**, or to
+  what you type next;
+- **Alt+F10** reaches the bar from the keyboard, the arrows move along it, Esc
+  returns to the text.
+
+**Enter starts a clean line** — no title, list, quote, code, bold or colour.
+**Shift+Enter** keeps the formatting: the next list item, the next line of the
+code block, the same title.
+
+**Markdown-style starts**: `#`, `##`, `###`, `-`, `1.`, `[]`, `>` or ` ``` `
+followed by a space at the start of a line turn it into a title, list,
+checklist, quote or code block.
+
+**Also in the note**: text colours from the theme, highlight, inline code,
+links (http, https, mailto; Ctrl+click opens them), real tables, separators,
+code blocks coloured by the language they look like (C#, Python, JavaScript,
+Rust, PowerShell, SQL, shell), find and replace, and framed **drawings, images
+and charts** the text wraps around. Right-click on a table, a separator, a code
+block or a quote deletes it (Ctrl+Z brings it back).
+
+**Addresses live in the text.** IPv4, IPv6 and domain names are collected from
+the whole sheet, mid-sentence included, set in monospace and **coloured by
+state** — green reachable, red down, grey never checked — a moment after you
+stop typing, without the text moving. File names, versions and e-mail
+addresses are left alone. Right-click on an address: analyse it now, show its
+card, stop analysing it (and put it back later), copy it.
 
 ---
 
-## How to use it
-
-### Note view — **Note**
-
-You write, select, and press a button in the bar; the keyboard shortcuts work
-too. Addresses go wherever they land: **IPv4, IPv6 and domain names are
-collected from the whole text**, mid-sentence included, as many per line as you
-like.
-
-```
-The gateway is 192.168.1.1, and behind it the NAS nas.home.lan that keeps vanishing.
-DNS: 1.1.1.1 and 1.0.0.1, plus 2606:4700:4700::1111 for IPv6.
-- [ ] check 10.0.0.50 before Friday
-```
-
-Every recognised address is set in monospace and **coloured by its state**:
-green reachable, red down, grey never checked. The colour updates on its own as
-scan results arrive, without the text moving.
-
-Whatever is not an address stays out: `notes.md`, `schema.sql`,
-`C:\path\file.xaml`, `version 1.2` and `name@example.com` do not become hosts.
-The rule: known file extensions are excluded, and a real domain has its suffix
-either all lowercase or all uppercase.
-
-### Network view — **Rete**
+## Network — Rete
 
 | Command | What it does |
 |---|---|
 | `192.168.1.0/24` + **Analizza** | scan a range (CIDR, `from-to`, `.1-254`, comma-separated lists) |
-| **Host della nota** | scan only the addresses written in the note |
-| **Ferma** | stop the running scan |
-| **Dettagli** | open the host card docked alongside |
+| **Host della nota** | keep in the list only the hosts written in the note, and check them |
+| **Tutti · Attivi · Spenti · Da controllare** | show only the hosts in that state |
+| **Tutti · Nota · Ricerca** | every host, only those written in the sheets, or only those found by the range search |
+| search box | free text, or by field: `ip:` `nome:` `mac:` `porta:` `os:` `tipo:` `produttore:` `gruppo:` `web:` `nota:` `stato:` |
+| export / to the note | what is shown, to CSV (opens in Excel as is) or into the sheet as a table |
+| **Messi da parte** | hosts set aside, one click (or a right-click on the table) to take them back |
 
-The sidebar switches between **Host** and **Struttura**, with a filter box over
-each. Picking a heading scrolls the note to its line — it travels there rather
-than jumping, so you can see where you came from.
+Every row starts with a dot — **green online, orange to check, red offline** —
+then the IP and the name. Selecting a row fills the card on the right with
+everything the scan collected: names, MAC and vendor, response time, the
+operating system it looks like, open ports and services, HTTP/SSH/FTP/SMTP
+banners, TLS certificate, SNMP, UPnP, SMB shares, WMI inventory.
 
-**Struttura is a tree of pages.** Under each page are its `#` headings, and
-under each of those the `##` headings that follow it — an `##` with no `#` above
-it hangs straight off the page. `###` is detail inside a section and would only
-be noise in the structure, so it is left out.
+**The full analysis runs once per start.** After that, the monitor and every
+new check only **ping**: names, MAC, ports and the rest stay as they were found.
+A host that comes back on is analysed in full again; restarting DuckNote starts
+from scratch. A new range removes only the rows that are not part of it.
+Automatic checks never pop up a notification; the ones you start do.
 
-Tree lines show what leads where: a vertical for every branch that continues
-below, an elbow into each entry. Folding is animated both ways, and what you
-fold stays folded while you keep typing.
+---
 
-A page reads as a section title with a filled toggle; a section is smaller and
-tighter, with a thin chevron — opening a page and opening a section are not the
-same act and do not look like it. The open page carries an accent dot, and a
-count appears only when a search found the word inside a page's body.
+## Encryption
 
-**Pressing a page takes you back to the top of it**, onto its title, even when
-it was already the open one. Pressing a section takes you to its line.
+Offered at the first start, and any time later from **Impostazioni ›
+Cassaforte**, the padlock or the user menu.
 
-**A page is named by hand, and only by hand.** The `+` button makes one;
-right-click → *Modifica titolo* writes the name in a field on its own row, no
-dialog. Inside that field the text behaves like text — clicking it places the
-caret, double-clicking selects it all — and the name is saved when you click
-anywhere else. A page with no name reads *Senza titolo*: nothing in the text renames
-it, because a page that renames itself as you write is a page you cannot keep
-track of. Right-click also removes a page, except the last.
+- **The password never becomes the key**: Argon2id (256 MiB, 3 passes, 4
+  lanes) then PBKDF2-HMAC-SHA512 (600,000 iterations) produce a key that only
+  unwraps the random 256-bit key the data is encrypted with — changing the
+  password rewrites a hundred bytes, not the note.
+- **Content**: AES-256-CBC with HMAC-SHA256, encrypt-then-MAC, fresh IV per
+  write, MAC verified before decrypting, padded to 4 KiB steps.
+- **Everything in one container**, `store.bin`: note, previous note, last scan,
+  hosts set aside, last range. While it exists, nothing is written in the clear.
+- **Locking**: the padlock, `Ctrl+L`, or 15 idle minutes (configurable). The
+  key leaves memory; while running it sits outside the managed heap, locked out
+  of the page file and encrypted with `CryptProtectMemory` when unused.
+- **Not covered**: malware or a keylogger in your account, a debugger on an
+  unlocked instance, a replaced executable, your screen, and cleartext copies
+  made before encryption was turned on.
 
-**The filter searches every page** — names, headings, and the text inside: a
-page whose body contains the word stays in the list and says how many times.
+**If you lose the password, the note is gone.** There is no recovery key.
 
 ---
 
@@ -325,89 +178,44 @@ page whose body contains the word stays in the list and says how many times.
 | Keys | Action |
 |---|---|
 | `Ctrl+L` | lock now |
-| `Ctrl+wheel` | grow the text |
-
-The other shortcuts of the PowerShell version are not wired yet.
-
----
-
-## Encryption
-
-Offered at the first start — **Piu' tardi** declines — and available any time
-afterwards from the padlock in the toolbar, which shows an open shackle while
-the note has no key. While encryption is on, every start goes through the
-unlock screen.
-
-**How the key is made.** The password never becomes the key: **Argon2id**
-(256 MiB, 3 passes, 4 lanes) then **PBKDF2-HMAC-SHA512** (600,000 iterations)
-produce a key-encryption key, which only unwraps the random 256-bit key the
-data is actually encrypted with — so changing the password rewrites a hundred
-bytes, not the note. Content is **AES-256-CBC with HMAC-SHA256**,
-encrypt-then-MAC, with a fresh IV per write and the MAC verified before any
-decryption.
-
-**Why those parameters.** There is no key exchange here and no signature, so
-there is nothing for a quantum computer's Shor algorithm to attack: the
-container is symmetric end to end. Grover takes AES-256 down to about 128 bits
-of effective security, which is out of reach. Your password is the real attack
-surface, so the cost is spent there — 256 MiB per guess makes GPUs and ASICs,
-the hardware that actually breaks passwords, wildly inefficient. Against a
-hundred datacentre GPUs, four random diceware words hold for centuries, three
-for weeks, and `Estate2026!` for minutes. The strength bar measures length
-times alphabet, not unpredictability: use dice, not inspiration.
-
-**What it covers.** Note, previous note, last scan, excluded hosts and last
-range, all inside `store.bin`. Content is padded to 4 KiB steps so the file
-size says nothing about what you wrote, and file timestamps are pinned.
-`settings.json` stays readable because the window is built from it before any
-key exists. **While a container exists, nothing is ever written in the clear**,
-and cleartext leftovers found beside it are overwritten and removed at unlock.
-
-**Locking.** The padlock — or `Ctrl+L` — locks on the spot, and after 15 idle
-minutes (configurable, 0 disables) it happens by itself: the note is saved,
-**the key leaves memory**, and the window is covered by the lock screen, which
-asks for the password right there rather than in a separate window. While
-running, the key sits outside the managed heap in a page pinned with
-`VirtualLock`, so it never reaches `pagefile.sys`, and encrypted with
-`CryptProtectMemory` whenever unused. Passwords read from the input boxes are
-disposed rather than left for the garbage collector.
-
-**A wrong password is shown, not written.** The screen shakes, the field and
-its label flash red, the rings around the duck change colour and speed up, and
-what was typed erases itself — no dialog to dismiss.
-
-**What it does not cover.** Malware or a keylogger in your account, a debugger
-on a running unlocked instance, a replaced executable, your screen being
-watched, and any cleartext copy made *before* you turned encryption on — shadow
-copies, File History, a sync folder. On an SSD, overwriting in place is only a
-partial defence.
-
-**If you lose the password, the note is gone.** There is no recovery key and no
-back door — that is the point.
+| `Ctrl+F`, `F3`, `Shift+F3`, `Esc` | find in the sheet, next, previous, close |
+| `Ctrl+Shift+F` | search the sheets in the sidebar |
+| `Ctrl+Alt+0` / `1` / `2` / `3` | normal text, title H1, H2, H3 |
+| `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+X` | bold, italic, underline, strikethrough |
+| `Ctrl+Alt+H`, `Ctrl+E` | highlight, inline code |
+| `Ctrl+Shift+8` / `7` / `9` | bullet list, numbered list, checklist |
+| `Ctrl+Shift+Q`, `Ctrl+Alt+C`, `Ctrl+Shift+-` | quote, code block, separator |
+| `Ctrl+K` | link |
+| `Ctrl+Space` | clear formatting |
+| `Enter` / `Shift+Enter` | new clean line / new line keeping the formatting |
+| `Alt+F10`, arrows, `Esc` | onto the formatting bar, along it, back to the text |
+| `Ctrl+Shift+V` | paste as plain text |
+| `Ctrl+wheel`, `Ctrl+plus`, `Ctrl+minus`, `Ctrl+0` | zoom the text |
 
 ---
 
 ## Where the data lives
 
-All of it in `%APPDATA%\DuckNote`, or in the folder named by `DUCKNOTE_HOME` if
-that variable is set — useful for keeping the note and the container on a USB
-stick next to the executable.
+In `%APPDATA%\DuckNote`, or in the folder named by `DUCKNOTE_HOME` — useful for
+keeping everything on a USB stick next to the executable.
 
 | File | Contents |
 |---|---|
-| `note.xaml` | the note, when encryption is off: a zip with one entry per page and an index holding their order and their names — despite the name, which earlier versions gave it when the note was one document |
+| `note.xaml` | the note, when encryption is off: a zip with one entry per sheet, their order and names, and the framed drawings, images and charts |
 | `note.xaml.bak` | the previous version, refreshed at most every 15 minutes |
 | `settings.json` | the settings |
 | `lastscan.json` | the last scan, so states are found again on reopening |
-| `store.bin` | with encryption on: **everything** — parameters, salt, wrapped key, note, previous note, last scan, excluded hosts, last range |
-| `store.bin.bak` | a copy of the container, refreshed at most every 15 minutes |
+| `store.bin`, `store.bin.bak` | with encryption on: everything above except the settings |
 
-Nothing leaves the computer: the only connections are the ones towards the
-hosts you ask to scan.
+Nothing leaves the computer: the only connections are towards the hosts you
+scan. Notes, containers and settings written by earlier versions open as they
+were.
 
 ---
 
 ## Building
+
+Requires the .NET 10 SDK.
 
 ```powershell
 dotnet build DuckNote.sln
@@ -422,60 +230,52 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
   -p:EnableCompressionInSingleFile=true -p:DebugType=none -o dist
 ```
 
-Everything ends up in one `DuckNote.exe` of about 62 MB: the .NET runtime, WPF
-and the application. No dependencies to install on the target machine.
+The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
+
+```powershell
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.12 /DSourceExe=..\dist\DuckNote.exe
+```
+
+On Linux the solution builds and the tests run with
+`-p:EnableWindowsTargeting=true`; the window itself needs Windows.
 
 ---
 
 ## Project layout
 
 ```
-src/DuckNote.Core    cryptography and the encrypted container, no UI
-src/DuckNote.Scan    the scan engine and the wire protocols, no UI
-src/DuckNote.App     the WPF application
-tests/               132 tests, including compatibility with PowerShell fixtures
-packaging/           the Inno Setup script that builds the installer
-_old/                the PowerShell original: 10,143 lines, its launcher and
-                     its build script — the only copy of what came before
-dist/                build output, not in the repository: the portable
-                     executable, the installer, and the notes that ship with it
+src/DuckNote.Core    cryptography and the encrypted container
+src/DuckNote.Scan    the scan engine and the wire protocols
+src/DuckNote.Notes   what the note knows without a window: addresses in text,
+                     code colouring, charts, the note file, the sheet tree,
+                     the host filter and CSV, settings
+src/DuckNote.App     the WPF application, on the Duck design kit
+  Theme/               design tokens, styles, theme manager
+  Ui/                  shared controls: toasts, wizard, segmented, animations
+  Pages/               the sheet, Rete, Impostazioni, Cassaforte
+  Editor/              the rich-text editor: looks, commands, painters, frames
+  Scanning/            the scan session behind the Rete table
+  Views/               lock screen, dialogs
+tests/               181 tests, including the fixtures written by the
+                     original PowerShell version
+assets/              logo and icon, the README images, and the scripts that
+                     draw the avatars, the sheet icon and the README images
+packaging/           the Inno Setup script
 ```
 
-`DuckNote.Core` and `DuckNote.Scan` have no reference to WPF: they run headless,
-which is what makes the tests possible.
-
-One folder holds everything — source, history and the build you hand to
-someone. `dist/` is written by `dotnet publish` and regenerates from scratch, so
-it is not versioned; there is never a second copy of a release somewhere else to
-open by mistake.
+`DuckNote.Core`, `DuckNote.Scan` and `DuckNote.Notes` do not reference WPF:
+they run headless, which is what makes the tests possible.
 
 ---
 
 ## A note on use
 
 Network scanning belongs **on your own networks, or where you are authorised**:
-SNMP probes and share enumeration are intrusive activities, and on someone
-else's network they can be unlawful.
-
----
-
-## Stars over time
-
-<div align="center">
-
-<a href="https://star-history.com/#Zaick99/DuckNote&Date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Zaick99/DuckNote&type=Date&theme=dark">
-    <img src="https://api.star-history.com/svg?repos=Zaick99/DuckNote&type=Date" alt="Star history of Zaick99/DuckNote" width="640">
-  </picture>
-</a>
-
-</div>
-
-The chart is drawn when the page is opened, so it is never out of date.
+SNMP probes and share enumeration are intrusive, and on someone else's network
+they can be unlawful.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Use it, change it, ship it; keep the copyright notice.
+MIT — see [LICENSE](LICENSE).

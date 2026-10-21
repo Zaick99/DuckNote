@@ -56,7 +56,7 @@ public sealed class SecretKey : IDisposable
         {
             Marshal.WriteByte(_page, i, 0);
         }
-        _pinned = VirtualLock(_page, (UIntPtr)(ulong)_capacity);
+        _pinned = OperatingSystem.IsWindows() && VirtualLock(_page, (UIntPtr)(ulong)_capacity);
     }
 
     public byte[] Reveal()
@@ -91,7 +91,7 @@ public sealed class SecretKey : IDisposable
 
     private void Veil()
     {
-        if (_veiled)
+        if (_veiled || !OperatingSystem.IsWindows())
         {
             return;
         }
@@ -103,7 +103,7 @@ public sealed class SecretKey : IDisposable
 
     private void Unveil()
     {
-        if (!_veiled)
+        if (!_veiled || !OperatingSystem.IsWindows())
         {
             return;
         }

@@ -2,7 +2,107 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.0.12] - 2026-10-16
+## [0.0.12] - 2026-10-21 — new interface
+
+**A new window, built from scratch on the Duck design kit**, released as an
+update of 0.0.12. Same features, same file formats: notes, containers and
+`settings.json` written by earlier versions open as they were.
+
+### Changed
+
+- **Shell**: macOS-style window with traffic lights; at the top right the
+  version, a padlock (lock now, or set up encryption), the **Impostazioni**
+  gear and day/night, all the same size. Themes crossfade and can follow
+  Windows live; toasts, illustrated headers and empty states, ducks swimming
+  behind the pages.
+- **Sidebar**: the duck with *DuckNote*; the current user (full Windows name,
+  `utente su PC`, one of 26 ducks dressed up in a funny way chosen by the first
+  letter of the name, a badge with the vault state). A click on the user opens
+  a menu: lock the note or quit, or — without encryption — set it up.
+  **Rete** with hosts down in red and up in green; then the **Fogli**, each on
+  a tile of its own colour with its H1/H2 titles always at hand, a search and
+  a + above them, and opening/closing animated; at the bottom the monitoring
+  card with the button that checks the hosts in the sheets.
+- **The sheet takes the whole window** and looks like paper: the title written
+  on it renames it; words, page, last save, zoom and encryption under it.
+- **The formatting bar comes from one table** (`NotesPage.Toolbar.cs`): toggles
+  stay pressed where the cursor is, disabled commands are greyed out, tooltips
+  carry name and shortcut, nothing wraps (the rest goes into ⋯), Alt+F10
+  reaches it from the keyboard. New shortcuts (Word/Docs where they exist),
+  text colour, and Markdown-style starts (`# `, `- `, `1. `, `[] `, `> `,
+  ```` ``` ````). With no selection a mark applies to the word under the cursor.
+- **Enter starts a clean line**, without title, list, quote, code, bold or
+  colour; **Shift+Enter** keeps the formatting (next list item, next code
+  line, same title).
+- **Right-click** on a table, a separator, a code block or a quote deletes it;
+  hosts set aside come back from the right-click menu of the sheet and of the
+  Rete table.
+- **Analisi and Host are one page, Rete**: table on the left with a coloured
+  dot (green online, orange to check, red offline), the IP and the name; the
+  card of the selected host on the right; filters by state and by origin
+  (*Tutti, Nota, Ricerca*), search and the hosts set aside in one row above.
+- **Full analysis once per start**: after it, the monitor and new checks only
+  ping and keep names, MAC, ports and the rest; a host that comes back on is
+  analysed again in full. A new range removes only the rows outside it;
+  **Host della nota** keeps only the hosts written in the note.
+- **Automatic scans are quiet**: no *Analisi finita* toast for the monitor or
+  freshly written addresses.
+- **Impostazioni** in tabs (*Aspetto, Nota, Scansione, Raccolta, Cassaforte,
+  Sistema*), groups in two columns, every row with the text on the left and the
+  control on the right, applied as you change them. **Cassaforte** is one of
+  the tabs: a three-step wizard, then state, auto-lock, *Blocca adesso*,
+  *Cambia password* and *Togli la cifratura*.
+- **Unlocking** covers the whole window in one colour and shows a plain loading
+  spinner while the key is derived.
+- **The editor was rewritten** with the same behaviour: code blocks coloured by
+  language, real tables, links, drawings, images and charts the text wraps
+  around, addresses coloured by state.
+- Logic that needs no window moved to `DuckNote.Notes`, with 49 tests: address
+  recognition, code colouring, charts, the note file, the sheet tree, the table
+  filter and CSV, settings.
+
+### Removed
+
+- The PowerShell original (`_old/`), editor settings (`.vscode/`) and the
+  screenshots of the old interface (`docs/`) are no longer in the repository.
+
+### Added
+
+- **Host table: filter by state** (*Tutti, Attivi, Spenti, Da controllare*) and
+  **search by field** (`ip:` `nome:` `mac:` `porta:` `os:` ...). `porta:22`
+  wants port 22, not 2222.
+- **CSV export** of what the table shows, with semicolons and a BOM so Excel in
+  Italian opens it as is. Cells starting with `=`, `+`, `-` or `@` are escaped:
+  a network banner cannot become a formula.
+- **Send to the note**: the rows shown become a table in the open page.
+- **Zoom**: Ctrl+wheel, Ctrl+plus, Ctrl+minus, Ctrl+0.
+- **The last scan is kept** (`lastscan.json`, or inside the vault) and comes
+  back at the next start, so states are there before the first check.
+- **IEEE vendor list download** from Settings, kept in `oui.txt`.
+- `Ctrl+K` for links, `Ctrl+Shift+V` to paste plain text.
+
+### Fixed
+
+- **The Rete table shows what a range scan finds**: it keeps its own list,
+  rebuilt from the filters, and scan results always reach it on the interface
+  thread.
+- **A range scan no longer loses its rows when the note changes.** A row found
+  by range is not tied to the note; only rows born from an address written in
+  the note follow it.
+- **`note.xaml.bak` is refreshed at most every 15 minutes**, as documented,
+  instead of at every save, which made it a copy of the last few seconds.
+- **Colours read from a saved note follow the theme.** Saving to XAML writes
+  colours as fixed values; they are recognised on reading and tied back to the
+  theme, so text written by day stays readable at night.
+- **The background ducks follow the theme** and stop while you type.
+- **Settings showed the wrong theme with *follow the system* on**, and Save then
+  wrote `light`.
+- **`settings.json` and `note.xaml` are written beside and moved into place**:
+  an interruption leaves the previous file, not a truncated one.
+- `SecretKey` called `kernel32`/`crypt32` unconditionally, so the vault tests
+  could not run anywhere but Windows.
+
+## [0.0.12, first build] - 2026-10-16
 
 ### Added
 
