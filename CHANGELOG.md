@@ -2,10 +2,9 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.0.12] - 2026-10-21 — new interface
+## [0.0.13] - 2026-10-23
 
-**A new window, built from scratch on the Duck design kit**, released as an
-update of 0.0.12. Same features, same file formats: notes, containers and
+**A new window, built from scratch on the Duck design kit.** Same features, same file formats: notes, containers and
 `settings.json` written by earlier versions open as they were.
 
 ### Changed
@@ -83,6 +82,9 @@ update of 0.0.12. Same features, same file formats: notes, containers and
 
 ### Fixed
 
+- **The data folder is `%APPDATA%\duck\DuckNote`**, next to the other duck
+  apps; the old `%APPDATA%\DuckNote` is moved there at the first start (if the
+  move fails, the old folder keeps being used rather than starting empty).
 - **The Rete table shows what a range scan finds**: it keeps its own list,
   rebuilt from the filters, and scan results always reach it on the interface
   thread.
@@ -102,7 +104,7 @@ update of 0.0.12. Same features, same file formats: notes, containers and
 - `SecretKey` called `kernel32`/`crypt32` unconditionally, so the vault tests
   could not run anywhere but Windows.
 
-## [0.0.12, first build] - 2026-10-16
+## [0.0.12] - 2026-10-16
 
 ### Added
 

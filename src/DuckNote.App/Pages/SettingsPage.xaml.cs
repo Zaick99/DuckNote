@@ -25,7 +25,7 @@ public partial class SettingsPage : UserControl, IDuckPage
         ("network", "Scansione", "Il monitoraggio degli host della nota, il ritmo delle analisi e le porte da provare."),
         ("hosts", "Raccolta", "Cosa chiedere a ogni host: nomi, produttori, servizi, inventario."),
         ("vault", "Cassaforte", ""),
-        ("export", "Sistema", "Dove stanno i dati, la verifica dell'eseguibile, la disinstallazione.")
+        ("system", "Sistema", "Dove stanno i dati, la verifica dell'eseguibile, la disinstallazione.")
     ];
 
     private readonly Workspace _ws;

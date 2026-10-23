@@ -10,7 +10,7 @@ results come back into the note. One executable, nothing to install.
 [![Downloads](https://img.shields.io/github/downloads/Zaick99/DuckNote/total?style=flat-square&label=downloads&color=2ea043)](https://github.com/Zaick99/DuckNote/releases)
 ![Platform](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-181-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-185-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
@@ -47,7 +47,7 @@ running executable shows its own in **Impostazioni › Sistema**.
 
 ## The window
 
-Since 0.0.12 the interface is rebuilt from scratch on the **Duck** design kit:
+Since 0.0.13 the interface is rebuilt from scratch on the **Duck** design kit:
 macOS-style window with traffic lights, a sidebar, orange accent, day/night
 themes that crossfade and can follow Windows, illustrations in the style of the
 duck, toasts, and ducks swimming behind the pages.
@@ -196,8 +196,9 @@ Cassaforte**, the padlock or the user menu.
 
 ## Where the data lives
 
-In `%APPDATA%\DuckNote`, or in the folder named by `DUCKNOTE_HOME` — useful for
-keeping everything on a USB stick next to the executable.
+In `%APPDATA%\duck\DuckNote`, or in the folder named by `DUCKNOTE_HOME` — useful for
+keeping everything on a USB stick next to the executable. Data from earlier versions, kept in
+`%APPDATA%\DuckNote`, is moved there at the first start.
 
 | File | Contents |
 |---|---|
@@ -233,7 +234,7 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
 The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.12 /DSourceExe=..\dist\DuckNote.exe
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.13 /DSourceExe=..\dist\DuckNote.exe
 ```
 
 On Linux the solution builds and the tests run with
@@ -256,7 +257,7 @@ src/DuckNote.App     the WPF application, on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table
   Views/               lock screen, dialogs
-tests/               181 tests, including the fixtures written by the
+tests/               185 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README images, and the scripts that
                      draw the avatars, the sheet icon and the README images

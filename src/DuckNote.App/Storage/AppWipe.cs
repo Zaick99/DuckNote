@@ -25,6 +25,14 @@ public static class AppWipe
             }
 
             Directory.Delete(AppPaths.Folder, recursive: true);
+
+            // la cartella duck e' condivisa con le altre app Duck: va via solo se resta vuota
+            if (Path.GetDirectoryName(AppPaths.Folder) is { } duck
+                && Path.GetFileName(duck).Equals("duck", StringComparison.OrdinalIgnoreCase)
+                && !Directory.EnumerateFileSystemEntries(duck).Any())
+            {
+                Directory.Delete(duck);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
