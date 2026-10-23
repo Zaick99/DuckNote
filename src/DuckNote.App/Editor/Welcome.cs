@@ -45,7 +45,7 @@ public static class Welcome
         Add(note, Look.Text,
             "La nota NON viene sovrascritta e il salvataggio resta sospeso, cosi' quel che c'e' dentro non va perso.");
         Add(note, Look.Text, "Accanto al contenitore c'e' una copia di poco precedente:");
-        Add(note, Look.Code, @"%APPDATA%\DuckNote\store.bin.bak");
+        Add(note, Look.Code, @"%APPDATA%\duck\DuckNote\store.bin.bak");
         Add(note, Look.Text, "Chiudi DuckNote, rinominala in store.bin e riapri.");
 
         return note;

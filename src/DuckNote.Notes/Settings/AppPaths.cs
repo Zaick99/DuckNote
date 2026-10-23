@@ -1,7 +1,7 @@
 namespace DuckNote.Notes.Settings;
 
 /// <summary>
-/// Dove vivono i dati: %APPDATA%\DuckNote, oppure la cartella in DUCKNOTE_HOME (per tenere
+/// Dove vivono i dati: %APPDATA%\duck\DuckNote, oppure la cartella in DUCKNOTE_HOME (per tenere
 /// nota e cassaforte su una chiavetta accanto all'eseguibile).
 /// </summary>
 public static class AppPaths
@@ -29,7 +29,7 @@ public static class AppPaths
         string? elsewhere = Environment.GetEnvironmentVariable("DUCKNOTE_HOME");
 
         return string.IsNullOrWhiteSpace(elsewhere)
-            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "DuckNote")
+            ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "duck", "DuckNote")
             : elsewhere;
     }
 }
