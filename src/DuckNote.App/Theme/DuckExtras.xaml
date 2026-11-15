@@ -294,6 +294,7 @@
 
   <!-- ===== Interruttore (CheckBox): testo a sinistra, levetta animata a destra ===== -->
   <Style x:Key="Switch" TargetType="CheckBox">
+    <Setter Property="FocusVisualStyle" Value="{DynamicResource RingFocus}"/>
     <Setter Property="Foreground" Value="{DynamicResource Label}"/>
     <Setter Property="FontFamily" Value="{StaticResource FText}"/>
     <Setter Property="FontSize" Value="12.5"/>

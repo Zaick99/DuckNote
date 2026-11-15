@@ -238,9 +238,18 @@ public sealed class InsetFrame : Border
         return grip;
     }
 
-    /// <summary>Quanto e' larga una riga nel controllo che mostra la nota: oltre, la cornice sborderebbe.</summary>
-    public static double Room(FrameworkElement page) =>
-        Math.Max(InsetAddress.LeastWidth * 2, (Doc.Column(page) ?? page.ActualWidth - 46) - 14);
+    /// <summary>
+    /// Quanto e' larga una riga nel controllo che mostra la nota: oltre, la cornice sborderebbe.
+    /// I margini della pagina stanno nel documento, quindi si tolgono dalla larghezza visibile.
+    /// </summary>
+    public static double Room(FrameworkElement page)
+    {
+        double margins = page is RichTextBox { Document: { } document }
+            ? document.PagePadding.Left + document.PagePadding.Right
+            : 0;
+
+        return Math.Max(InsetAddress.LeastWidth * 2, (Doc.Column(page) ?? page.ActualWidth - 46) - margins - 14);
+    }
 
     private FrameworkElement? Page()
     {

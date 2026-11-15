@@ -29,7 +29,7 @@
         <TextBlock Text="TESTO" Style="{StaticResource GroupHeader}" Margin="2,0,0,6"/>
         <TextBox x:Name="ShownBox" Style="{StaticResource HintField}" Height="34" Tag="Il testo da mostrare nella nota"/>
         <TextBlock Text="INDIRIZZO" Style="{StaticResource GroupHeader}" Margin="2,14,0,6"/>
-        <TextBox x:Name="AddressBox" Style="{StaticResource HintMono}" Height="34" Tag="https://esempio.it oppure nome@esempio.it"/>
+        <TextBox x:Name="AddressBox" Style="{StaticResource HintMono}" Height="34" Tag="https://example.com oppure nome@example.com"/>
         <TextBlock x:Name="Hint" Style="{StaticResource GroupFooter}" Margin="2,8,0,0"
                    Text="Senza schema viene aggiunto https://. Nella nota si apre con Ctrl+clic."/>
         <Border x:Name="Problem" Style="{StaticResource ErrorBox}" Margin="0,10,0,0" Visibility="Collapsed">

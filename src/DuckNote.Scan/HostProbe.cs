@@ -45,18 +45,28 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             return;
         }
 
-        HashSet<int> open = await ScanPortsAsync(address, result, cancellationToken).ConfigureAwait(false);
-        if (!result.IsAlive)
+        // Da qui in poi si raccolgono dettagli. Una sonda che va in errore (una porta, un
+        // protocollo che il sistema rifiuta) non cambia quel che gia' si sa: l'host che ha
+        // risposto resta acceso, e l'errore si annota.
+        try
         {
-            return;
+            HashSet<int> open = await ScanPortsAsync(address, result, cancellationToken).ConfigureAwait(false);
+            if (!result.IsAlive)
+            {
+                return;
+            }
+
+            result.Deep = true;
+
+            DeepFindings found = await GatherAsync(address, open, result, cancellationToken).ConfigureAwait(false);
+            Apply(found, result);
+
+            Conclude(result, open);
         }
-
-        result.Deep = true;
-
-        DeepFindings found = await GatherAsync(address, open, result, cancellationToken).ConfigureAwait(false);
-        Apply(found, result);
-
-        Conclude(result, open);
+        catch (Exception problem) when (problem is not OperationCanceledException)
+        {
+            result.Error = problem.Message;
+        }
     }
 
     private async Task ReachAsync(string address, HostScanResult result, CancellationToken cancellationToken)
@@ -80,9 +90,18 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             }
         }
 
-        result.Mac = ping.Online
-            ? ArpProbe.FromCache(address)
-            : await ArpProbe.ResolveAsync(address, cancellationToken).ConfigureAwait(false);
+        // Il MAC e' un dettaglio: se la tabella ARP non si lascia leggere, quel che ha detto il
+        // ping resta valido.
+        try
+        {
+            result.Mac = ping.Online
+                ? await ArpProbe.FromCacheAsync(address, cancellationToken).ConfigureAwait(false)
+                : await ArpProbe.ResolveAsync(address, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception problem) when (problem is not OperationCanceledException)
+        {
+            result.Error = problem.Message;
+        }
 
         if (result.Mac.Length > 0)
         {

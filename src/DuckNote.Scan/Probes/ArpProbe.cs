@@ -18,9 +18,21 @@ public static class ArpProbe
         return own.Length > 0 ? own : NeighbourCache.Lookup(address);
     }
 
+    /// <summary>Il MAC dalla tabella del sistema, aspettando (poco) una rilettura gia' in corso.</summary>
+    public static async Task<string> FromCacheAsync(string address, CancellationToken cancellationToken = default)
+    {
+        if (!IsReachableByArp(address))
+        {
+            return string.Empty;
+        }
+
+        string own = LocalNetwork.OwnMac(address);
+        return own.Length > 0 ? own : await NeighbourCache.LookupAsync(address, cancellationToken).ConfigureAwait(false);
+    }
+
     public static async Task<string> ResolveAsync(string address, CancellationToken cancellationToken = default)
     {
-        string cached = FromCache(address);
+        string cached = await FromCacheAsync(address, cancellationToken).ConfigureAwait(false);
         if (cached.Length > 0)
         {
             return cached;

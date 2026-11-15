@@ -110,6 +110,28 @@ public static class Looks
                 : NumberMark(text);
     }
 
+    /// <summary>
+    /// Il segno e' un pezzo a se', messo da DuckNote (pallino, numero, casella: monospazio, senza
+    /// sfondo), e non un testo qualsiasi che comincia per "12. ". Solo un segno cosi' si
+    /// rinumera, si scavalca col cursore e si toglie con Backspace: quello che ha scritto una
+    /// persona non si tocca.
+    /// </summary>
+    public static bool HasMarkRun(Paragraph row) =>
+        row.Inlines.FirstInline is Run first
+        && first.Text.Length > 0
+        && first.Text.Length == MarkLength(row)
+        && first.Background is null
+        && IsMono(first.FontFamily);
+
+    /// <summary>Un carattere a spaziatura fissa, anche quello delle note scritte da versioni di prima.</summary>
+    private static bool IsMono(System.Windows.Media.FontFamily family) =>
+        family.Source.Contains("Mono", StringComparison.OrdinalIgnoreCase)
+        || family.Source.Contains("Consolas", StringComparison.OrdinalIgnoreCase)
+        || family.Source.Contains("Courier", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>La riga e' una voce numerata con il suo segno.</summary>
+    public static bool IsNumbered(Paragraph? row) => row is not null && HasMarkRun(row) && Of(row) == Look.Number;
+
     /// <summary>Il punto cade sul segno della riga (per spuntare una casella con un clic).</summary>
     public static bool OnMark(Paragraph row, TextPointer point)
     {

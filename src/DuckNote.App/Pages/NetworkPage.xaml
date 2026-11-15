@@ -123,7 +123,7 @@
         </Grid.RowDefinitions>
         <DataGrid x:Name="Table" Style="{StaticResource HostGrid}" SelectionChanged="OnPick">
           <DataGrid.Columns>
-            <DataGridTemplateColumn Header="Indirizzo" Width="1.3*" MinWidth="120" SortMemberPath="SortKey">
+            <DataGridTemplateColumn Header="Indirizzo" Width="1.5*" MinWidth="150" SortMemberPath="SortKey">
               <DataGridTemplateColumn.CellTemplate>
                 <DataTemplate>
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -137,10 +137,10 @@
                 </DataTemplate>
               </DataGridTemplateColumn.CellTemplate>
             </DataGridTemplateColumn>
-            <DataGridTextColumn Header="Nome" Binding="{Binding Label}" Width="1.4*" MinWidth="80"/>
-            <DataGridTextColumn Header="Risposta" Binding="{Binding RoundTrip}" Width="0.8*" MinWidth="70" SortMemberPath="AverageMs"/>
-            <DataGridTextColumn Header="Sistema" Binding="{Binding Os}" Width="1.1*" MinWidth="70"/>
-            <DataGridTextColumn Header="Porte" Binding="{Binding OpenPorts}" Width="1.2*" MinWidth="70" SortMemberPath="PortCount"/>
+            <DataGridTextColumn Header="Nome" Binding="{Binding Label}" Width="1.4*" MinWidth="80" ElementStyle="{StaticResource GridText}"/>
+            <DataGridTextColumn Header="Risposta" Binding="{Binding RoundTripShort}" Width="0.7*" MinWidth="70" SortMemberPath="AverageMs" ElementStyle="{StaticResource GridText}"/>
+            <DataGridTextColumn Header="Sistema" Binding="{Binding Os}" Width="1.3*" MinWidth="70" ElementStyle="{StaticResource GridText}"/>
+            <DataGridTextColumn Header="Porte" Binding="{Binding OpenPorts}" Width="1.2*" MinWidth="70" SortMemberPath="PortCount" ElementStyle="{StaticResource GridText}"/>
           </DataGrid.Columns>
           <DataGrid.ContextMenu>
             <ContextMenu Opened="OnRowMenu">

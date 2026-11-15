@@ -39,7 +39,7 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
     /// </summary>
     public void Toggle(Mark mark)
     {
-        TextRange target = editor.Selection.IsEmpty && WordAt(editor.CaretPosition) is { } word ? word : editor.Selection;
+        TextRange target = Target();
 
         switch (mark)
         {
@@ -80,14 +80,16 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
     /// </summary>
     public void Colour(string token)
     {
-        TextRange target = editor.Selection.IsEmpty && WordAt(editor.CaretPosition) is { } word ? word : editor.Selection;
+        TextRange target = Target();
         target.ApplyPropertyValue(TextElement.ForegroundProperty, Palette.Of(token));
     }
 
     /// <summary>Il segno e' acceso sulla selezione (o sul cursore)? Serve alla barra per mostrarlo premuto.</summary>
     public bool Has(Mark mark)
     {
-        TextSelection selection = editor.Selection;
+        // lo stesso testo su cui lavorerebbe il comando: cosi' il pulsante dice il vero anche
+        // quando la selezione si porta dietro lo spazio dopo la parola
+        TextRange selection = editor.Selection.IsEmpty ? editor.Selection : Target();
 
         return mark switch
         {
@@ -117,6 +119,46 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
 
         Look first = Looks.Of(rows[0]);
         return rows.All(row => Looks.Of(row) == first) ? first : Look.Text;
+    }
+
+    /// <summary>
+    /// Il testo su cui lavora un segno. Senza selezione: la parola sotto il cursore, o quel che
+    /// si scrive dopo. Con una selezione: la selezione senza gli spazi in coda. Un doppio clic
+    /// (o Ctrl+Maiusc+freccia) prende la parola e lo spazio che la segue: sottolineare, barrare o
+    /// evidenziare anche quello spazio e' il difetto che Word evita allo stesso modo.
+    /// </summary>
+    private TextRange Target()
+    {
+        TextSelection selection = editor.Selection;
+
+        if (selection.IsEmpty)
+        {
+            return WordAt(editor.CaretPosition) is { } word ? word : selection;
+        }
+
+        return Trimmed(selection);
+    }
+
+    private static TextRange Trimmed(TextRange range)
+    {
+        string text = range.Text;
+        int trailing = text.Length - text.TrimEnd(' ', '\t').Length;
+
+        if (trailing == 0 || trailing == text.Length)
+        {
+            return range;
+        }
+
+        // gli spazi in coda stanno quasi sempre nello stesso pezzo di testo: se non e' cosi'
+        // (un confine di formato in mezzo) si lascia la selezione com'e'
+        if (range.End.GetPositionAtOffset(-trailing) is { } end
+            && end.CompareTo(range.Start) > 0
+            && new TextRange(end, range.End).Text == text[^trailing..])
+        {
+            return new TextRange(range.Start, end);
+        }
+
+        return range;
     }
 
     /// <summary>La parola sotto il cursore, se il cursore sta proprio dentro (non ai bordi).</summary>
@@ -317,18 +359,29 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
     {
         Paragraph[] rows = Chosen();
 
+        // senza selezione vale per la parola sotto il cursore (come Ctrl+Spazio in Word)
+        TextRange? letters = editor.Selection.IsEmpty ? WordAt(editor.CaretPosition) : editor.Selection;
+
         Change(() =>
         {
-            if (!editor.Selection.IsEmpty)
-            {
-                editor.Selection.ClearAllProperties();
-            }
+            letters?.ClearAllProperties();
 
             foreach (Paragraph row in rows)
             {
                 Styler.Undress(row);
             }
         });
+
+        // e per quel che si scrive da qui in poi
+        if (editor.Selection.IsEmpty)
+        {
+            editor.Selection.ApplyPropertyValue(TextElement.FontWeightProperty, FontWeights.Normal);
+            editor.Selection.ApplyPropertyValue(TextElement.FontStyleProperty, FontStyles.Normal);
+            editor.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty, null);
+            editor.Selection.ApplyPropertyValue(TextElement.BackgroundProperty, null);
+            editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, Palette.Text);
+            editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(Doc.TextFonts));
+        }
 
         watcher.PaintAll();
     }
@@ -348,6 +401,7 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
         }
 
         Paragraph? clean = null;
+        Paragraph? left = null;
 
         Change(() =>
         {
@@ -356,6 +410,7 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
                 editor.Selection.Text = string.Empty;
             }
 
+            left = editor.Selection.Start.Paragraph;
             TextPointer at = editor.Selection.Start.InsertParagraphBreak();
 
             if (at.Paragraph is not { } fresh || Doc.Siblings(fresh) is not { } where)
@@ -388,6 +443,9 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
         }
 
         editor.CaretPosition = clean.ContentStart.GetInsertionPosition(LogicalDirection.Forward);
+
+        // la riga lasciata e' finita: i suoi indirizzi si colorano adesso, non al prossimo giro
+        watcher.Touch(left);
         watcher.Touch(clean);
         watcher.Flush();
         return true;
@@ -403,6 +461,33 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
         if (watcher.CaretRow is { } row && (Looks.IsListed(Looks.Of(row)) || Looks.Of(row) == Look.Code) && Enter())
         {
             return true;
+        }
+
+        // a meta' di una voce d'elenco: quel che segue il cursore diventa la voce successiva
+        if (watcher.CaretRow is { } item && Looks.HasMarkRun(item) && editor.Selection.IsEmpty && !editor.IsReadOnly
+            && editor.CaretPosition is { } middle && Doc.OffsetOf(item, middle) >= Looks.MarkLength(item))
+        {
+            Look look = Looks.Of(item);
+            Paragraph? fresh = null;
+
+            Change(() =>
+            {
+                fresh = middle.InsertParagraphBreak().Paragraph;
+
+                if (fresh is not null)
+                {
+                    Styler.Dress(fresh, look, Looks.Counter(item) + 1);
+                }
+            });
+
+            if (fresh is not null && Doc.PointAt(fresh, Looks.MarkLength(fresh)) is { } start)
+            {
+                editor.CaretPosition = start;
+                WritePlain(fresh);
+                watcher.Touch(item);
+                watcher.Touch(fresh);
+                return true;
+            }
         }
 
         if (editor.CaretPosition is not { Paragraph: { } } caret || editor.IsReadOnly)
@@ -515,7 +600,7 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
     /// Il cursore appena dopo un segno d'elenco ne erediterebbe il grigio monospazio: si dice
     /// alla selezione vuota come scrivere il prossimo carattere.
     /// </summary>
-    private void WritePlain(Paragraph row)
+    public void WritePlain(Paragraph row)
     {
         if (Looks.MarkLength(row) == 0 || !editor.Selection.IsEmpty)
         {
@@ -525,6 +610,180 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
         editor.Selection.ApplyPropertyValue(TextElement.ForegroundProperty, Palette.Text);
         editor.Selection.ApplyPropertyValue(TextElement.FontFamilyProperty, new FontFamily(Doc.TextFonts));
         editor.Selection.ApplyPropertyValue(Inline.TextDecorationsProperty, null);
+    }
+
+    // ------------------------------------------------------------------ i bordi delle righe
+
+    /// <summary>
+    /// Il cursore non sta mai dentro il segno di una voce (pallino, numero, casella): se ci
+    /// finisce (Home, freccia su, un clic) va all'inizio del testo, e quel che si scrive da li'
+    /// e' testo normale, non il grigio del segno. Una selezione dentro una sola riga non prende
+    /// il segno: scrivendoci sopra la voce resta una voce.
+    /// </summary>
+    public void KeepOutOfMark()
+    {
+        TextSelection selection = editor.Selection;
+
+        if (selection.Start.Paragraph is not { } row || !Looks.HasMarkRun(row))
+        {
+            return;
+        }
+
+        int mark = Looks.MarkLength(row);
+        int at = Doc.OffsetOf(row, selection.Start);
+
+        if (at < 0 || at > mark || Doc.PointAt(row, mark) is not { } start)
+        {
+            return;
+        }
+
+        if (selection.IsEmpty)
+        {
+            if (at < mark)
+            {
+                editor.CaretPosition = start;
+            }
+
+            WritePlain(row);
+        }
+        else if (at < mark && ReferenceEquals(selection.End.Paragraph, row))
+        {
+            if (selection.End.CompareTo(start) > 0)
+            {
+                selection.Select(start, selection.End);
+            }
+            else
+            {
+                editor.CaretPosition = start;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Backspace all'inizio di una riga che ha un formato lo toglie, invece di fondere la riga
+    /// con quella sopra portandosi dietro il pallino: una voce torna testo, un titolo o una
+    /// citazione tornano testo, un blocco di codice torna righe. Il Backspace dopo fonde.
+    /// Torna true se ha fatto lui.
+    /// </summary>
+    public bool Backspace()
+    {
+        if (!editor.Selection.IsEmpty || editor.IsReadOnly || watcher.CaretRow is not { } row || editor.CaretPosition is not { } caret)
+        {
+            return false;
+        }
+
+        int at = Doc.OffsetOf(row, caret);
+        Look look = Looks.Of(row);
+
+        if (Looks.HasMarkRun(row) && at <= Looks.MarkLength(row))
+        {
+            Change(() => Styler.Undress(row));
+            editor.CaretPosition = row.ContentStart.GetInsertionPosition(LogicalDirection.Forward);
+            watcher.Touch(row);
+            return true;
+        }
+
+        if (at != 0)
+        {
+            return false;
+        }
+
+        if (look is Look.Heading1 or Look.Heading2 or Look.Heading3 or Look.Quote)
+        {
+            Change(() => Styler.Undress(row));
+            watcher.Touch(row);
+            return true;
+        }
+
+        if (look == Look.Code)
+        {
+            ToggleCode();
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Canc in fondo a una riga, quando sotto c'e' una voce d'elenco: la voce sale senza il suo
+    /// segno. Qui si toglie solo il segno; a fondere le righe ci pensa l'editor (torna sempre
+    /// false: il tasto prosegue).
+    /// </summary>
+    public bool DeleteForward()
+    {
+        if (!editor.Selection.IsEmpty || editor.IsReadOnly || watcher.CaretRow is not { } row || editor.CaretPosition is not { } caret
+            || Rest(caret, row).Length > 0)
+        {
+            return false;
+        }
+
+        if (row.ElementEnd.GetNextInsertionPosition(LogicalDirection.Forward)?.Paragraph is { } below
+            && !ReferenceEquals(below, row) && Looks.HasMarkRun(below))
+        {
+            Change(() => Styler.Undress(below));
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Freccia a sinistra dall'inizio del testo di una voce: si va in fondo alla riga sopra,
+    /// scavalcando il segno (con Maiusc si estende la selezione fin li').
+    /// </summary>
+    public bool Left(bool extend)
+    {
+        TextSelection selection = editor.Selection;
+
+        if (watcher.CaretRow is not { } row || !Looks.HasMarkRun(row) || (!selection.IsEmpty && !extend))
+        {
+            return false;
+        }
+
+        if (Doc.OffsetOf(row, selection.Start) != Looks.MarkLength(row)
+            || (extend && !selection.IsEmpty && !ReferenceEquals(selection.End.Paragraph, row)))
+        {
+            return false;
+        }
+
+        if (row.ElementStart.GetNextInsertionPosition(LogicalDirection.Backward) is not { } above)
+        {
+            return true;
+        }
+
+        if (extend)
+        {
+            selection.Select(above, selection.End);
+        }
+        else
+        {
+            editor.CaretPosition = above;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Tre trattini (o asterischi, o trattini bassi) da soli su una riga e Invio: la riga diventa
+    /// una separazione, come in Markdown. Torna true se l'ha fatto.
+    /// </summary>
+    public bool RuleFromDashes()
+    {
+        if (!editor.Selection.IsEmpty || editor.IsReadOnly || watcher.CaretRow is not { } row || Looks.Of(row) != Look.Text
+            || row.Parent is TableCell || Doc.LineOf(row).Trim() is not ("---" or "***" or "___") || Doc.Siblings(row) is not { } where)
+        {
+            return false;
+        }
+
+        Paragraph after = Doc.Row();
+
+        Change(() =>
+        {
+            Styler.Dress(row, Look.Rule);
+            where.InsertAfter(row, after);
+        });
+
+        editor.CaretPosition = after.ContentStart;
+        return true;
     }
 
     // ------------------------------------------------------------------ collegamenti
@@ -544,7 +803,7 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
             return;
         }
 
-        string shown = here is null ? editor.Selection.Text : Doc.TextOf(here);
+        string shown = here is null ? Trimmed(editor.Selection).Text : Doc.TextOf(here);
 
         if (AskForLink(shown, here?.NavigateUri?.ToString() ?? string.Empty) is not { } choice)
         {
@@ -578,7 +837,8 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
 
         if (!editor.Selection.IsEmpty)
         {
-            Dress(new Hyperlink(editor.Selection.Start, editor.Selection.End), choice);
+            TextRange words = Trimmed(editor.Selection);
+            Dress(new Hyperlink(words.Start, words.End), choice);
             return;
         }
 
@@ -692,6 +952,7 @@ public sealed class TextCommands(RichTextBox editor, RowWatcher watcher)
 
     public void Change(Action change)
     {
+        Typing.Flush(editor);
         watcher.Suspended = true;
 
         try

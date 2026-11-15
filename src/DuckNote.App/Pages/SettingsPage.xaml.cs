@@ -42,6 +42,18 @@ public partial class SettingsPage : UserControl, IDuckPage
             if (SecVault.IsChecked == true) SectionSub.Text = Vault.Summary;
         };
         PanelVault.Content = Vault;
+
+        // Invio in una casella conferma il valore, come uscire dalla casella (le impostazioni
+        // valgono subito: non c'e' un tasto Salva da cercare)
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Enter && e.OriginalSource is TextBox { AcceptsReturn: false } box
+                && !ReferenceEquals(box, Ports) && IsAncestorOf(box) && !Vault.IsAncestorOf(box))
+            {
+                box.MoveFocus(new System.Windows.Input.TraversalRequest(System.Windows.Input.FocusNavigationDirection.Next));
+                e.Handled = true;
+            }
+        };
         Load();
         OnSection(this, new RoutedEventArgs());
         _loading = false;

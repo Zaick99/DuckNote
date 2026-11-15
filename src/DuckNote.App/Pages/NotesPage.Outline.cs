@@ -75,6 +75,13 @@ public partial class NotesPage
         int pages = _ws.Book.Sheets.Count;
         string many = pages == 1 ? "1 foglio" : $"{pages} fogli";
         OutlineFoot.Text = rows.Count == 0 ? $"{many}, niente che corrisponda" : many;
+
+        // nell'indice e' evidenziato il foglio aperto (o un suo titolo), non quello di prima
+        if (_front && _sheet is not null && (OutlineList.SelectedItem as OutlineItem)?.Row.PageId != _sheet.Id
+            && _outline.FirstOrDefault(item => item.Row.IsPage && item.Row.PageId == _sheet.Id) is { } open)
+        {
+            OutlineList.SelectedItem = open;
+        }
     }
 
     private void OnOutlineFilter(object sender, TextChangedEventArgs e) => RefreshOutline();
@@ -89,6 +96,7 @@ public partial class NotesPage
 
         if (on)
         {
+            SidebarWanted?.Invoke();
             OutlineFilter.Focus();
             OutlineFilter.SelectAll();
         }
@@ -163,7 +171,15 @@ public partial class NotesPage
 
         Editor.UpdateLayout();
         Rect spot = target.ContentStart.GetCharacterRect(LogicalDirection.Forward);
-        Motion.ScrollTo(view, Math.Max(0, view.VerticalOffset + spot.Top - HeadingAir));
+        double wanted = view.VerticalOffset + spot.Top - HeadingAir;
+
+        // in cima al foglio c'e' il titolo della pagina: le prime righe lo portano con se'
+        if (wanted < Editor.Document.PagePadding.Top)
+        {
+            wanted = 0;
+        }
+
+        Motion.ScrollTo(view, wanted);
         Editor.Focus();
     }
 
@@ -437,6 +453,8 @@ public partial class NotesPage
 
     private void StopRenaming()
     {
+        bool was = _renaming is not null;
+
         if (_renaming is { } item)
         {
             item.Editing = false;
@@ -445,6 +463,12 @@ public partial class NotesPage
         _renaming = null;
         RefreshOutline();
         ShowCounts();
+
+        // dato il nome, si scrive: il cursore torna nel foglio senza doverci cliccare
+        if (was)
+        {
+            Dispatcher.BeginInvoke(() => Editor.Focus(), DispatcherPriority.Input);
+        }
     }
 
     private void OnDropPage(object sender, RoutedEventArgs e)

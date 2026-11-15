@@ -147,6 +147,76 @@ public static class Styler
         }
     }
 
+    /// <summary>
+    /// Rimette d'accordo il rientro con il segno. Cancellando e fondendo righe puo' restare un
+    /// rientro da elenco su una riga che il segno non l'ha piu', o un segno su una riga senza
+    /// rientro: la riga si sistema da sola invece di restare a meta'. Torna true se ha cambiato.
+    /// </summary>
+    public static bool Heal(Paragraph row)
+    {
+        bool hanging = row.ReadLocalValue(Paragraph.TextIndentProperty) != DependencyProperty.UnsetValue && row.TextIndent < 0;
+        bool marked = Looks.HasMarkRun(row);
+
+        if (hanging && !marked && Looks.MarkLength(row) == 0)
+        {
+            row.ClearValue(Paragraph.TextIndentProperty);
+            row.ClearValue(Block.PaddingProperty);
+            return true;
+        }
+
+        if (marked && !hanging && row.Background is null)
+        {
+            row.Padding = Looks.ListIndent;
+            row.TextIndent = -Looks.ListIndent.Left;
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>La prima voce del gruppo di voci numerate consecutive a cui appartiene la riga.</summary>
+    public static Paragraph? NumberedHead(Paragraph? row)
+    {
+        if (!Looks.IsNumbered(row))
+        {
+            return null;
+        }
+
+        Paragraph head = row!;
+
+        while (head.PreviousBlock is Paragraph before && Looks.IsNumbered(before))
+        {
+            head = before;
+        }
+
+        return head;
+    }
+
+    /// <summary>
+    /// Un elenco numerato conta da 1, sempre: tolta una voce, aggiunta una in mezzo, le altre
+    /// prendono il numero giusto. Torna le righe a cui ha cambiato il numero, con di quanto si
+    /// e' allungato o accorciato il segno (per rimettere il cursore dov'era).
+    /// </summary>
+    public static List<(Paragraph Row, int Grew)> Renumber(Paragraph head)
+    {
+        List<(Paragraph, int)> changed = [];
+        int number = 1;
+
+        for (Paragraph? row = head; Looks.IsNumbered(row); row = row!.NextBlock as Paragraph)
+        {
+            if (Looks.Counter(row!) != number && row!.Inlines.FirstInline is Run sign)
+            {
+                string mark = Looks.Counted(number);
+                changed.Add((row, mark.Length - sign.Text.Length));
+                sign.Text = mark;
+            }
+
+            number++;
+        }
+
+        return changed;
+    }
+
     /// <summary>Un blocco di codice: una riga sola nel documento, le righe del codice separate da a capo.</summary>
     public static Paragraph CodeBlock(IEnumerable<string> lines)
     {

@@ -8,7 +8,7 @@ using DuckNote.App.Theme;
 namespace DuckNote.App.Ui;
 
 /// <summary>
-/// Notifiche non bloccanti in alto a destra (al posto dei popup di conferma per gli esiti
+/// Notifiche non bloccanti in basso a destra (al posto dei popup di conferma per gli esiti
 /// positivi): entrano scivolando, restano 6 s (si fermano col mouse sopra), azione facoltativa.
 /// </summary>
 public static class Toast

@@ -29,3 +29,14 @@ public interface IDuckPage
 {
     void OnShown();
 }
+
+/// <summary>
+/// Pagina che accompagna la sidebar quando entra o esce. La finestra le ha gia' dato la
+/// larghezza nuova e la sta facendo scivolare da <c>from</c> a zero, in <c>ms</c> millisecondi
+/// con quella curva: qui la pagina tiene fermo quello che non deve muoversi (cio' che sta a
+/// destra o al centro), con la stessa durata e la stessa curva.
+/// </summary>
+public interface ISlidingPage
+{
+    void Slide(double from, int ms, System.Windows.Media.Animation.IEasingFunction ease);
+}

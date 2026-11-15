@@ -22,7 +22,10 @@ public sealed class NetworkScanner(ScanOptions options, IVendorLookup vendors)
         Channel<HostScanResult> results = Channel.CreateUnbounded<HostScanResult>(
             new UnboundedChannelOptions { SingleReader = true });
 
-        Task producer = ProduceAsync(queue, results.Writer, cancellationToken);
+        // Tutta l'analisi parte da un thread di lavoro, mai da quello di chi la chiede: chi
+        // chiede e' l'interfaccia, e la preparazione di centinaia di sonde (o una sonda che
+        // finisce subito e prosegue sul posto) la terrebbe ferma.
+        Task producer = Task.Run(() => ProduceAsync(queue, results.Writer, cancellationToken), CancellationToken.None);
 
         await foreach (HostScanResult result in results.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
         {

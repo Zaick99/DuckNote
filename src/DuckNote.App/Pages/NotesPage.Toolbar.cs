@@ -24,7 +24,8 @@ namespace DuckNote.App.Pages;
 ///   frequente ha una scorciatoia (quelle di Word e Docs, dove esistono);
 /// - quello che non si puo' fare e' spento, non nascosto (Annulla senza nulla da annullare,
 ///   le righe di una tabella fuori dalla tabella, tutto a nota chiusa);
-/// - la barra non va mai a capo: quello che non ci sta finisce nel menu "Altro" (⋯);
+/// - la barra sta nella fascia del titolo della finestra, per lasciare al foglio tutta
+///   l'altezza, e non va mai a capo: quello che non ci sta finisce nel menu "Altro" (⋯);
 /// - da tastiera: Alt+F10 porta sulla barra, le frecce si spostano, Invio/Spazio eseguono,
 ///   Esc torna al testo.
 /// </summary>
@@ -57,8 +58,8 @@ public partial class NotesPage
 
     private IReadOnlyList<Tool> Tools() =>
     [
-        new("storia", "Annulla", () => Glyph("\uE7A7"), Do(() => Editor.Undo())) { Keys = new(Key.Z, Ctrl), CanRun = () => Editor.CanUndo },
-        new("storia", "Ripeti", () => Glyph("\uE7A6"), Do(() => Editor.Redo())) { Keys = new(Key.Y, Ctrl), CanRun = () => Editor.CanRedo },
+        new("storia", "Annulla", () => Glyph("\uE7A7"), Do(UndoStep)) { Keys = new(Key.Z, Ctrl), CanRun = () => Editor.CanUndo },
+        new("storia", "Ripeti", () => Glyph("\uE7A6"), Do(RedoStep)) { Keys = new(Key.Y, Ctrl), CanRun = () => Editor.CanRedo },
 
         LookTool("Testo normale", () => Letters("T", 13), Look.Text, new(Key.D0, Ctrl | Alt), "Toglie titolo, elenco o citazione dalla riga.", plain: true),
         LookTool("Titolo", () => Letters("H1", 13.5), Look.Heading1, new(Key.D1, Ctrl | Alt), "Oppure scrivi # e uno spazio a inizio riga. Va nell'indice dei fogli."),
@@ -317,20 +318,39 @@ public partial class NotesPage
 
     private void FitToolbar()
     {
-        const double more = 36;
-        double room = ToolHost.ActualWidth - more;
+        // quanto e' largo ogni gruppo: lo si chiede a tutti, anche a quelli ora nascosti
+        double[] widths = new double[_groups.Count];
+
+        for (int i = 0; i < _groups.Count; i++)
+        {
+            StackPanel panel = _groups[i].Panel;
+            Visibility now = panel.Visibility;
+            panel.Visibility = Visibility.Visible;
+            panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            widths[i] = panel.DesiredSize.Width;
+            panel.Visibility = now;
+        }
+
+        // se ci stanno tutti il "⋯" non serve; altrimenti gli si tiene il posto
+        double room = ToolHost.ActualWidth;
+        bool all = widths.Sum() <= room;
+
+        if (!all)
+        {
+            room -= 32;
+        }
+
         double used = 0;
         bool full = false;
 
-        foreach ((StackPanel panel, _) in _groups)
+        for (int i = 0; i < _groups.Count; i++)
         {
-            panel.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            full |= used + panel.DesiredSize.Width > room;
-            panel.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
-            used += full ? 0 : panel.DesiredSize.Width;
+            full |= used + widths[i] > room;
+            _groups[i].Panel.Visibility = full ? Visibility.Collapsed : Visibility.Visible;
+            used += full ? 0 : widths[i];
         }
 
-        BtnMore.Visibility = full ? Visibility.Visible : Visibility.Collapsed;
+        BtnMore.Visibility = all ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void OnMoreTools(object sender, RoutedEventArgs e)
@@ -396,11 +416,24 @@ public partial class NotesPage
             return true;
         }
 
+        // Ripeti anche con Ctrl+Maiusc+Z, come in molti editor
+        if (key == Key.Z && mods == (Ctrl | Shift))
+        {
+            if (!Editor.IsReadOnly && Editor.CanRedo)
+            {
+                RedoStep();
+                RefreshTools();
+            }
+
+            return true;
+        }
+
         foreach ((Tool tool, ButtonBase button) in _tools)
         {
             if (tool.Keys is { } keys && keys.Key == key && keys.Modifiers == mods && tool.Menu is null)
             {
-                if (button.IsEnabled)
+                // lo stato del pulsante si aggiorna a riposo: qui si chiede quello vero di adesso
+                if (!Editor.IsReadOnly && (tool.CanRun?.Invoke() ?? true))
                 {
                     tool.Run();
                     RefreshTools();
@@ -417,7 +450,7 @@ public partial class NotesPage
     private static readonly (string Mark, Look Look)[] Typed =
     [
         ("#", Look.Heading1), ("##", Look.Heading2), ("###", Look.Heading3),
-        ("-", Look.Bullet), ("*", Look.Bullet), ("1.", Look.Number), ("[]", Look.Todo),
+        ("-", Look.Bullet), ("*", Look.Bullet), ("1.", Look.Number), ("[]", Look.Todo), ("[ ]", Look.Todo),
         (">", Look.Quote), ("```", Look.Code)
     ];
 
@@ -428,12 +461,26 @@ public partial class NotesPage
     private bool AutoFormat(KeyEventArgs e)
     {
         if (e.Key != Key.Space || Keyboard.Modifiers != ModifierKeys.None || Editor.IsReadOnly || !Editor.Selection.IsEmpty
-            || Editor.CaretPosition is not { Paragraph: { } row } caret || Looks.Of(row) != Look.Text || row.Parent is TableCell)
+            || Editor.CaretPosition is not { Paragraph: { } row } caret || row.Parent is TableCell)
         {
             return false;
         }
 
         string typed = new TextRange(row.ContentStart, caret).Text;
+
+        // "- [ ]" come in Markdown: il trattino ha gia' fatto un elenco, le quadre lo fanno spunta
+        if (Looks.Of(row) == Look.Bullet && typed is Looks.Dot + "[]" or Looks.Dot + "[ ]")
+        {
+            new TextRange(row.ContentStart, caret).Text = string.Empty;
+            _commands.SetLook(Look.Todo);
+            RefreshTools();
+            return true;
+        }
+
+        if (Looks.Of(row) != Look.Text)
+        {
+            return false;
+        }
 
         if (Typed.FirstOrDefault(pair => pair.Mark == typed) is not { Mark: not null } hit)
         {

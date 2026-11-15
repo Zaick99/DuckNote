@@ -6,7 +6,7 @@
         Title="DuckNote" Width="1240" Height="800" MinWidth="980" MinHeight="640"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
         AllowsTransparency="True" UseLayoutRounding="True" SnapsToDevicePixels="True"
-        Background="Transparent" Icon="/Assets/duck.ico"
+        Background="Transparent" Icon="/Assets/duck.ico" FocusVisualStyle="{x:Null}"
         FontFamily="{StaticResource FText}" FontSize="12.5" TextOptions.TextFormattingMode="Ideal">
   <shell:WindowChrome.WindowChrome>
     <shell:WindowChrome CaptionHeight="46" CornerRadius="12" GlassFrameThickness="0"
@@ -15,18 +15,63 @@
 
   <!-- Shell Duck: sidebar a tutta altezza (macOS) con semafori, papera + DuckNote, utente;
        Rete in cima, i fogli della nota al centro (NavigatorHost), in fondo la scheda del
-       monitoraggio (con il pulsante degli host, CommandsHost) e l'ingranaggio delle Impostazioni. A destra barra del titolo con
-       sole/luna, pagina, barra di stato, paperelle e notifiche. Le voci si registrano dal
-       codice (AddPage), indice e comandi li fornisce la NotesPage. -->
+       monitoraggio (con il pulsante degli host, CommandsHost). A destra la fascia del titolo
+       (con la barra di formattazione della nota, ToolbarHost) e sotto la pagina, a tutta
+       altezza: l'ultimo evento compare in basso e se ne va da solo. Le voci si registrano
+       dal codice (AddPage); indice, comandi e barra li fornisce la NotesPage.
+
+       La sidebar si nasconde (F9, o il pulsante accanto ai semafori) e tutta la finestra
+       resta al foglio: gli strati qui sotto sono sovrapposti, e MainWindow.Sidebar.cs li
+       muove. Il contenuto cambia larghezza una volta sola e poi scivola, cosi' una nota
+       lunga non si reimpagina a ogni fotogramma. -->
   <Border x:Name="RootBorder" Background="{DynamicResource BgWindow}"
           BorderBrush="{DynamicResource Separator}" BorderThickness="1" CornerRadius="12">
     <Grid>
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="266"/>
-        <ColumnDefinition Width="*"/>
-      </Grid.ColumnDefinitions>
+      <!-- ===================== contenuto ===================== -->
+      <Grid x:Name="ContentArea" Margin="266,0,0,0">
+        <Grid.RenderTransform>
+          <TranslateTransform x:Name="ContentShift"/>
+        </Grid.RenderTransform>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="46"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Canvas x:Name="DuckLayer" Grid.RowSpan="2" ClipToBounds="True" IsHitTestVisible="False" Background="Transparent"/>
+
+        <ContentControl x:Name="PageHost" Grid.Row="1" Focusable="False"/>
+
+        <!-- l'ultimo evento: compare in basso a sinistra, resta il tempo di leggerlo e se ne va.
+             Non prende il mouse: quello che c'e' sotto resta cliccabile. -->
+        <Border x:Name="StatusPill" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="22,0,22,20"
+                Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}" BorderThickness="1"
+                CornerRadius="13" Padding="12,5,13,6" MaxWidth="620" Visibility="Collapsed" IsHitTestVisible="False">
+          <Border.Effect>
+            <DropShadowEffect BlurRadius="14" ShadowDepth="3" Direction="270" Opacity="0.16" Color="Black"/>
+          </Border.Effect>
+          <TextBlock x:Name="StatusText" Style="{StaticResource TxtCaption}" Foreground="{DynamicResource LabelSecondary}"
+                     TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
+        </Border>
+      </Grid>
+
+      <!-- la barra di formattazione della nota, nella fascia del titolo: la fornisce la
+           NotesPage, e si vede solo mentre la nota e' in primo piano. Lo spazio fra i
+           pulsanti resta buono per trascinare la finestra. -->
+      <ContentControl x:Name="ToolbarHost" VerticalAlignment="Top" Height="46" Margin="276,0,170,0" Panel.ZIndex="1"
+                      Focusable="False" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Center" Visibility="Collapsed">
+        <ContentControl.RenderTransform>
+          <TranslateTransform x:Name="ToolbarShift"/>
+        </ContentControl.RenderTransform>
+      </ContentControl>
 
       <!-- ===================== sidebar ===================== -->
+      <Grid x:Name="Sidebar" Width="266" HorizontalAlignment="Left" Panel.ZIndex="2">
+        <Grid.RenderTransform>
+          <TranslateTransform x:Name="SidebarShift"/>
+        </Grid.RenderTransform>
+        <!-- quando si affaccia sopra al foglio: un'ombra sul bordo e un fondo pieno (col vetro
+             il suo colore e' semitrasparente, e sotto si leggerebbe il testo) -->
+        <Rectangle x:Name="SidebarShadow" Width="18" HorizontalAlignment="Right" Margin="0,0,-18,0" IsHitTestVisible="False" Opacity="0"/>
+        <Border x:Name="SidebarBack" Background="{DynamicResource BgSidebar}" CornerRadius="11,0,0,11" Opacity="0"/>
       <Border Background="{DynamicResource BgSidebarGlass}" BorderBrush="{DynamicResource Separator}" BorderThickness="0,0,1,0" CornerRadius="11,0,0,11">
         <DockPanel>
           <!-- la fascia dei semafori: i pulsanti stanno nello strato TitleLayer, sopra a tutto -->
@@ -94,25 +139,16 @@
           <ContentControl x:Name="NavigatorHost" Focusable="False"/>
         </DockPanel>
       </Border>
-
-      <!-- ===================== contenuto ===================== -->
-      <Grid Grid.Column="1">
-        <Grid.RowDefinitions>
-          <RowDefinition Height="46"/>
-          <RowDefinition Height="*"/>
-          <RowDefinition Height="26"/>
-        </Grid.RowDefinitions>
-        <Canvas x:Name="DuckLayer" Grid.RowSpan="3" ClipToBounds="True" IsHitTestVisible="False" Background="Transparent"/>
-
-
-        <ContentControl x:Name="PageHost" Grid.Row="1" Focusable="False"/>
-
-        <Border Grid.Row="2" BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,1,0,0">
-          <TextBlock x:Name="StatusText" Style="{StaticResource TxtCaption}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="22,0"/>
-        </Border>
-
-        <StackPanel x:Name="ToastHost" Grid.RowSpan="3" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,52,18,0" Panel.ZIndex="20"/>
       </Grid>
+
+      <!-- a sidebar nascosta: fermando il mouse sul bordo sinistro la sidebar si affaccia sopra
+           al foglio, e rientra quando il mouse se ne va -->
+      <Border x:Name="EdgeSensor" Width="12" HorizontalAlignment="Left" Margin="0,46,0,0" Background="Transparent"
+              Panel.ZIndex="3" Visibility="Collapsed"/>
+
+      <!-- le notifiche, in basso a destra: in alto coprirebbero i comandi delle pagine (Analizza,
+           Host della nota) -->
+      <StackPanel x:Name="ToastHost" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,18" Panel.ZIndex="20"/>
 
       <!-- il menu dell'utente (e del lucchetto): blocca la nota o esci; senza cifratura propone
            di impostarla e porta in Impostazioni > Cassaforte -->
@@ -150,14 +186,14 @@
       </Popup>
 
       <!-- schermata di sblocco: copre tutta la finestra -->
-      <views:LockScreen x:Name="Lock" Grid.ColumnSpan="2" Visibility="Collapsed" Panel.ZIndex="10"/>
+      <views:LockScreen x:Name="Lock" Visibility="Collapsed" Panel.ZIndex="10"/>
 
       <!-- la barra in cima, sopra a tutto (anche alla schermata di blocco, che cosi' copre la
-           finestra intera con un colore solo): semafori a sinistra; versione, lucchetto e
-           giorno/notte a destra -->
-      <Grid x:Name="TitleLayer" Grid.ColumnSpan="2" Height="46" VerticalAlignment="Top" Panel.ZIndex="11">
+           finestra intera con un colore solo): a sinistra i semafori e il pulsante che nasconde
+           la sidebar; versione, lucchetto e giorno/notte a destra -->
+      <Grid x:Name="TitleLayer" Height="46" VerticalAlignment="Top" Panel.ZIndex="11">
         <Grid HorizontalAlignment="Left" Margin="16,0,0,0">
-            <StackPanel Orientation="Horizontal">
+            <StackPanel x:Name="TitleLeft" Orientation="Horizontal">
               <Button Style="{StaticResource TrafficBtn}" Background="{DynamicResource TLClose}" ToolTip="Chiudi" Click="OnClose" VerticalAlignment="Center">
                 <Path Data="M 0,0 L 6,6 M 6,0 L 0,6" Stroke="{DynamicResource TrafficGlyph}" StrokeThickness="1.2" Stretch="Uniform" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
               </Button>
@@ -167,23 +203,30 @@
               <Button Style="{StaticResource TrafficBtn}" Background="{DynamicResource TLZoom}" ToolTip="Ingrandisci" Click="OnMax" VerticalAlignment="Center">
                 <Path Data="M 0,3 L 7,3 M 3.5,0 L 3.5,6.5" Stroke="{DynamicResource TrafficZoomGlyph}" StrokeThickness="1.2" Stretch="Uniform" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
               </Button>
+              <!-- resta dov'e' anche a sidebar nascosta, come nelle app del Mac: e' da qui che la si richiama -->
+              <Button x:Name="BtnSidebar" Style="{StaticResource Toolbtn}" Width="30" Height="28" Padding="0" VerticalAlignment="Center" Margin="10,0,0,0"
+                      Click="OnSidebarToggle" Focusable="False" AutomationProperties.Name="Barra laterale">
+                <Path Style="{StaticResource FmtPath}" Data="M1.5,2.5 H14.5 V13.5 H1.5 Z M6,2.5 V13.5 M3.2,5.5 H4.3 M3.2,8 H4.3"/>
+              </Button>
             </StackPanel>
         </Grid>
         <Grid HorizontalAlignment="Right" Margin="0,0,12,0">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+            <StackPanel x:Name="TitleRight" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
               <!-- come in Duck Printer Manager: la versione, poi lucchetto, Impostazioni e giorno/notte,
                  tre pulsanti della stessa misura (30x28) con icone da 14 -->
+              <!-- la nota e' salvata? arancio mentre ci sono modifiche da scrivere, verde quando sono su disco -->
+              <Ellipse x:Name="SaveDot" Width="7" Height="7" VerticalAlignment="Center" Margin="0,1,8,0" Fill="{DynamicResource Green}" Visibility="Collapsed"/>
               <TextBlock x:Name="StatusRight" Style="{StaticResource TxtCaption}" VerticalAlignment="Center" Margin="0,0,10,0"/>
               <Button x:Name="BtnLock" Style="{StaticResource Toolbtn}" Width="30" Height="28" Padding="0" VerticalAlignment="Center" Margin="0,0,2,0"
-                      Click="OnLockButton" AutomationProperties.Name="Blocca la nota">
+                      Click="OnLockButton" FocusVisualStyle="{StaticResource RingFocus}" AutomationProperties.Name="Blocca la nota">
                 <TextBlock x:Name="LockGlyph" Text="&#xE785;" Style="{StaticResource Icon}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Button>
               <Button x:Name="BtnSettings" Style="{StaticResource Toolbtn}" Width="30" Height="28" Padding="0" VerticalAlignment="Center" Margin="0,0,2,0"
-                      Click="OnSettings" ToolTip="Impostazioni" AutomationProperties.Name="Impostazioni">
+                      Click="OnSettings" FocusVisualStyle="{StaticResource RingFocus}" ToolTip="Impostazioni (premuto di nuovo torna alla pagina di prima)" AutomationProperties.Name="Impostazioni">
                 <TextBlock x:Name="SettingsGlyph" Text="&#xE713;" Style="{StaticResource Icon}" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Button>
               <Button x:Name="BtnTheme" Style="{StaticResource Toolbtn}" Width="30" Height="28" Padding="0" VerticalAlignment="Center" ToolTip="Aspetto chiaro / scuro (clic destro: segui Windows)"
-                      Click="OnTheme" MouseRightButtonUp="OnThemeSystem">
+                      Click="OnTheme" MouseRightButtonUp="OnThemeSystem" FocusVisualStyle="{StaticResource RingFocus}">
                 <Path x:Name="ThemeGlyph" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               </Button>
             </StackPanel>

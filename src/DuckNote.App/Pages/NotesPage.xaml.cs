@@ -11,7 +11,8 @@ using DuckNote.App.Ui;
 namespace DuckNote.App.Pages;
 
 /// <summary>
-/// La nota: la struttura delle pagine a sinistra, il testo a destra. Qui si collegano il
+/// La nota: la pagina e' il foglio, a tutta finestra; l'indice dei fogli, il pulsante degli host
+/// e la barra di formattazione li mette al loro posto la finestra. Qui si collegano il
 /// RichTextBox e il motore dell'editor (pittura degli indirizzi e del codice, comandi della
 /// barra, tabelle, riquadri, ricerca).
 /// </summary>
@@ -23,7 +24,7 @@ public partial class NotesPage : UserControl, IDuckPage
     private readonly TableCommands _tables;
     private readonly Finder _finder;
 
-    private readonly DispatcherTimer _format = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(180) };
+    private readonly DispatcherTimer _format = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(120) };
     private readonly DispatcherTimer _settle = new();
 
     private Sheet? _sheet;
@@ -36,7 +37,7 @@ public partial class NotesPage : UserControl, IDuckPage
         _ws = ws;
         InitializeComponent();
 
-        // indice e comandi vanno nella sidebar della finestra (vedi il commento nel XAML)
+        // indice, comandi e barra vanno nella finestra (vedi il commento nel XAML)
         SideParts.Children.Clear();
 
         HostPainter hosts = new(ws.StateOf, ws.Session.IsHidden);
@@ -56,9 +57,11 @@ public partial class NotesPage : UserControl, IDuckPage
         _format.Tick += (_, _) =>
         {
             _format.Stop();
-            _watcher.Touch(_watcher.CaretRow);
-            _watcher.Flush();
-            _ws.SyncHosts();
+            Typing.Flush(Editor);
+            bool settled = _settleNext;
+            _settleNext = false;
+            _watcher.Flush(settled);
+            _ws.SyncHosts(settled);
             RefreshOutline();
             ShowCounts();
         };
@@ -72,6 +75,7 @@ public partial class NotesPage : UserControl, IDuckPage
         };
 
         WireEditor();
+        WirePage();
         BuildToolbar();
         Zoom(ws.Settings.EditorZoom);
 
@@ -87,14 +91,28 @@ public partial class NotesPage : UserControl, IDuckPage
     /// <summary>Il pulsante che controlla gli host dei fogli: sta nella scheda del monitoraggio.</summary>
     public FrameworkElement Commands => CommandsPanel;
 
+    /// <summary>La barra di formattazione: sta nella fascia del titolo della finestra, sopra al foglio.</summary>
+    public FrameworkElement Toolbar => ToolHost;
+
     /// <summary>Un clic nell'indice o un foglio nuovo: la finestra deve mostrare questa pagina.</summary>
     public event Action? Wanted;
 
+    /// <summary>Serve l'indice dei fogli (la ricerca da tastiera): se la sidebar e' nascosta deve affacciarsi.</summary>
+    public event Action? SidebarWanted;
+
     /// <summary>Un'altra pagina e' in primo piano: nell'indice resta solo il pallino del foglio aperto.</summary>
-    public void OnHidden() => OutlineList.SelectedItem = null;
+    public void OnHidden()
+    {
+        _front = false;
+        OutlineList.SelectedItem = null;
+    }
+
+    /// <summary>La pagina della nota e' quella in primo piano.</summary>
+    private bool _front;
 
     public void OnShown()
     {
+        _front = true;
         RefreshOutline();
         ShowCounts();
         Dispatcher.BeginInvoke(() => Editor.Focus(), DispatcherPriority.Input);
@@ -119,6 +137,7 @@ public partial class NotesPage : UserControl, IDuckPage
             _swapping = false;
         }
 
+        _hiddenSeen = string.Join('\n', _ws.Session.Hidden);
         _openBranches.Clear();
         Show(_ws.Book.Sheets.FirstOrDefault());
         Editor.IsReadOnly = _ws.IsDamaged || _ws.IsLocked;
@@ -133,12 +152,16 @@ public partial class NotesPage : UserControl, IDuckPage
         }
 
         _sheet = sheet;
+        _ws.CurrentSheet = sheet;
         _swapping = true;
 
         try
         {
             Editor.Document = sheet.Document;
             Editor.CaretPosition = sheet.Document.ContentStart;
+            _caretRow = _watcher.CaretRow;
+            _undoPaint.Clear();
+            _redoPaint.Clear();
         }
         finally
         {
@@ -146,11 +169,36 @@ public partial class NotesPage : UserControl, IDuckPage
         }
 
         _finder.Look(string.Empty, false);
+        Unmark();
+        _anchor = null;
+        PlacePage();
         RefreshOutline();
         ShowCounts();
     }
 
+    private string _hiddenSeen = string.Empty;
+
+    /// <summary>
+    /// Gli stati sono cambiati: ogni indirizzo prende il suo colore cambiando il pennello, senza
+    /// toccare i documenti. Solo se e' cambiato l'elenco degli host messi da parte le righe si
+    /// ridipingono (chi e' da parte torna testo normale, chi torna in lista si rivede).
+    /// </summary>
     private void OnHostsChanged()
+    {
+        _watcher.Hosts.Refresh();
+
+        string hidden = string.Join('\n', _ws.Session.Hidden);
+
+        if (hidden != _hiddenSeen)
+        {
+            _hiddenSeen = hidden;
+            RepaintSheets();
+        }
+
+        ShowCounts();
+    }
+
+    private void RepaintSheets()
     {
         _swapping = true;
 
@@ -158,15 +206,13 @@ public partial class NotesPage : UserControl, IDuckPage
         {
             foreach (Sheet sheet in _ws.Book.Sheets)
             {
-                _watcher.RecolourAll(sheet.Document);
+                _watcher.PaintAll(sheet.Document);
             }
         }
         finally
         {
             _swapping = false;
         }
-
-        ShowCounts();
     }
 
     private void Retint()
@@ -184,11 +230,16 @@ public partial class NotesPage : UserControl, IDuckPage
         {
             _swapping = false;
         }
+
+        _watcher.Hosts.Refresh();
     }
 
     private void ShowCounts()
     {
-        if (_sheet is null)
+        // Parole e indirizzi si contano rileggendo il foglio: mentre si sta scrivendo si
+        // aspetta la pausa (il giro di _format richiama questo metodo), cosi' una nota lunga
+        // con un'analisi in corso non rallenta la battitura.
+        if (_sheet is null || _format.IsEnabled)
         {
             return;
         }

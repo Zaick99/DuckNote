@@ -1,5 +1,6 @@
 using System.Windows.Documents;
 using System.Windows.Media;
+using DuckNote.App.Theme;
 using DuckNote.Notes.Hosts;
 
 namespace DuckNote.App.Editor;
@@ -29,32 +30,44 @@ public sealed class HostPainter(Func<string, bool?> state, Func<string, bool> hi
         }
     }
 
-    /// <summary>Solo i colori: i pezzi restano quelli che sono.</summary>
-    public void Recolour(Paragraph row)
+    /// <summary>
+    /// Un pennello per indirizzo, condiviso da tutti i pezzi che lo scrivono, in ogni foglio.
+    /// Cambiare stato vuol dire cambiare il colore del pennello: il documento non si tocca,
+    /// quindi niente da rifare, niente che entri nella cronologia di Annulla, e costa quanto
+    /// il numero degli indirizzi, non la lunghezza della nota.
+    /// </summary>
+    private readonly Dictionary<string, SolidColorBrush> _inks = new(StringComparer.OrdinalIgnoreCase);
+
+    private SolidColorBrush Ink(string host)
     {
-        foreach (Run run in row.Inlines.OfType<Run>())
+        if (!_inks.TryGetValue(host, out SolidColorBrush? ink))
         {
-            if (HostOf(run) is not { } host)
-            {
-                continue;
-            }
-
-            if (hidden(host))
-            {
-                Bare(run);
-                continue;
-            }
-
-            run.Foreground = Ink(host);
+            _inks[host] = ink = new SolidColorBrush(Shade(host));
         }
+
+        return ink;
     }
 
-    private Brush Ink(string host) => state(host) switch
+    private Color Shade(string host) => ThemeTokens.Parse(ThemeTokens.Colour(ThemeManager.Effective, state(host) switch
     {
-        true => Palette.Up,
-        false => Palette.Down,
-        _ => Palette.Unknown
-    };
+        true => "Green",
+        false => "Red",
+        _ => "LabelQuaternary"
+    }));
+
+    /// <summary>Gli stati (o il tema) sono cambiati: ogni indirizzo prende il colore di adesso.</summary>
+    public void Refresh()
+    {
+        foreach ((string host, SolidColorBrush ink) in _inks)
+        {
+            Color now = Shade(host);
+
+            if (ink.Color != now)
+            {
+                ink.Color = now;
+            }
+        }
+    }
 
     private void Dress(Paragraph row, Stretch stretch, int caret)
     {
@@ -82,6 +95,12 @@ public sealed class HostPainter(Func<string, bool?> state, Func<string, bool> hi
                 if (HostOf(piece) is { } host)
                 {
                     piece.Foreground = Ink(host);
+
+                    // "togli la formattazione" porta via anche il monospazio: l'indirizzo lo riprende
+                    if (piece.FontFamily.Source != Doc.MonoFonts)
+                    {
+                        piece.FontFamily = new FontFamily(Doc.MonoFonts);
+                    }
                 }
             }
 

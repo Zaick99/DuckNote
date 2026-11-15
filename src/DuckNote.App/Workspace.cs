@@ -5,6 +5,7 @@ using DuckNote.App.Editor;
 using DuckNote.App.Scanning;
 using DuckNote.App.Vault;
 using DuckNote.Notes.Hosts;
+using DuckNote.Notes.Notebook;
 using DuckNote.Notes.Scanning;
 using DuckNote.Notes.Settings;
 
@@ -23,6 +24,14 @@ public sealed class Workspace
     private readonly DispatcherTimer _fresh = new() { Interval = TimeSpan.FromMilliseconds(1600) };
     private readonly DispatcherTimer _monitor = new();
     private readonly DispatcherTimer _idle = new() { Interval = TimeSpan.FromSeconds(20) };
+
+    /// <summary>Raggruppa gli avvisi "gli host sono cambiati": durante un'analisi ne arrivano a decine al secondo.</summary>
+    private readonly DispatcherTimer _hosts = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(150) };
+
+    /// <summary>Le scritture su disco, fuori dal thread dell'interfaccia.</summary>
+    private readonly Storage.IoQueue _io = new();
+
+    private readonly Dispatcher _ui = Dispatcher.CurrentDispatcher;
 
     private DateTime _lastActivity = DateTime.UtcNow;
     private DateTime _lastBackup = DateTime.MinValue;
@@ -78,11 +87,46 @@ public sealed class Workspace
         Session.Finished += _ =>
         {
             KeepLastScan();
+            RaiseHosts();
+        };
+
+        Session.Rows.CollectionChanged += (_, _) => RaiseHosts();
+        Session.PropertyChanged += (_, _) => RaiseHosts();
+
+        _hosts.Tick += (_, _) =>
+        {
+            _hosts.Stop();
             HostsChanged?.Invoke();
         };
 
-        Session.Rows.CollectionChanged += (_, _) => HostsChanged?.Invoke();
+        _io.Failed += (what, problem) => _ui.BeginInvoke(() =>
+        {
+            if (what == "nota")
+            {
+                _dirty = true;
+                Unsaved?.Invoke();
+            }
+
+            Say(problem is IOException or UnauthorizedAccessException
+                ? "Non salvato: la cartella dei dati non e' scrivibile. Riprovo al prossimo salvataggio."
+                : $"Non salvato: {problem.Message}");
+        });
     }
+
+    /// <summary>
+    /// Avvisa che gli host sono cambiati, ma non a ogni singolo risultato: il primo avviso
+    /// fa partire un breve conto e tutti quelli che arrivano nel frattempo valgono come uno.
+    /// </summary>
+    private void RaiseHosts()
+    {
+        if (!_hosts.IsEnabled)
+        {
+            _hosts.Start();
+        }
+    }
+
+    /// <summary>Il foglio aperto nell'editor: e' quello che cambia quando si tocca la nota.</summary>
+    public Sheet? CurrentSheet { get; set; }
 
     public AppSettings Settings { get; }
 
@@ -115,6 +159,12 @@ public sealed class Workspace
 
     /// <summary>La nota e' appena stata scritta.</summary>
     public event Action? Saved;
+
+    /// <summary>Nella nota c'e' qualcosa che non e' ancora su disco (la prima modifica dopo un salvataggio).</summary>
+    public event Action? Unsaved;
+
+    /// <summary>Ci sono modifiche che aspettano di essere scritte.</summary>
+    public bool HasUnsaved => _dirty;
 
     /// <summary>Gli host della tabella o il loro stato sono cambiati.</summary>
     public event Action? HostsChanged;
@@ -161,6 +211,7 @@ public sealed class Workspace
     /// <summary>Legge la nota (dalla cassaforte se e' aperta) e l'ultima scansione.</summary>
     public void OpenNote()
     {
+        _io.Drain();
         byte[]? stored = Vault.IsOpen ? Vault.Note : ReadPlain(AppPaths.Note);
         bool fresh = false;
 
@@ -194,6 +245,8 @@ public sealed class Workspace
         Session.Restore(LastScanFile.Read(Vault.IsOpen ? Vault.LastScan : ReadText(AppPaths.LastScan)));
 
         _dirty = fresh || Book.NeedsRewrite;
+        _noteHosts = null;
+        CurrentSheet = null;
         NoteReplaced?.Invoke();
         SyncHosts();
 
@@ -206,7 +259,14 @@ public sealed class Workspace
     /// <summary>Qualcosa nella nota e' cambiato: si salva fra poco, a meno che non si continui a scrivere.</summary>
     public void Touch()
     {
-        _dirty = true;
+        if (!_dirty)
+        {
+            _dirty = true;
+            Unsaved?.Invoke();
+        }
+
+        CurrentSheet?.Changed();
+        _noteHosts = null;
         _save.Interval = TimeSpan.FromMilliseconds(Settings.AutosaveEnabled ? Settings.AutosaveDebounceMs : 4000);
 
         if (Settings.AutosaveEnabled)
@@ -216,24 +276,57 @@ public sealed class Workspace
         }
     }
 
-    public bool SaveNote(bool force = false)
+    /// <summary>
+    /// Salva la nota. La fotografia dei fogli si fa qui (e solo di quelli cambiati); comprimere,
+    /// cifrare e scrivere vanno nel thread delle scritture, cosi' chi scrive non si ferma mai.
+    /// <paramref name="wait"/> aspetta che la scrittura sia finita: serve solo a chi sta per
+    /// chiudere o bloccare.
+    /// </summary>
+    public bool SaveNote(bool force = false, bool wait = false)
     {
         if ((!_dirty && !force) || IsLocked || Vault.IsDamaged)
         {
+            if (wait)
+            {
+                _io.Drain();
+            }
+
             return true;
         }
 
+        bool sealedNote = VaultSession.Exists;
+
+        if (sealedNote && !Vault.IsOpen)
+        {
+            return false;
+        }
+
+        NoteArchive photo;
+        IsSaving = true;
+
         try
         {
-            byte[] note = Snapshot();
+            photo = Book.Snapshot();
+        }
+        finally
+        {
+            IsSaving = false;
+        }
 
-            if (VaultSession.Exists)
+        _dirty = false;
+        bool backup = !sealedNote && DateTime.UtcNow - _lastBackup >= BackupEvery;
+
+        if (backup)
+        {
+            _lastBackup = DateTime.UtcNow;
+        }
+
+        _io.Post("nota", () =>
+        {
+            byte[] note = photo.Save();
+
+            if (sealedNote)
             {
-                if (!Vault.IsOpen)
-                {
-                    return false;
-                }
-
                 Vault.WriteNote(note);
             }
             else
@@ -241,10 +334,9 @@ public sealed class Workspace
                 AppPaths.Ensure();
 
                 // la copia di prima, rinfrescata al massimo ogni quarto d'ora: non a ogni tasto
-                if (File.Exists(AppPaths.Note) && DateTime.UtcNow - _lastBackup >= BackupEvery)
+                if (backup && File.Exists(AppPaths.Note))
                 {
                     File.Copy(AppPaths.Note, AppPaths.NoteBackup, overwrite: true);
-                    _lastBackup = DateTime.UtcNow;
                 }
 
                 string temp = AppPaths.Note + ".tmp";
@@ -252,20 +344,25 @@ public sealed class Workspace
                 File.Move(temp, AppPaths.Note, overwrite: true);
             }
 
-            _dirty = false;
-            LastSaved = DateTime.Now;
-            Saved?.Invoke();
-            return true;
-        }
-        catch (Exception problem) when (problem is IOException or UnauthorizedAccessException)
+            _ui.BeginInvoke(() =>
+            {
+                LastSaved = DateTime.Now;
+                Saved?.Invoke();
+            });
+        });
+
+        if (wait)
         {
-            Say("Nota non salvata: la cartella non e' scrivibile.");
-            return false;
+            _io.Drain();
         }
+
+        return true;
     }
 
+    /// <summary>La nota in byte, subito: per cifrare, togliere la cifratura.</summary>
     private byte[] Snapshot()
     {
+        _io.Drain();
         IsSaving = true;
 
         try
@@ -290,6 +387,44 @@ public sealed class Workspace
         List<string> hosts = [];
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
 
+        foreach ((Paragraph row, HostToken token) in Written())
+        {
+            if (caret >= 0 && ReferenceEquals(row, writing) && HostTokens.Touches(token, caret))
+            {
+                continue;
+            }
+
+            if (seen.Add(token.Value) && !Session.IsHidden(token.Value))
+            {
+                hosts.Add(token.Value);
+            }
+        }
+
+        return hosts;
+    }
+
+    private List<(Paragraph Row, HostToken Token)>? _noteHosts;
+
+    /// <summary>
+    /// Quanti indirizzi c'erano l'ultima volta che si e' letta la nota. Per mostrare un numero
+    /// (scheda del monitoraggio) senza rileggere tutto mentre si scrive.
+    /// </summary>
+    public int NoteHostCount { get; private set; }
+
+    /// <summary>
+    /// Tutti gli indirizzi scritti nei fogli, con la riga in cui stanno. Leggere l'intera nota
+    /// costa: lo si fa una volta per modifica (<see cref="Touch"/> butta via il risultato), non
+    /// a ogni domanda, e le domande sono tante (barra, contatori, tabella, monitoraggio).
+    /// </summary>
+    private List<(Paragraph Row, HostToken Token)> Written()
+    {
+        if (_noteHosts is { } kept)
+        {
+            return kept;
+        }
+
+        List<(Paragraph, HostToken)> found = [];
+
         foreach (Sheet sheet in Book.Sheets)
         {
             foreach (Paragraph row in Doc.Rows(sheet.Document))
@@ -299,24 +434,16 @@ public sealed class Workspace
                     continue;
                 }
 
-                bool here = ReferenceEquals(row, writing);
-
                 foreach (HostToken token in HostTokens.Find(Doc.LineOf(row)))
                 {
-                    if (here && caret >= 0 && HostTokens.Touches(token, caret))
-                    {
-                        continue;
-                    }
-
-                    if (seen.Add(token.Value) && !Session.IsHidden(token.Value))
-                    {
-                        hosts.Add(token.Value);
-                    }
+                    found.Add((row, token));
                 }
             }
         }
 
-        return hosts;
+        NoteHostCount = found.Select(pair => pair.Item2.Value).Distinct(StringComparer.OrdinalIgnoreCase).Count(host => !Session.IsHidden(host));
+
+        return _noteHosts = found;
     }
 
     /// <summary>
@@ -335,11 +462,11 @@ public sealed class Workspace
             _fresh.Start();
         }
 
-        HostsChanged?.Invoke();
+        RaiseHosts();
     }
 
     /// <summary>Lo stato di un indirizzo: true raggiungibile, false spento, null mai provato.</summary>
-    public bool? StateOf(string host) => Session.Find(host) is { IsChecked: true } row ? row.IsUp : null;
+    public bool? StateOf(string host) => Session.Find(host) is { NeedsCheck: false } row ? row.IsUp : null;
 
     /// <summary>
     /// L'ultima analisi l'ha fatta partire DuckNote da solo (monitoraggio, indirizzi appena
@@ -368,7 +495,7 @@ public sealed class Workspace
         // "Host della nota": nell'elenco restano solo loro, gli altri trovati per intervallo escono
         if (!Session.IsRunning && Session.KeepOnlyNote() > 0)
         {
-            HostsChanged?.Invoke();
+            RaiseHosts();
         }
 
         if (hosts.Count == 0)
@@ -397,7 +524,7 @@ public sealed class Workspace
         {
             KeepHidden();
             Say(Session.Message);
-            HostsChanged?.Invoke();
+            RaiseHosts();
         }
     }
 
@@ -417,8 +544,11 @@ public sealed class Workspace
 
         if (Vault.IsOpen)
         {
-            Vault.Hidden = list;
-            Vault.Save();
+            _io.Post("da parte", () =>
+            {
+                Vault.Hidden = list;
+                Vault.Save();
+            });
 
             if (Settings.IgnoredHosts.Length > 0)
             {
@@ -435,36 +565,43 @@ public sealed class Workspace
 
     private void KeepLastScan()
     {
-        string json = LastScanFile.Write(Session.Records());
+        // i dati si leggono qui, la scrittura (e la cifratura di tutto il contenitore) altrove
+        List<IReadOnlyDictionary<string, string>> records = [.. Session.Records()];
+        bool open = Vault.IsOpen;
 
-        if (Vault.IsOpen)
-        {
-            Vault.LastScan = json;
-            Vault.Save();
-            return;
-        }
-
-        if (VaultSession.Exists)
+        if (!open && VaultSession.Exists)
         {
             return;
         }
 
-        try
+        _io.Post("scansione", () =>
         {
-            AppPaths.Ensure();
-            File.WriteAllText(AppPaths.LastScan, json);
-        }
-        catch (Exception problem) when (problem is IOException or UnauthorizedAccessException)
-        {
-            // l'ultima scansione e' una comodita': se non si scrive, si rifa'
-        }
+            string json = LastScanFile.Write(records);
+
+            if (open)
+            {
+                Vault.LastScan = json;
+                Vault.Save();
+                return;
+            }
+
+            try
+            {
+                AppPaths.Ensure();
+                File.WriteAllText(AppPaths.LastScan, json);
+            }
+            catch (Exception problem) when (problem is IOException or UnauthorizedAccessException)
+            {
+                // l'ultima scansione e' una comodita': se non si scrive, si rifa'
+            }
+        });
     }
 
     // ------------------------------------------------------------------ cassaforte
 
     public void Encrypt(byte[] key, DuckNote.Core.Crypto.KdfParameters kdf, byte[] salt)
     {
-        SaveNote();
+        SaveNote(wait: true);
         Vault.Create(key, kdf, salt, Snapshot(), LastScanFile.Write(Session.Records()), HostList.Write(Session.Hidden));
         Settings.IgnoredHosts = string.Empty;
         Settings.SecurityPrompted = true;
@@ -475,6 +612,8 @@ public sealed class Workspace
 
     public bool Unlock(byte[] key)
     {
+        _io.Drain();
+
         if (!Vault.Unlock(key))
         {
             return false;
@@ -496,15 +635,18 @@ public sealed class Workspace
             return;
         }
 
-        SaveNote();
+        SaveNote(wait: true);
         Session.Stop();
         StopTimers();
+        _io.Drain();
         Vault.Lock();
 
         Book.Forget();
         Book = Book.Of(Doc.Empty());
         Session.Clear();
         IsLocked = true;
+        _noteHosts = null;
+        CurrentSheet = null;
 
         NoteReplaced?.Invoke();
         VaultChanged?.Invoke();
@@ -514,7 +656,7 @@ public sealed class Workspace
 
     public bool Decrypt()
     {
-        SaveNote(force: true);
+        SaveNote(force: true, wait: true);
 
         if (!Vault.Disable(Snapshot()))
         {
@@ -529,8 +671,11 @@ public sealed class Workspace
         return true;
     }
 
-    public void ChangePassword(byte[] key, DuckNote.Core.Crypto.KdfParameters kdf, byte[] salt) =>
+    public void ChangePassword(byte[] key, DuckNote.Core.Crypto.KdfParameters kdf, byte[] salt)
+    {
+        _io.Drain();
         Vault.ChangePassword(key, kdf, salt);
+    }
 
     // ------------------------------------------------------------------ orologi
 
@@ -566,6 +711,7 @@ public sealed class Workspace
         _wiped = true;
         StopTimers();
         Session.Stop();
+        _io.Drain();
         Vault.Dispose();
         Storage.AppWipe.Remove();
     }
@@ -579,7 +725,8 @@ public sealed class Workspace
 
         StopTimers();
         Session.Stop();
-        SaveNote();
+        SaveNote(wait: true);
+        _io.Drain();
         Vault.Dispose();
         Settings.Save();
     }

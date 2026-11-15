@@ -2,6 +2,94 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.14] - 2026-11-19
+
+Found by running the application and driving it with a simulated keyboard and
+mouse, then fixed one by one.
+
+### Changed
+
+- **All the room to the sheet.** The formatting bar moved into the title strip
+  of the window and the status strip at the bottom is gone: the sheet starts
+  right under the title strip and ends at the bottom edge. The last event
+  appears at the bottom left, stays long enough to be read and leaves (sooner
+  if you go on typing).
+- **The sidebar hides.** `F9`, `Ctrl+\` or the button next to the traffic
+  lights slide it away and the sheet takes the whole window; hidden, it peeks
+  over the sheet when the mouse rests on the left edge, and `Ctrl+Shift+F`
+  brings it up with the cursor in the search. The choice is remembered. Every
+  passage is animated and can be interrupted halfway; the note is laid out
+  again once, not at every frame, and the right edge of the page stays still
+  while the left one follows the sidebar.
+- **Title and margins scroll with the text**: the title of the page is written
+  at the top of the sheet and scrolls away with it, so the whole height is for
+  the text; the line you write on keeps air below it instead of sticking to the
+  edge, and Ctrl+Home shows the title again. Zooming enlarges the text, not the
+  margins.
+- A dot next to the version tells whether the note is saved (orange: changes
+  waiting, green: on disk). The **Impostazioni** gear, pressed again, goes back
+  to the page you were on; while the note is locked it is hidden, like the
+  padlock.
+- **Releases are built by GitHub Actions**: both files are compiled on Windows
+  from the published source, and every release carries `SHA256SUMS.txt`.
+
+### Fixed
+
+- **Lists keep their shape at the edges.** Backspace at the start of a list
+  item, a title, a quote or a code line removes the formatting instead of
+  gluing the line to the one above with a stray bullet; Del at the end of a
+  line joins the next one without its mark; the cursor does not enter the mark;
+  numbered lists renumber from 1 when an item is added, removed or moved, and
+  Shift+Enter in the middle of an item splits it into two.
+- **Marks stop at the word.** Bold, colour and links applied to a selection
+  leave out the spaces at its end, as in Word; *Togli la formattazione* works
+  with nothing selected (the word under the cursor); `---` and Enter draw a
+  separator.
+- **No formatting the bar cannot show.** The text control's own shortcuts for
+  superscript and subscript, font size, right and justified alignment, indents
+  and line spacing, and the Ins key that switches to overwriting, changed the
+  text in ways no button could display or undo. They are now inert;
+  `Ctrl+Shift+L` and `Ctrl+Shift+N` do what they do in Word (bullet list,
+  normal text) and Ctrl with `+` zooms on every keyboard.
+
+- **Typing fast no longer scrambles the text.** The editor inserts typed
+  characters a moment later, in batches; Enter, the Space that formats and the
+  shortcuts acted at once, so a line break could land before the last letters
+  typed. They now wait for the pending characters first.
+- **Addresses written one under the other are all formatted.** Only the line
+  under the cursor used to be repainted: lines left with Enter, or pasted, stayed
+  plain. Every line touched by an edit is now repainted, and the line just left
+  is finished at once.
+- **Pasting many lines formats all of them**, the last one included; text pasted
+  from outside (browser, Word, Excel) comes in as plain text with the note's
+  style, text copied from DuckNote keeps titles, lists and marks.
+- **Undo works again.** Colouring an address used to wipe the undo history;
+  colour changes no longer touch the document, repainting is one step that
+  Ctrl+Z skips, and Ctrl+Shift+Z redoes as well as Ctrl+Y.
+- **The window no longer stops during a scan.** The scan ran partly on the
+  interface thread and read the ARP table behind a lock with a blocking call: a
+  slow `arp` could hang everything. The whole scan now runs on worker threads,
+  the ARP table is read in the background with a time limit, WMI and DNS
+  lookups are capped so they cannot use up every thread.
+- **A host that answers is no longer shown as "Errore"** because a secondary
+  probe failed; an error in the check itself counts as *da verificare*, not
+  *spento*, in the dot, the counters and the note.
+- **Saving does not interrupt writing**: only the sheets that changed are
+  re-read, and compressing, encrypting and writing happen on another thread
+  (the note, the last scan, the hosts set aside).
+- **Long notes stay fluid**: counters and the address list are recomputed when
+  you pause, not at every key or scan result; scan updates are grouped; pages
+  that are not on screen do not refresh.
+- **Rete**: columns use the whole table (addresses were cut), cells show the full
+  text in a tooltip, the notification no longer covers *Analizza* (it appears at
+  the bottom right), the card does not repeat the IP twice.
+- **A new sheet takes the cursor** after you name it, and the sidebar highlights
+  the sheet that is open; a new line no longer leaves a gap after Ctrl+A, Del.
+- **Find shows the match**: an accent frame over the current occurrence.
+- The *Forgiatura* indicator stops before an error message; Enter confirms a
+  settings field; Esc closes the user menu; keyboard focus is an accent ring
+  instead of the dotted rectangle; `- [ ]` makes a checkbox.
+
 ## [0.0.13] - 2026-10-23
 
 **A new window, built from scratch on the Duck design kit.** Same features, same file formats: notes, containers and

@@ -49,6 +49,13 @@ public partial class NetworkPage : UserControl, IDuckPage
         InitializeComponent();
 
         Table.ItemsSource = _visible;
+        Table.SizeChanged += (_, change) =>
+        {
+            if (change.WidthChanged)
+            {
+                Dispatcher.BeginInvoke(SpreadColumns, System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+        };
         RangeBox.Text = ws.Settings.LastRange;
 
         // durante una scansione arrivano decine di esiti al secondo: la tabella si rinfresca a
@@ -64,9 +71,29 @@ public partial class NetworkPage : UserControl, IDuckPage
         ShowSession();
     }
 
+    /// <summary>
+    /// Le colonne a larghezza proporzionale si misurano quando la tabella ha gia' il suo spazio:
+    /// una pagina preparata fuori schermo le lascerebbe strette al minimo, con gli indirizzi
+    /// tagliati. Le si riassegna quando la tabella cambia misura.
+    /// </summary>
+    private void SpreadColumns()
+    {
+        foreach (DataGridColumn column in Table.Columns)
+        {
+            DataGridLength width = column.Width;
+
+            if (width.IsStar)
+            {
+                column.Width = new DataGridLength(width.Value, DataGridLengthUnitType.Pixel);
+                column.Width = new DataGridLength(width.Value, DataGridLengthUnitType.Star);
+            }
+        }
+    }
+
     public void OnShown()
     {
-        ShowSession();
+        SpreadColumns();
+        ShowSession(force: true);
         RangeBox.Focus();
     }
 
@@ -96,7 +123,7 @@ public partial class NetworkPage : UserControl, IDuckPage
     {
         bool state = ShowUp?.IsChecked == true ? row.IsUp
             : ShowDown?.IsChecked == true ? row.IsDown
-            : ShowWait?.IsChecked != true || !row.IsChecked;
+            : ShowWait?.IsChecked != true || row.NeedsCheck;
 
         bool source = OnlyNote?.IsChecked == true ? row.FromNote
             : OnlySearch?.IsChecked != true || !row.FromNote;
@@ -104,7 +131,11 @@ public partial class NetworkPage : UserControl, IDuckPage
         return state && source && _query.Matches(row.Facts());
     }
 
-    /// <summary>Allinea le righe mostrate ai filtri, toccando solo quelle che cambiano.</summary>
+    /// <summary>
+    /// Allinea le righe mostrate ai filtri toccando solo quelle che cambiano, in un passaggio
+    /// solo: via chi non c'entra piu', dentro i nuovi al loro posto. Se l'ordine e' cambiato
+    /// (raro: un nome che diventa un IP) l'elenco si rifa' da capo, tenendo la riga scelta.
+    /// </summary>
     private void Fill()
     {
         List<HostRow> wanted = [.. _ws.Session.Rows.Where(Wanted)];
@@ -118,23 +149,46 @@ public partial class NetworkPage : UserControl, IDuckPage
             }
         }
 
+        HashSet<HostRow> shown = [.. _visible];
+
         for (int i = 0; i < wanted.Count; i++)
         {
-            int at = _visible.IndexOf(wanted[i]);
+            if (i < _visible.Count && ReferenceEquals(_visible[i], wanted[i]))
+            {
+                continue;
+            }
 
-            if (at < 0)
+            if (shown.Contains(wanted[i]))
             {
-                _visible.Insert(i, wanted[i]);
+                HostRow? chosen = Table.SelectedItem as HostRow;
+                _visible.Clear();
+
+                foreach (HostRow row in wanted)
+                {
+                    _visible.Add(row);
+                }
+
+                if (chosen is not null && keep.Contains(chosen))
+                {
+                    Table.SelectedItem = chosen;
+                }
+
+                return;
             }
-            else if (at != i)
-            {
-                _visible.Move(at, i);
-            }
+
+            _visible.Insert(i, wanted[i]);
+            shown.Add(wanted[i]);
         }
     }
 
-    private void ShowSession()
+    private void ShowSession(bool force = false)
     {
+        // una pagina che non si vede non si aggiorna: lo fa OnShown quando torna in primo piano
+        if (!force && !IsVisible)
+        {
+            return;
+        }
+
         ScanSession session = _ws.Session;
 
         CountAll.Text = session.Rows.Count.ToString(CultureInfo.CurrentCulture);
@@ -237,7 +291,9 @@ public partial class NetworkPage : UserControl, IDuckPage
     private void Fill(HostRow row)
     {
         CardTitle.Text = row.Name.Length > 0 ? row.Name : row.IP;
-        CardSub.Text = string.Join("  ·  ", ((string[])[row.IP, row.DeviceType]).Where(part => part.Length > 0));
+        // l'IP sotto al titolo solo se il titolo e' un nome: due volte lo stesso numero non serve
+        CardSub.Text = string.Join("  ·  ", ((string[])[row.Name.Length > 0 ? row.IP : string.Empty, row.DeviceType]).Where(part => part.Length > 0));
+        CardSub.Visibility = CardSub.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         CardStatus.Text = row.Status.ToUpperInvariant();
         Tok.SetForeground(CardDot, row.Tone);
         CardChip.Style = (Style)FindResource(row.Chip);

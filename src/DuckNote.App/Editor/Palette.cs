@@ -73,6 +73,12 @@ public static class Palette
             {
                 foreach (Inline inline in Inlines(row.Inlines))
                 {
+                    // il colore di un indirizzo e' del suo pennello di stato (vedi HostPainter)
+                    if (inline is Run piece && HostPainter.HostOf(piece) is not null)
+                    {
+                        continue;
+                    }
+
                     Swap(inline, TextElement.ForegroundProperty);
                     Swap(inline, TextElement.BackgroundProperty);
                 }

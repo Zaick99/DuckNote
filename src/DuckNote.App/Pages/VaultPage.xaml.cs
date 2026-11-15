@@ -254,7 +254,12 @@ public partial class VaultPage : UserControl, IDuckPage
         }
         catch (Exception problem) when (problem is CryptographicException or System.IO.IOException or UnauthorizedAccessException or OutOfMemoryException)
         {
-            DuckDialog.Error(Window.GetWindow(this), "Cifratura non riuscita", problem.Message);
+            // l'indicatore si ferma prima del messaggio: dietro a un errore non deve sembrare
+            // che il lavoro continui
+            tick.Stop();
+            Forging.Visibility = Visibility.Collapsed;
+            DuckDialog.Error(Window.GetWindow(this), "Cifratura non riuscita",
+                "La nota resta com'era, in chiaro. Dettaglio: " + problem.Message);
         }
         finally
         {

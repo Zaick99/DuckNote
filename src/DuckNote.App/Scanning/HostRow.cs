@@ -72,6 +72,9 @@ public sealed class HostRow : Observable
 
     public bool FromNote => NoteKey.Length > 0;
 
+    /// <summary>La risposta in tabella: solo la media ("0.5 ms"); minimo e massimo stanno nella scheda.</summary>
+    public string RoundTripShort => RoundTrip.Split('(')[0].Trim();
+
     /// <summary>La colonna Indirizzo: sempre l'IP; finche' non si conosce, com'e' scritto nella nota.</summary>
     public string Address => IP.Length > 0 ? IP : NoteKey;
 
@@ -86,7 +89,11 @@ public sealed class HostRow : Observable
 
     public bool IsUp => Rank <= 1;
 
-    public bool IsDown => Rank is > 1 and < NeverChecked;
+    /// <summary>Spento: ha risposto "non raggiungibile". Un controllo andato in errore non dice spento.</summary>
+    public bool IsDown => Rank == 2;
+
+    /// <summary>Da verificare: mai controllato, o il controllo e' andato in errore (pallino arancione).</summary>
+    public bool NeedsCheck => Rank >= 3;
 
     public bool IsChecked => Rank < NeverChecked;
 

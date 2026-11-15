@@ -20,9 +20,50 @@ public sealed class Sheet(string id, FlowDocument document, string name = "")
 
     public string Title => PageIds.Title(Name);
 
-    public string Text => Doc.PlainText(Document);
+    /// <summary>
+    /// Sale a ogni modifica del testo: chi tiene da parte qualcosa di calcolato sul foglio (il
+    /// testo, i titoli, gli indirizzi, il file da salvare) lo rifa' solo se e' cambiato.
+    /// </summary>
+    public int Version { get; private set; }
 
-    public IReadOnlyList<Heading> Headings()
+    public void Changed()
+    {
+        Version++;
+        _text = null;
+        _headings = null;
+        _frames = null;
+    }
+
+    private InsetFrame[]? _frames;
+
+    /// <summary>I riquadri (disegni, immagini, grafici) del foglio.</summary>
+    public InsetFrame[] Frames => _frames ??= InsetRafts.Frames(Document);
+
+    private string? _text;
+    private IReadOnlyList<Heading>? _headings;
+    private (int Version, byte[] Xaml, IReadOnlyList<Inset> Insets)? _photo;
+
+    /// <summary>Il foglio come va nel file. Rifatto solo se il foglio e' cambiato.</summary>
+    public (byte[] Xaml, IReadOnlyList<Inset> Insets) Photograph()
+    {
+        if (_photo is { } kept && kept.Version == Version)
+        {
+            return (kept.Xaml, kept.Insets);
+        }
+
+        using InsetRafts.Folding folded = InsetRafts.Fold(Document);
+        byte[] xaml = Doc.ToXaml(Document);
+        IReadOnlyList<Inset> insets = folded.Insets;
+        _photo = (Version, xaml, insets);
+
+        return (xaml, insets);
+    }
+
+    public string Text => _text ??= Doc.PlainText(Document);
+
+    public IReadOnlyList<Heading> Headings() => _headings ??= ReadHeadings();
+
+    private List<Heading> ReadHeadings()
     {
         List<Heading> found = [];
         Paragraph[] rows = Doc.Rows(Document);
@@ -100,23 +141,31 @@ public sealed class Book
         return book._sheets.Count > 0 ? book : null;
     }
 
-    public byte[] Save()
+    /// <summary>La nota pronta da scrivere, tutta nel thread dell'interfaccia (solo a chiusura, blocco, cifratura).</summary>
+    public byte[] Save() => Snapshot().Save();
+
+    /// <summary>
+    /// Fotografa la nota: i fogli diventano XAML qui, nel thread dell'interfaccia (un documento
+    /// si legge solo da li'), ma solo quelli cambiati dall'ultima volta; gli altri riusano la
+    /// fotografia che avevano. Comprimere (<see cref="NoteArchive.Save"/>), cifrare e scrivere
+    /// si possono poi fare altrove.
+    /// </summary>
+    public NoteArchive Snapshot()
     {
         NoteArchive archive = new();
 
         foreach (Sheet sheet in _sheets)
         {
-            using InsetRafts.Folding folded = InsetRafts.Fold(sheet.Document);
+            (byte[] xaml, IReadOnlyList<Inset> insets) = sheet.Photograph();
+            archive.Pages.Add(new ArchivedPage(sheet.Id, sheet.Name, xaml));
 
-            archive.Pages.Add(new ArchivedPage(sheet.Id, sheet.Name, Doc.ToXaml(sheet.Document)));
-
-            foreach (Inset inset in folded.Insets)
+            foreach (Inset inset in insets)
             {
                 archive.Insets[inset.Address.Entry] = inset.Bytes;
             }
         }
 
-        return archive.Save();
+        return archive;
     }
 
     /// <summary>Via la nota dalla memoria: i byte dei riquadri azzerati, i documenti svuotati.</summary>

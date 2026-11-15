@@ -29,6 +29,12 @@ public static class Doc
 
         document.SetResourceReference(FlowDocument.ForegroundProperty, "Label");
 
+        // ogni riga nasce senza il margine automatico, anche quelle che crea l'editor da solo
+        // (dopo Ctrl+A e Canc, incollando): altrimenti fra due righe compare un buco
+        Style flat = new(typeof(Paragraph));
+        flat.Setters.Add(new Setter(Block.MarginProperty, Flush));
+        document.Resources[typeof(Paragraph)] = flat;
+
         return document;
     }
 

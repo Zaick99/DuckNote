@@ -2,10 +2,11 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="clr-namespace:DuckNote.App.Ui">
-  <!-- La pagina e' il foglio, a tutta larghezza. L'indice dei fogli (con i titoli H1 e H2) e i
-       comandi stanno nella sidebar della finestra: sono definiti qui sotto, per avere i gestori
-       e i nomi nella pagina, e il costruttore li stacca da SideParts perche' la finestra li
-       metta al loro posto (Navigator al centro della sidebar, Commands in basso). -->
+  <!-- La pagina e' il foglio, e nient'altro: tutto lo spazio e' per scrivere. L'indice dei
+       fogli (con i titoli H1 e H2), il pulsante degli host e la barra di formattazione stanno
+       nella finestra: sono definiti qui sotto, per avere i gestori e i nomi nella pagina, e il
+       costruttore li stacca da SideParts perche' la finestra li metta al loro posto (Navigator
+       al centro della sidebar, Commands in basso, Toolbar nella fascia del titolo). -->
   <Grid>
     <Grid x:Name="SideParts" Visibility="Collapsed">
       <DockPanel x:Name="NavigatorPanel">
@@ -98,56 +99,40 @@
           </Border>
         </StackPanel>
       </Button>
+
+      <!-- la barra di formattazione, che la finestra mette nella fascia del titolo: i pulsanti li
+           crea NotesPage.Toolbar.cs dalla sua tabella; qui solo il contenitore e il "⋯" per quello
+           che non ci sta -->
+      <DockPanel x:Name="ToolHost" LastChildFill="False" ClipToBounds="True">
+        <StackPanel x:Name="ToolStrip" DockPanel.Dock="Left" Orientation="Horizontal"
+                    KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle"
+                    AutomationProperties.Name="Formattazione"/>
+        <Button x:Name="BtnMore" DockPanel.Dock="Left" Style="{StaticResource FmtBtn}" Click="OnMoreTools" Visibility="Collapsed"
+                ToolTip="Altri comandi" AutomationProperties.Name="Altri comandi" Margin="2,0,0,0">
+          <TextBlock Text="&#xE712;" Style="{StaticResource FmtGlyph}"/>
+        </Button>
+      </DockPanel>
     </Grid>
 
-    <!-- ===================== foglio ===================== -->
-    <Grid Margin="20,2,20,14">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto"/>
-        <RowDefinition Height="*"/>
-      </Grid.RowDefinitions>
-
-      <!-- la barra degli strumenti, sopra al foglio: i pulsanti li crea NotesPage.Toolbar.cs dalla
-           sua tabella; qui solo il contenitore e il "⋯" per quello che non ci sta -->
-      <Border Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}" BorderThickness="1"
-              CornerRadius="12" Padding="6,5" Margin="0,0,0,10">
-        <Grid x:Name="ToolHost">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-          <StackPanel x:Name="ToolStrip" Orientation="Horizontal" ClipToBounds="True"
-                      KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle"
-                      AutomationProperties.Name="Formattazione"/>
-          <Button x:Name="BtnMore" Grid.Column="1" Style="{StaticResource FmtBtn}" Click="OnMoreTools" Visibility="Collapsed"
-                  ToolTip="Altri comandi" AutomationProperties.Name="Altri comandi">
-            <TextBlock Text="&#xE712;" Style="{StaticResource FmtGlyph}"/>
-          </Button>
-        </Grid>
-      </Border>
-
-      <Border x:Name="Sheet" Grid.Row="1" Background="{DynamicResource NotePaper}" BorderBrush="{DynamicResource Separator}"
-              BorderThickness="1" CornerRadius="14" ClipToBounds="True">
+    <!-- ===================== foglio =====================
+         La carta e quello che c'e' scritto sopra sono due strati: quando la sidebar entra o
+         esce il contenuto scivola, e la carta tiene fermo il bordo destro (NotesPage.Page.cs). -->
+    <Grid x:Name="SheetHost" Margin="10,0,10,10">
+      <Border x:Name="Paper" Background="{DynamicResource NotePaper}" BorderBrush="{DynamicResource Separator}"
+              BorderThickness="1" CornerRadius="14">
         <Border.Effect>
           <DropShadowEffect BlurRadius="16" ShadowDepth="2" Direction="270" Opacity="0.08" Color="Black"/>
         </Border.Effect>
-        <Grid>
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-          </Grid.RowDefinitions>
+      </Border>
 
+      <Grid x:Name="Sheet" ClipToBounds="True">
           <!-- il margine colorato del quaderno -->
-          <Rectangle Grid.RowSpan="2" Width="2" HorizontalAlignment="Left" Margin="34,0,0,0" Fill="{DynamicResource NoteMargin}" Opacity="0.7"/>
+          <Rectangle Width="2" HorizontalAlignment="Left" Margin="28,1,0,1" Fill="{DynamicResource NoteMargin}" Opacity="0.7"/>
 
-          <!-- titolo della pagina, scritto sul foglio -->
-          <StackPanel Margin="58,26,48,6">
-            <TextBox x:Name="TitleBox" Style="{StaticResource TitleField}" Tag="Senza titolo"
-                     KeyDown="OnTitleKey" LostKeyboardFocus="OnTitleDone" ToolTip="Il nome della pagina: lo decidi tu"/>
-            <TextBlock x:Name="Meta" Style="{StaticResource TxtCaption}" Margin="2,4,0,0"/>
-          </StackPanel>
-
-          <RichTextBox x:Name="Editor" Grid.Row="1" BorderThickness="0" Background="Transparent" Padding="56,4,48,40"
+          <!-- Il testo occupa tutto il foglio. I margini della pagina stanno nel documento
+               (PagePadding, li mette PlacePage): cosi' scorrono via col testo, e in cima
+               lasciano il posto al titolo, che e' disegnato qui sopra e scorre anche lui. -->
+          <RichTextBox x:Name="Editor" IsInactiveSelectionHighlightEnabled="True" BorderThickness="0" Background="Transparent" Padding="0" Margin="1,1,3,1"
                        AcceptsTab="True" IsDocumentEnabled="True" SpellCheck.IsEnabled="False"
                        VerticalScrollBarVisibility="Auto" Foreground="{DynamicResource Label}"
                        CaretBrush="{DynamicResource Accent}" SelectionBrush="{DynamicResource Accent}"
@@ -184,9 +169,29 @@
             </RichTextBox.ContextMenu>
           </RichTextBox>
 
+          <!-- titolo della pagina, scritto in cima al foglio: scorre via con il testo -->
+          <StackPanel x:Name="Header" VerticalAlignment="Top" Margin="43,16,40,8">
+            <StackPanel.RenderTransform>
+              <TranslateTransform x:Name="HeaderShift"/>
+            </StackPanel.RenderTransform>
+            <TextBox x:Name="TitleBox" Style="{StaticResource TitleField}" Tag="Senza titolo"
+                     KeyDown="OnTitleKey" LostKeyboardFocus="OnTitleDone" ToolTip="Il nome della pagina: lo decidi tu"/>
+            <TextBlock x:Name="Meta" Style="{StaticResource TxtCaption}" Margin="2,4,0,0" IsHitTestVisible="False"/>
+          </StackPanel>
+
+          <!-- la parola trovata dalla ricerca: un riquadro d'accento sopra al testo, che si vede
+               anche mentre il fuoco e' nella casella di ricerca -->
+          <Canvas x:Name="FindLayer" IsHitTestVisible="False" ClipToBounds="True">
+            <Border x:Name="FindMark" Visibility="Collapsed" CornerRadius="3" Background="{DynamicResource AccentSoft}"
+                    BorderBrush="{DynamicResource Accent}" BorderThickness="1.5"/>
+          </Canvas>
+
           <!-- pagina vuota: un invito, che sparisce alla prima lettera -->
-          <StackPanel x:Name="EmptyHint" Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
-                      MaxWidth="360" Visibility="Collapsed" Margin="0,0,0,60">
+          <StackPanel x:Name="EmptyHint" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"
+                      MaxWidth="360" Visibility="Collapsed" Margin="0,40,0,20">
+            <StackPanel.RenderTransform>
+              <TranslateTransform x:Name="EmptyShift"/>
+            </StackPanel.RenderTransform>
             <Image Source="/Assets/art/empty_note.png" Width="110" Height="110" Opacity="0.85" RenderOptions.BitmapScalingMode="HighQuality"/>
             <TextBlock Text="Una pagina bianca" Style="{StaticResource TxtSub}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
             <TextBlock Style="{StaticResource TxtMuted}" TextWrapping="Wrap" TextAlignment="Center" Margin="0,4,0,0"
@@ -194,7 +199,11 @@
           </StackPanel>
 
           <!-- ricerca: scende sopra l'angolo in alto a destra del testo -->
-          <Border x:Name="FindBar" Grid.RowSpan="2" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,14,18,0"
+          <Grid HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,20,0">
+            <Grid.RenderTransform>
+              <TranslateTransform x:Name="FindShift"/>
+            </Grid.RenderTransform>
+          <Border x:Name="FindBar"
                   Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}" BorderThickness="1"
                   CornerRadius="12" Padding="10,8" Visibility="Collapsed" Width="380">
             <Border.Effect>
@@ -234,9 +243,9 @@
               </Grid>
             </StackPanel>
           </Border>
+          </Grid>
 
-        </Grid>
-      </Border>
+      </Grid>
     </Grid>
   </Grid>
 </UserControl>

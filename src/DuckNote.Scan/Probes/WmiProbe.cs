@@ -9,9 +9,29 @@ public static class WmiProbe
     private const string Namespace = @"root\cimv2";
     private const string Dialect = "WQL";
 
-    public static Task<WindowsInventory> ReadAsync(
-        string address, TimeSpan timeout, CancellationToken cancellationToken = default) =>
-        Task.Run(() => Read(address, timeout), cancellationToken);
+    /// <summary>Quante interrogazioni WMI insieme: sono chiamate che aspettano, fino a 8 secondi l'una.</summary>
+    private static readonly SemaphoreSlim Readers = new(8);
+
+    /// <summary>
+    /// L'interrogazione e' una chiamata che blocca il suo thread finche' l'host non risponde:
+    /// sta in un thread suo (non in quelli condivisi, che servono a tutto il resto dell'analisi)
+    /// e poche alla volta. Cento host Windows insieme non devono lasciare l'analisi senza thread.
+    /// </summary>
+    public static async Task<WindowsInventory> ReadAsync(
+        string address, TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        await Readers.WaitAsync(cancellationToken).ConfigureAwait(false);
+
+        try
+        {
+            return await Task.Factory.StartNew(
+                () => Read(address, timeout), cancellationToken, TaskCreationOptions.LongRunning, TaskScheduler.Default).ConfigureAwait(false);
+        }
+        finally
+        {
+            Readers.Release();
+        }
+    }
 
     private static WindowsInventory Read(string address, TimeSpan timeout)
     {

@@ -32,13 +32,17 @@ public partial class MainWindow
 
         _ws.Status += message => Dispatcher.BeginInvoke(() => SetStatus(message));
         _ws.Locked += () => Dispatcher.BeginInvoke(ShowLock);
-        _ws.VaultChanged += () => Dispatcher.BeginInvoke(ShowVault);
-        _ws.HostsChanged += () => Dispatcher.BeginInvoke(ShowHosts);
-        _ws.Session.PropertyChanged += (_, _) => Dispatcher.BeginInvoke(() =>
+        _ws.VaultChanged += () => Dispatcher.BeginInvoke(() =>
+        {
+            ShowVault();
+            ShowSaved();
+        });
+        // gia' raggruppato dal Workspace: qualche volta al secondo anche durante un'analisi
+        _ws.HostsChanged += () =>
         {
             ShowMonitor();
             ShowHosts();
-        });
+        };
         _ws.Session.Finished += message =>
         {
             // le analisi partite da sole (monitoraggio, indirizzi appena scritti) non disturbano:
@@ -88,8 +92,20 @@ public partial class MainWindow
         };
 
         PreviewKeyDown += OnShortcut;
+        AccountMenu.PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+            {
+                AccountMenu.IsOpen = false;
+                e.Handled = true;
+            }
+        };
         PreviewMouseMove += (_, _) => _ws.Activity();
-        PreviewMouseDown += (_, _) => _ws.Activity();
+        PreviewMouseDown += (_, e) =>
+        {
+            _ws.Activity();
+            DismissPeek(e);
+        };
     }
 
     private void Start()
@@ -100,10 +116,17 @@ public partial class MainWindow
         var notes = (NotesPage)Open("notes");
         NavigatorHost.Content = notes.Navigator;
         CommandsHost.Content = notes.Commands;
+        ToolbarHost.Content = notes.Toolbar;
         notes.Wanted += () =>
         {
             if (_current != "notes") Navigate("notes");
         };
+        notes.SidebarWanted += WantSidebar;
+
+        // la sidebar resta come la si e' lasciata: nascosta, tutta la finestra e' del foglio
+        ShowSidebarButton();
+        SetSide(_ws.Settings.SidebarHidden ? Side.Hidden : Side.Docked, animate: false);
+        PlaceToolbar(animate: false);
 
         ShowUser();
         ShowVault();
@@ -112,6 +135,7 @@ public partial class MainWindow
         StatusRight.ToolTip = $"DuckNote {StatusRight.Text}";
         ShowHosts();
         ShowMonitor();
+        ShowSaved();
 
         if (_ws.IsLocked)
         {
@@ -153,6 +177,10 @@ public partial class MainWindow
         MenuSep.Visibility = MenuExit.Visibility = withExit ? Visibility.Visible : Visibility.Collapsed;
         AccountMenu.PlacementTarget = target;
         AccountMenu.IsOpen = true;
+
+        // da tastiera: il fuoco va sulla prima voce, Esc chiude e torna dov'era
+        Button first = vault ? MenuLock : MenuVault;
+        Dispatcher.BeginInvoke(() => first.Focus(), System.Windows.Threading.DispatcherPriority.Input);
     }
 
     private void OnLockButton(object sender, RoutedEventArgs e)
@@ -203,8 +231,15 @@ public partial class MainWindow
 
     private void ShowLock()
     {
+        // affacciata non resta: a nota riaperta la si ritrova nascosta com'era
+        if (_side == Side.Peek)
+        {
+            SetSide(Side.Hidden, animate: false);
+        }
+
         Lock.Present();
         ShowVault();
+        ShowSaved();
     }
 
     /// <summary>
@@ -239,8 +274,9 @@ public partial class MainWindow
         LockGlyph.SetResourceReference(TextBlock.ForegroundProperty, _ws.Vault.IsOpen ? "Orange" : "LabelSecondary");
         BtnLock.ToolTip = _ws.Vault.IsOpen ? "Blocca la nota (Ctrl+L)" : "Cifratura non attiva: clic per impostarla";
 
-        // a nota bloccata restano solo versione e giorno/notte
-        BtnLock.Visibility = _ws.IsLocked ? Visibility.Collapsed : Visibility.Visible;
+        // a nota bloccata restano solo versione e giorno/notte (l'ingranaggio porterebbe a una
+        // pagina che sta dietro alla schermata di sblocco)
+        BtnLock.Visibility = BtnSidebar.Visibility = BtnSettings.Visibility = _ws.IsLocked ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void ShowHosts()
@@ -269,7 +305,7 @@ public partial class MainWindow
             return;
         }
 
-        int hosts = _ws.NoteHosts(settled: true).Count;
+        int hosts = _ws.NoteHostCount;
 
         SetStatusCard(
             "Monitoraggio",
@@ -300,6 +336,7 @@ public partial class MainWindow
     private void OnShortcut(object sender, KeyEventArgs e)
     {
         _ws.Activity();
+        StatusOnKey(e);
 
         if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control && _ws.Vault.IsOpen)
         {
@@ -310,6 +347,14 @@ public partial class MainWindow
 
         if (_ws.IsLocked)
         {
+            return;
+        }
+
+        // la sidebar: F9, oppure Ctrl+\ come negli editor (il tasto accanto all'1 sulla tastiera italiana)
+        if ((e.Key == Key.F9 && Keyboard.Modifiers == ModifierKeys.None) || (e.Key == Key.Oem5 && Keyboard.Modifiers == ModifierKeys.Control))
+        {
+            ToggleSidebar();
+            e.Handled = true;
             return;
         }
 

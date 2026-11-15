@@ -49,7 +49,7 @@ public sealed class ScanSession : Observable
 
     public int DownCount => Rows.Count(row => row.IsDown);
 
-    public int WaitingCount => Rows.Count(row => !row.IsChecked);
+    public int WaitingCount => Rows.Count(row => row.NeedsCheck);
 
     /// <summary>Una scansione e' appena finita: il messaggio e' quello definitivo.</summary>
     public event Action<string>? Finished;
@@ -94,10 +94,12 @@ public sealed class ScanSession : Observable
         _hidden.UnionWith(hosts.Where(host => host.Length > 0));
     }
 
-    public HostRow? Find(string host) =>
-        _index.TryGetValue(host, out HostRow? row)
-            ? row
-            : Rows.FirstOrDefault(r => r.Names().Contains(host, StringComparer.OrdinalIgnoreCase));
+    /// <summary>
+    /// La riga di un host, per uno qualsiasi dei suoi nomi (IP, com'e' scritto nella nota, nome
+    /// DNS). Solo dall'indice: cercare riga per riga a ogni risultato fermerebbe l'interfaccia
+    /// sulle reti grandi.
+    /// </summary>
+    public HostRow? Find(string host) => _index.GetValueOrDefault(host);
 
     /// <summary>
     /// Allinea la tabella alla nota: una riga nata da un indirizzo scritto lo segue, cancellato
@@ -159,6 +161,7 @@ public sealed class ScanSession : Observable
                 if (known.NoteKey.Length == 0 && known.IP.Equals(host, StringComparison.OrdinalIgnoreCase))
                 {
                     known.Bind(host);
+                    _index[host] = known;
                 }
 
                 continue;
@@ -351,8 +354,16 @@ public sealed class ScanSession : Observable
             Absorb(result);
         }
 
-        Say(string.Create(CultureInfo.CurrentCulture, $"{_done} di {_total} analizzati, {UpCount} attivi..."));
+        // il messaggio conta le righe: a ogni risultato, su una rete grande, sarebbe un lavoro
+        // quadratico. Lo si aggiorna qualche volta al secondo, che e' quanto si riesce a leggere.
+        if (_progress.ElapsedMilliseconds >= 120 || _done == _total)
+        {
+            _progress.Restart();
+            Say(string.Create(CultureInfo.CurrentCulture, $"{_done} di {_total} analizzati, {UpCount} attivi..."));
+        }
     }
+
+    private readonly Stopwatch _progress = Stopwatch.StartNew();
 
     /// <summary>Le stesse regole, ma solo il ping: niente porte, nomi o sonde.</summary>
     private static ScanOptions Ping(ScanOptions full) => new()
@@ -396,8 +407,15 @@ public sealed class ScanSession : Observable
         }
         else
         {
+            long before = row.SortKey;
             row.Apply(result);
-            Rows.Move(Rows.IndexOf(row), Place(row, Rows.IndexOf(row)));
+
+            // la riga si sposta solo se e' cambiato il suo posto (un nome che diventa un IP)
+            if (before != row.SortKey)
+            {
+                int from = Rows.IndexOf(row);
+                Rows.Move(from, Place(row, from));
+            }
         }
 
         foreach (string name in row.Names())
@@ -410,20 +428,46 @@ public sealed class ScanSession : Observable
 
     private void Insert(HostRow row) => Rows.Insert(Place(row, -1), row);
 
-    /// <summary>Dove va la riga per restare in ordine di indirizzo (escludendo se stessa).</summary>
+    /// <summary>
+    /// Dove va la riga per restare in ordine di indirizzo. Una riga nuova (self = -1) si cerca
+    /// con la ricerca binaria: la tabella e' sempre ordinata e su una rete grande le righe sono
+    /// migliaia. Una riga che si sposta e' rara: li' si contano le altre.
+    /// </summary>
     private int Place(HostRow row, int self)
     {
-        int at = 0;
-
-        for (int i = 0; i < Rows.Count; i++)
+        if (self >= 0)
         {
-            if (i != self && Rows[i].SortKey <= row.SortKey)
+            int at = 0;
+
+            for (int i = 0; i < Rows.Count; i++)
             {
-                at++;
+                if (i != self && Rows[i].SortKey <= row.SortKey)
+                {
+                    at++;
+                }
+            }
+
+            return at;
+        }
+
+        int low = 0;
+        int high = Rows.Count;
+
+        while (low < high)
+        {
+            int middle = (low + high) / 2;
+
+            if (Rows[middle].SortKey <= row.SortKey)
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
             }
         }
 
-        return at;
+        return low;
     }
 
     private void Drop(int index)

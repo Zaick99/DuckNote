@@ -1,5 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
   <ResourceDictionary.MergedDictionaries>
     <!-- Il kit si unisce qui e non accanto: gli StaticResource verso RControl, FIcons... si
          risolvono dentro lo stesso documento, non fra dizionari fratelli. -->
@@ -9,7 +10,9 @@
   <!-- Solo cio' che e' di DuckNote: barra dell'editor, struttura delle pagine, tabella degli
        host. Colori sempre da DynamicResource, mai esadecimali. -->
 
-  <!-- ===== barra dell'editor ===== -->
+  <!-- ===== barra dell'editor =====
+       Sta nella fascia del titolo della finestra: i pulsanti dichiarano di voler ricevere i clic
+       (IsHitTestVisibleInChrome), lo spazio fra l'uno e l'altro resta buono per trascinare. -->
   <!-- Contorno di fuoco: compare solo quando ci si arriva da tastiera (Alt+F10, frecce). -->
   <Style x:Key="FmtFocus">
     <Setter Property="Control.Template">
@@ -22,7 +25,7 @@
   </Style>
   <!-- Comando semplice: si spegne (non sparisce) quando non si puo' usare. -->
   <Style x:Key="FmtBtn" TargetType="Button" BasedOn="{StaticResource Toolbtn}">
-    <Setter Property="Width" Value="30"/>
+    <Setter Property="Width" Value="28"/>
     <Setter Property="Height" Value="28"/>
     <Setter Property="MinWidth" Value="0"/>
     <Setter Property="Padding" Value="0"/>
@@ -35,9 +38,9 @@
   <!-- Interruttore (grassetto, titoli, elenchi...): premuto = vale dove sta il cursore. Premuto ha
        fondo e bordo d'accento, il passaggio del mouse solo un grigio: non si confondono. -->
   <Style x:Key="FmtToggle" TargetType="ToggleButton">
-    <Setter Property="Width" Value="30"/>
+    <Setter Property="Width" Value="28"/>
     <Setter Property="Height" Value="28"/>
-    <Setter Property="Margin" Value="0,0,1,0"/>
+    <Setter Property="shell:WindowChrome.IsHitTestVisibleInChrome" Value="True"/>
     <Setter Property="FontSize" Value="12.5"/>
     <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
     <Setter Property="Cursor" Value="Hand"/>
@@ -91,7 +94,7 @@
   <Style x:Key="ToolSep" TargetType="Rectangle">
     <Setter Property="Width" Value="1"/>
     <Setter Property="Height" Value="18"/>
-    <Setter Property="Margin" Value="6,0"/>
+    <Setter Property="Margin" Value="4,0"/>
     <Setter Property="Fill" Value="{DynamicResource Separator}"/>
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
@@ -193,7 +196,19 @@
 
   <!-- Voce della sidebar senza pillola che scorre: Rete in cima e Impostazioni in fondo stanno in
        due pannelli diversi, quindi la voce attiva si colora da sola, come i fogli dell'indice. -->
+  <!-- Contorno di fuoco da tastiera per voci e pulsanti della finestra: un anello d'accento
+       arrotondato al posto del rettangolo tratteggiato di Windows. -->
+  <Style x:Key="RingFocus">
+    <Setter Property="Control.Template">
+      <Setter.Value>
+        <ControlTemplate>
+          <Rectangle Margin="1" RadiusX="8" RadiusY="8" StrokeThickness="1.5" Stroke="{DynamicResource Accent}"/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <Style x:Key="NavItem" TargetType="Button">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource RingFocus}"/>
     <Setter Property="Foreground" Value="{DynamicResource Label}"/>
     <Setter Property="FontFamily" Value="{StaticResource FText}"/>
     <Setter Property="FontSize" Value="13"/>
@@ -239,6 +254,7 @@
 
   <!-- Riga di un menu a comparsa (il menu dell'utente): icona e testo, grigio al passaggio. -->
   <Style x:Key="MenuRow" TargetType="Button">
+    <Setter Property="FocusVisualStyle" Value="{StaticResource RingFocus}"/>
     <Setter Property="Foreground" Value="{DynamicResource Label}"/>
     <Setter Property="FontSize" Value="12.5"/>
     <Setter Property="Cursor" Value="Hand"/>
@@ -328,7 +344,15 @@
     </Style.Triggers>
   </Style>
 
+  <!-- Il testo di una cella che non ci sta si accorcia con i puntini e si legge per intero nel
+       tooltip. -->
+  <Style x:Key="GridText" TargetType="TextBlock">
+    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+    <Setter Property="ToolTipService.InitialShowDelay" Value="500"/>
+  </Style>
   <Style x:Key="GridCell" TargetType="DataGridCell">
+    <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
     <Setter Property="BorderThickness" Value="0"/>
     <Setter Property="Padding" Value="10,0"/>
     <Setter Property="FontSize" Value="12"/>

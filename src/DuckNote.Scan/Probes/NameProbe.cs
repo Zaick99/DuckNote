@@ -46,9 +46,19 @@ public static class NameProbe
             timeout, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Quante richieste al risolutore di sistema insieme. Una richiesta abbandonata per tempo
+    /// scaduto continua a occupare un thread finche' il sistema non si arrende: senza un tetto,
+    /// mille nomi che non rispondono diventano mille thread fermi. Il posto si libera quando la
+    /// richiesta finisce davvero, non quando la si abbandona.
+    /// </summary>
+    private static readonly SemaphoreSlim SystemLookups = new(64);
+
     private static async Task<string> Abandon(
         Func<Task<string>> lookup, TimeSpan timeout, CancellationToken cancellationToken)
     {
+        await SystemLookups.WaitAsync(cancellationToken).ConfigureAwait(false);
+
         Task<string> resolution;
         try
         {
@@ -56,8 +66,12 @@ public static class NameProbe
         }
         catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)
         {
+            SystemLookups.Release();
             return string.Empty;
         }
+
+        _ = resolution.ContinueWith(
+            static _ => SystemLookups.Release(), CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
 
         Task finished = await Task.WhenAny(resolution, Task.Delay(timeout, cancellationToken)).ConfigureAwait(false);
         if (!ReferenceEquals(finished, resolution))

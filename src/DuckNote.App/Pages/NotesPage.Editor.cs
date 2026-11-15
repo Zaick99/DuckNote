@@ -26,11 +26,20 @@ public partial class NotesPage
     {
         _veil = Editor.SelectionOpacity;
 
+        // La selezione resta visibile anche quando il fuoco e' altrove (la casella di ricerca):
+        // e' cosi' che si vede la parola trovata. Il grigio di sistema sul foglio non si
+        // distingue: si usa l'accento, lo stesso pennello vivo del tema.
+        Editor.Resources[SystemColors.InactiveSelectionHighlightBrushKey] = FindResource("Accent");
+
         Editor.TextChanged += OnTextChanged;
         Editor.PreviewKeyDown += OnEditorKey;
         Editor.PreviewMouseLeftButtonDown += OnEditorClick;
         Editor.PreviewMouseWheel += OnEditorWheel;
-        Editor.SelectionChanged += (_, _) => MarkChosenInsets();
+        Editor.SelectionChanged += (_, _) =>
+        {
+            OnCaretMoved();
+            MarkChosenInsets();
+        };
         Editor.ContextMenuOpening += (_, _) => DressMenu();
         Editor.AddHandler(Hyperlink.RequestNavigateEvent, new RequestNavigateEventHandler(OnNavigate));
         DataObject.AddPastingHandler(Editor, OnPaste);
@@ -38,11 +47,114 @@ public partial class NotesPage
         _settle.Interval = TimeSpan.FromMilliseconds(Math.Clamp(_ws.Settings.HostDebounceMs, 500, 30000));
     }
 
+    // ------------------------------------------------------------------ cronologia di Annulla
+
+    /// <summary>
+    /// Lo specchio della cronologia dell'editor: per ogni passo, se l'ha fatto chi scrive o la
+    /// pittura degli indirizzi. Annulla e Ripeti saltano i passi di pittura, cosi' un Ctrl+Z
+    /// toglie quello che si e' scritto e non "il colore dell'indirizzo".
+    /// </summary>
+    private readonly List<bool> _undoPaint = [];
+    private readonly List<bool> _redoPaint = [];
+    private bool _undoing;
+
+    private void TrackUndo(UndoAction action)
+    {
+        switch (action)
+        {
+            case UndoAction.Create:
+                _undoPaint.Add(_watcher.IsPainting);
+                _redoPaint.Clear();
+
+                if (_undoPaint.Count > 2000)
+                {
+                    _undoPaint.RemoveRange(0, 1000);
+                }
+
+                break;
+
+            case UndoAction.Undo when _undoPaint.Count > 0:
+                _redoPaint.Add(_undoPaint[^1]);
+                _undoPaint.RemoveAt(_undoPaint.Count - 1);
+                break;
+
+            case UndoAction.Redo when _redoPaint.Count > 0:
+                _undoPaint.Add(_redoPaint[^1]);
+                _redoPaint.RemoveAt(_redoPaint.Count - 1);
+                break;
+
+            case UndoAction.Clear:
+                _undoPaint.Clear();
+                _redoPaint.Clear();
+                break;
+        }
+    }
+
+    /// <summary>Annulla l'ultima cosa fatta da chi scrive, con la pittura che le stava sopra.</summary>
+    private void UndoStep()
+    {
+        Typing.Flush(Editor);
+        _undoing = true;
+
+        try
+        {
+            while (Editor.CanUndo && _undoPaint.Count > 0 && _undoPaint[^1])
+            {
+                Editor.Undo();
+            }
+
+            Editor.Undo();
+        }
+        finally
+        {
+            _undoing = false;
+        }
+    }
+
+    /// <summary>Ripete l'ultima cosa annullata, e la pittura che la seguiva.</summary>
+    private void RedoStep()
+    {
+        Typing.Flush(Editor);
+        _undoing = true;
+
+        try
+        {
+            Editor.Redo();
+
+            while (Editor.CanRedo && _redoPaint.Count > 0 && _redoPaint[^1])
+            {
+                Editor.Redo();
+            }
+        }
+        finally
+        {
+            _undoing = false;
+        }
+    }
+
+    // ------------------------------------------------------------------ testo che cambia
+
+    private Paragraph? _caretRow;
+
+    /// <summary>Al prossimo giro di pittura le righe si considerano finite (dopo un incolla).</summary>
+    private bool _settleNext;
+
     private void OnTextChanged(object sender, TextChangedEventArgs e)
     {
+        if (ReferenceEquals(Editor.Document, _sheet?.Document))
+        {
+            TrackUndo(e.UndoAction);
+        }
+
         if (_swapping || _watcher.IsPainting || _ws.IsSaving)
         {
             return;
+        }
+
+        // il testo e' cambiato: il riquadro della parola trovata non e' piu' al suo posto
+        if (_found is not null)
+        {
+            Unmark();
         }
 
         _ws.Touch();
@@ -53,17 +165,102 @@ public partial class NotesPage
             shell.RestDucks();
         }
 
+        // Si segnano da dipingere le righe toccate da questa modifica: scritte, incollate,
+        // spezzate. Annulla e Ripeti rimettono il documento com'era, pittura compresa: li' non
+        // si ridipinge, o il nuovo passo cancellerebbe quello che si puo' ancora ripetere.
+        if (!_undoing && e.UndoAction is not (UndoAction.Undo or UndoAction.Redo))
+        {
+            TextPointer start = Editor.Document.ContentStart;
+
+            foreach (TextChange change in e.Changes)
+            {
+                _watcher.Touch(start.GetPositionAtOffset(change.Offset), start.GetPositionAtOffset(change.Offset + change.AddedLength));
+            }
+        }
+
         _format.Stop();
         _format.Start();
         _settle.Stop();
         _settle.Start();
     }
 
+    /// <summary>
+    /// Il cursore ha cambiato riga: quella lasciata e' finita, il suo ultimo indirizzo non e'
+    /// piu' "una parola che si sta scrivendo" e si colora subito.
+    /// </summary>
+    private bool _steering;
+
+    private void OnCaretMoved()
+    {
+        // il cursore non entra nel segno di una voce d'elenco (vedi TextCommands.KeepOutOfMark)
+        if (!_steering && !_swapping && !_undoing && !_watcher.IsPainting && !_watcher.Suspended && !Editor.IsReadOnly)
+        {
+            _steering = true;
+
+            try
+            {
+                _commands.KeepOutOfMark();
+            }
+            finally
+            {
+                _steering = false;
+            }
+        }
+
+        AirLater();
+
+        Paragraph? now = _watcher.CaretRow;
+
+        if (ReferenceEquals(now, _caretRow))
+        {
+            return;
+        }
+
+        Paragraph? left = _caretRow;
+        _caretRow = now;
+
+        if (left?.Parent is null || _swapping || _undoing || Editor.IsReadOnly)
+        {
+            return;
+        }
+
+        _watcher.Touch(left);
+        _format.Stop();
+        _format.Start();
+    }
+
     private void OnEditorKey(object sender, KeyEventArgs e)
     {
         ModifierKeys mods = Keyboard.Modifiers;
 
-        if (RunShortcut(e) || AutoFormat(e))
+        // Invio, Spazio e le scorciatoie lavorano sul documento: prima ci devono essere dentro
+        // tutte le lettere gia' battute (vedi Typing), o l'a capo arriva a meta' parola
+        if (e.Key is Key.Return or Key.Space or Key.Tab or Key.Back or Key.Delete or Key.Left or Key.Home
+            || mods.HasFlag(ModifierKeys.Control) || mods.HasFlag(ModifierKeys.Alt))
+        {
+            Typing.Flush(Editor);
+        }
+
+        if (RunShortcut(e) || AutoFormat(e) || Foreign(e.Key, mods))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // I bordi delle righe con un formato: vedi TextCommands (Backspace, DeleteForward, Left).
+        if (e.Key == Key.Back && (mods == ModifierKeys.None || mods == ModifierKeys.Control) && _commands.Backspace())
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Delete && mods == ModifierKeys.None)
+        {
+            _commands.DeleteForward();
+        }
+
+        if (e.Key == Key.Left && (mods & ~(ModifierKeys.Shift | ModifierKeys.Control)) == ModifierKeys.None
+            && _commands.Left(extend: mods.HasFlag(ModifierKeys.Shift)))
         {
             e.Handled = true;
             return;
@@ -72,7 +269,7 @@ public partial class NotesPage
         // Invio: riga nuova senza alcuna formattazione. Maiusc+Invio: riga nuova che la mantiene.
         if (e.Key == Key.Return && mods == ModifierKeys.None)
         {
-            e.Handled = _commands.PlainEnter();
+            e.Handled = _commands.RuleFromDashes() || _commands.PlainEnter();
             return;
         }
 
@@ -110,6 +307,57 @@ public partial class NotesPage
         }
     }
 
+    /// <summary>
+    /// Le scorciatoie che il RichTextBox ha di suo per formati che DuckNote non usa: apici e
+    /// pedici, corpo del carattere, allineamenti, rientri, interlinea, e il tasto Ins che passa
+    /// a sovrascrivere. Lasciate fare, mettono nel testo cose che la barra non sa mostrare ne'
+    /// togliere, e la formattazione "si blocca". Qui diventano il comando di DuckNote che piu'
+    /// somiglia, oppure non fanno niente. Torna true se il tasto e' stato consumato.
+    /// </summary>
+    private bool Foreign(Key key, ModifierKeys mods)
+    {
+        const ModifierKeys CtrlShift = ModifierKeys.Control | ModifierKeys.Shift;
+
+        switch (key)
+        {
+            // Ctrl e "+" sulle tastiere dove il + sta con Maiusc: ingrandisce, come nei browser
+            case Key.OemPlus or Key.Add when mods == CtrlShift:
+                Zoom(_ws.Settings.EditorZoom + 10);
+                return true;
+
+            // come in Word: Ctrl+Maiusc+L elenco puntato, Ctrl+Maiusc+N testo normale
+            case Key.L when mods == CtrlShift:
+                if (!Editor.IsReadOnly)
+                {
+                    _commands.SetLook(Look.Bullet);
+                    RefreshTools();
+                }
+
+                return true;
+
+            case Key.N when mods == CtrlShift:
+                if (!Editor.IsReadOnly)
+                {
+                    _commands.Plain();
+                    RefreshTools();
+                }
+
+                return true;
+
+            // sovrascrittura
+            case Key.Insert when mods == ModifierKeys.None:
+            // allineamento a destra e giustificato, rientro, interlinea
+            case Key.R or Key.J or Key.T or Key.D1 or Key.D2 or Key.D5 when mods == ModifierKeys.Control:
+            case Key.T when mods == CtrlShift:
+            // corpo del carattere
+            case Key.OemOpenBrackets or Key.OemCloseBrackets when mods == ModifierKeys.Control:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
     /// <summary>Un clic sul quadratino di una spunta la segna fatta (o la riapre).</summary>
     private void OnEditorClick(object sender, MouseButtonEventArgs e)
     {
@@ -141,6 +389,7 @@ public partial class NotesPage
         int zoom = Math.Clamp(percent, 50, 300);
         _ws.Settings.EditorZoom = zoom;
         Editor.LayoutTransform = new System.Windows.Media.ScaleTransform(zoom / 100.0, zoom / 100.0);
+        PlacePage();
         ShowCounts();
         _ws.Settings.Save();
     }
@@ -369,6 +618,7 @@ public partial class NotesPage
         {
             if (Clipboard.GetText() is { Length: > 0 } text)
             {
+                _settleNext = true;
                 Editor.Selection.Text = text;
                 Editor.CaretPosition = Editor.Selection.End;
             }
@@ -512,7 +762,14 @@ public partial class NotesPage
     /// </summary>
     private void MarkChosenInsets()
     {
-        InsetFrame[] frames = InsetRafts.Frames(Editor.Document);
+        // Succede a ogni movimento del cursore, quindi a ogni lettera: senza selezione e senza
+        // riquadri segnati non c'e' nulla da fare, e non si cercano nemmeno i riquadri.
+        if (Editor.Selection.IsEmpty && !_anyChosen)
+        {
+            return;
+        }
+
+        InsetFrame[] frames = _sheet?.Frames ?? [];
 
         if (frames.Length == 0)
         {
@@ -529,14 +786,28 @@ public partial class NotesPage
             any |= frame.Chosen;
         }
 
+        _anyChosen = any;
         Editor.SelectionOpacity = any ? 0 : _veil;
     }
+
+    private bool _anyChosen;
 
     /// <summary>Un'immagine incollata diventa un riquadro: incollata cosi' com'e' sparirebbe alla riapertura.</summary>
     private void OnPaste(object sender, DataObjectPastingEventArgs e)
     {
+        // quello che si incolla e' finito: i suoi indirizzi si colorano subito, anche l'ultimo
+        _settleNext = true;
+
         if (!e.SourceDataObject.GetDataPresent(DataFormats.Bitmap, autoConvert: true) || ClipboardPng() is not { } bytes)
         {
+            // Testo che arriva da fuori (browser, Word, Excel) porta caratteri, colori e misure
+            // suoi: nella nota entra come testo, con lo stile della nota. Quello copiato da
+            // DuckNote (ha il formato XAML) tiene titoli, elenchi e segni.
+            if (!e.SourceDataObject.GetDataPresent(DataFormats.Xaml) && e.SourceDataObject.GetDataPresent(DataFormats.UnicodeText, autoConvert: true))
+            {
+                e.FormatToApply = DataFormats.UnicodeText;
+            }
+
             return;
         }
 

@@ -48,6 +48,9 @@ public sealed class AppSettings
     public string IgnoredHosts { get; set; } = string.Empty;
 
     public int SidebarWidth { get; set; } = 232;
+
+    /// <summary>La barra laterale e' nascosta: tutta la finestra e' del foglio (F9 la riporta).</summary>
+    public bool SidebarHidden { get; set; }
     public int InspectorWidth { get; set; } = 330;
     public int WindowWidth { get; set; } = 1240;
     public int WindowHeight { get; set; } = 800;

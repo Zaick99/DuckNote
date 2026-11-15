@@ -74,6 +74,7 @@ public partial class NotesPage
 
     private void CloseFind()
     {
+        Unmark();
         Fx.SlideVisible(FindBar, false, -14);
         Editor.Focus();
     }
@@ -130,22 +131,77 @@ public partial class NotesPage
         }
         else if (FindBox.Text.Length > 0)
         {
+            Unmark();
             Fx.Shake(FindBox);
+        }
+        else
+        {
+            Unmark();
         }
 
         Tally();
     }
 
+    private TextRange? _found;
+    private bool _markWired;
+
+    /// <summary>Mette (o toglie) il riquadro sopra la parola trovata, dov'e' adesso sullo schermo.</summary>
+    private void PlaceMark()
+    {
+        if (_found is not { } hit || FindBar.Visibility != Visibility.Visible || hit.Start.Paragraph?.Parent is null)
+        {
+            FindMark.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        try
+        {
+            Rect from = hit.Start.GetCharacterRect(LogicalDirection.Forward);
+            Rect to = hit.End.GetCharacterRect(LogicalDirection.Backward);
+
+            // su una riga sola il riquadro copre la parola; se va a capo, la prima riga
+            double width = Math.Abs(to.Top - from.Top) < 1 ? Math.Max(6, to.Right - from.Left) : 24;
+            Point corner = Editor.TranslatePoint(new Point(from.Left, from.Top), FindLayer);
+            Point other = Editor.TranslatePoint(new Point(from.Left + width, from.Bottom), FindLayer);
+
+            Canvas.SetLeft(FindMark, corner.X - 2);
+            Canvas.SetTop(FindMark, corner.Y - 1);
+            FindMark.Width = Math.Max(6, other.X - corner.X) + 4;
+            FindMark.Height = Math.Max(8, other.Y - corner.Y) + 2;
+            FindMark.Visibility = Visibility.Visible;
+        }
+        catch (InvalidOperationException)
+        {
+            FindMark.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    private void Unmark()
+    {
+        _found = null;
+        FindMark.Visibility = Visibility.Collapsed;
+    }
+
     private void Reveal(TextRange hit)
     {
         Editor.Selection.Select(hit.Start, hit.End);
+        _found = hit;
 
         if (Doc.Scroller(Editor) is not { } view)
         {
             return;
         }
 
+        if (!_markWired)
+        {
+            // il riquadro segue il testo mentre scorre (anche durante lo scorrimento animato)
+            _markWired = true;
+            view.ScrollChanged += (_, _) => PlaceMark();
+            Editor.SizeChanged += (_, _) => PlaceMark();
+        }
+
         Editor.UpdateLayout();
+        PlaceMark();
         Rect spot = hit.Start.GetCharacterRect(LogicalDirection.Forward);
         double wanted = view.VerticalOffset + spot.Top - view.ViewportHeight / 3;
         Theme.Motion.ScrollTo(view, Math.Clamp(wanted, 0, Math.Max(0, view.ScrollableHeight)));

@@ -1,0 +1,135 @@
+# Builds on Windows and publishes a release whenever the version in Directory.Build.props
+# changes: the portable executable, the installer and SHA256SUMS.txt.
+# One release per version: if the tag vX.Y.Z already has a release, nothing is built.
+# "[rebuild-release]" in the commit message deletes and recreates the release (and its tag)
+# of the current version from the commit just pushed - ask before using it.
+name: Build and release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  APP_NAME: 'DuckNote'                         # release title: "<APP_NAME> <version>"
+  VERSION_FILE: 'Directory.Build.props'        # <Version> for every project of the solution
+  PUBLISH_PROJECT: 'src/DuckNote.App'          # dotnet project to publish
+  EXE_NAME: 'DuckNote.exe'                     # the portable executable
+  INSTALLER_SCRIPT: 'packaging/DuckNote.iss'   # Inno Setup script (empty: no installer)
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: ver
+        shell: pwsh
+        run: |
+          $f = $env:VERSION_FILE
+          $text = Get-Content $f -Raw
+          switch -Regex ($f) {
+            '\.(csproj|props|targets)$' { $v = ([regex]::Match($text, '<Version>([^<]+)</Version>')).Groups[1].Value }
+            'Cargo\.toml$'   { $v = ([regex]::Match($text, '(?m)^version\s*=\s*"([^"]+)"')).Groups[1].Value }
+            'package\.json$' { $v = ($text | ConvertFrom-Json).version }
+            default          { $v = $text.Trim() }
+          }
+          if (-not $v) { Write-Host "::error::no version found in $f"; exit 1 }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          gh release view "v$v" --repo "${{ github.repository }}" *> $null
+          $exists = $LASTEXITCODE -eq 0
+          if ($exists -and $env:COMMIT_MSG -match '\[rebuild-release\]') {
+            Write-Host "Recreating v${v}: deleting the current release and tag"
+            $out = gh release delete "v$v" --repo "${{ github.repository }}" --yes 2>&1 | Out-String
+            if ($LASTEXITCODE) { Write-Host "::error::deleting release v${v}: $($out.Trim())"; exit 1 }
+            $out = gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/v$v" 2>&1 | Out-String
+            if ($LASTEXITCODE) { Write-Host "::warning::tag v${v} not deleted: $($out.Trim())" }
+            $exists = $false
+          }
+          if ($exists) { Write-Host "v$v is already released: nothing to build" }
+          "exists=$([int]$exists)" >> $env:GITHUB_OUTPUT
+          $global:LASTEXITCODE = 0   # "release not found" is not a failure of this step
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
+
+      - uses: actions/setup-dotnet@v4
+        if: steps.ver.outputs.exists == '0'
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Portable executable
+        if: steps.ver.outputs.exists == '0'
+        shell: pwsh
+        run: |
+          dotnet publish $env:PUBLISH_PROJECT -c Release -r win-x64 -o dist --self-contained true `
+            -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true -p:DebugType=none
+          if ($LASTEXITCODE) { Write-Host "::error::dotnet publish failed"; exit 1 }
+          if (-not (Test-Path "dist/$env:EXE_NAME")) { Write-Host "::error::dist/$env:EXE_NAME was not produced"; exit 1 }
+
+      - name: Installer
+        if: steps.ver.outputs.exists == '0' && env.INSTALLER_SCRIPT != ''
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $places = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe")
+          $iscc = $places | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            choco install innosetup --no-progress -y | Out-Host
+            if ($LASTEXITCODE) { Write-Host "::error::Inno Setup could not be installed"; exit 1 }
+            $iscc = $places | Where-Object { Test-Path $_ } | Select-Object -First 1
+          }
+          if (-not $iscc) { Write-Host "::error::ISCC.exe not found after installing Inno Setup"; exit 1 }
+          $script = $env:INSTALLER_SCRIPT -replace '/', '\'
+          # SourceExe is relative to the .iss file, not to the current folder
+          & $iscc /Q "/DAppVersion=$v" "/DSourceExe=..\dist\$env:EXE_NAME" $script
+          if ($LASTEXITCODE) { Write-Host "::error::the installer did not compile (ISCC exit code $LASTEXITCODE)"; exit 1 }
+          $setup = "dist/$env:APP_NAME-$v-setup.exe"
+          if (-not (Test-Path $setup)) { Write-Host "::error::$setup was not produced"; exit 1 }
+
+      - name: Release notes
+        if: steps.ver.outputs.exists == '0'
+        shell: pwsh
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $notes = "docs/release-notes/$v.md"
+          if (Test-Path $notes) { Copy-Item $notes dist/notes.md }
+          else {
+            # fallback: the version's section of the CHANGELOG
+            $c = Get-Content CHANGELOG.md -Raw
+            $m = [regex]::Match($c, "(?ms)^## \[$([regex]::Escape($v))\][^\n]*\n(.*?)(?=^## \[|^\[)")
+            Set-Content dist/notes.md $m.Groups[1].Value.Trim()
+          }
+          $names = @($env:EXE_NAME, "$env:APP_NAME-$v-setup.exe") | Where-Object { Test-Path "dist/$_" }
+          $sums = foreach ($name in $names) {
+            "$((Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLowerInvariant())  $name"
+          }
+          $sums | Set-Content -Encoding ascii dist/SHA256SUMS.txt
+          Add-Content dist/notes.md "`n`n**SHA-256**`n"
+          foreach ($line in $sums) {
+            $hash, $name = $line -split '  ', 2
+            Add-Content dist/notes.md "- ``$name``: ``$hash``"
+          }
+
+      - name: Release
+        if: steps.ver.outputs.exists == '0'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = '${{ steps.ver.outputs.version }}'
+          $wanted = @($env:EXE_NAME, "$env:APP_NAME-$v-setup.exe", 'SHA256SUMS.txt')
+          $files = @(Get-ChildItem dist -File | Where-Object { $_.Name -in $wanted } | ForEach-Object FullName)
+          gh release create "v$v" @files --repo "${{ github.repository }}" --target "${{ github.sha }}" `
+            --title "$env:APP_NAME $v" --notes-file dist/notes.md --latest
+          if ($LASTEXITCODE) { Write-Host "::error::gh release create failed"; exit 1 }

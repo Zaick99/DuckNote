@@ -32,6 +32,9 @@ public partial class MainWindow : Window
     private string? _current;
     private string? _previous;
 
+    /// <summary>La pagina da cui si e' entrati nelle Impostazioni: l'ingranaggio, premuto di nuovo, ci riporta li'.</summary>
+    private string _beforeSettings = "notes";
+
     /// <summary>Clic sul riquadro account (login/logout a cura dell'app).</summary>
     public event Action? AccountClicked;
 
@@ -52,6 +55,7 @@ public partial class MainWindow : Window
 
         RegisterPages();
         WireWorkspace();
+        WireSidebar();
 
         ThemeManager.TranslucentChanged += _ => ApplyGlass();
         SourceInitialized += (_, _) => ApplyGlass();
@@ -155,6 +159,7 @@ public partial class MainWindow : Window
     {
         if (_pages.FirstOrDefault(p => p.Key == key) is not { } info) return;
         if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is NotesPage leaving) leaving.OnHidden();
+        if (key == "settings" && _current is not null && _current != "settings") _beforeSettings = _current;
 
         _current = key;
         foreach (var p in _pages)
@@ -165,6 +170,7 @@ public partial class MainWindow : Window
         var page = Open(key);
         Title = $"{AppTitle} - {info.Title}";
         PageHost.Content = page;
+        ShowToolbar(page is NotesPage);
         var order = _pages.Select(p => p.Key).ToList();
         // direzionale: verso il basso della sidebar entra da destra, verso l'alto da sinistra
         Fx.PageIn(page, _previous is null || order.IndexOf(key) >= order.IndexOf(_previous) ? 1 : -1);
@@ -205,13 +211,6 @@ public partial class MainWindow : Window
     }
 
     // ---------------------------------------------------------------- stato, account
-    /// <summary>Riga di stato in basso (ultimo evento) e testo piccolo in alto a destra (versione...).</summary>
-    public void SetStatus(string text, string? right = null)
-    {
-        StatusText.Text = text;
-        if (right is not null) StatusRight.Text = right;
-    }
-
     /// <summary>Scheda in fondo alla sidebar. progress: 0..1 oppure null per nasconderla. dotToken: Green | Blue | Orange | Red.</summary>
     public void SetStatusCard(string title, string text, double? progress, string dotToken = "Green", string right = "", bool pulse = false)
     {
@@ -231,7 +230,17 @@ public partial class MainWindow : Window
 
     // ---------------------------------------------------------------- tema
     private void OnTheme(object sender, RoutedEventArgs e) => ThemeManager.Toggle();
-    private void OnSettings(object sender, RoutedEventArgs e) => Navigate("settings");
+    /// <summary>
+    /// L'ingranaggio apre le Impostazioni e, premuto di nuovo, torna alla pagina di prima: a
+    /// sidebar nascosta e' la strada piu' corta per tornare a scrivere.
+    /// </summary>
+    private void OnSettings(object sender, RoutedEventArgs e)
+    {
+        if (!_ws.IsLocked)
+        {
+            Navigate(_current == "settings" ? _beforeSettings : "settings");
+        }
+    }
     private void OnThemeSystem(object sender, MouseButtonEventArgs e) { ThemeManager.Set("system"); e.Handled = true; }
 
     private void OnThemeChanged(string theme)

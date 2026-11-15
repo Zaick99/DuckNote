@@ -54,12 +54,22 @@ duck, toasts, and ducks swimming behind the pages.
 
 | Where | What is there |
 |---|---|
-| top right | the version, the **padlock** (lock now, or set up encryption), the **Impostazioni** gear, day/night |
+| top left | the traffic lights and the button that **hides the sidebar** (`F9`) |
+| top, middle | while a sheet is open, the **formatting bar**: it lives in the title strip, so the sheet gets the whole height |
+| top right | a dot that tells whether the note is saved (orange: changes waiting, green: on disk), the version, the **padlock** (lock now, or set up encryption), the **Impostazioni** gear (pressed again, it goes back to where you were), day/night |
 | sidebar, top | **DuckNote**, then the user: the Windows account's full name, `user on PC`, a picture chosen among 26 dressed-up ducks by the first letter of the name, and a badge with the vault state. A click opens a menu: lock the note or quit — without encryption, it offers to set it up |
 | sidebar | **Rete**, with the number of hosts down (red) and up (green) |
 | sidebar, middle | **Fogli**: the sheets, each on a tile of its own colour, with their H1/H2 titles always at hand; 🔍 searches them, + adds one |
 | sidebar, bottom | the monitoring card, with the button that checks the hosts written in the sheets |
-| the rest | the open sheet, full width, or the **Rete** / **Impostazioni** page |
+| the rest | the open sheet, or the **Rete** / **Impostazioni** page. The last event (a refusal, "copied", "sheet deleted") appears at the bottom left, stays long enough to be read and goes away |
+
+**All the room to the sheet.** `F9` (or `Ctrl+\`, or the button next to the
+traffic lights) slides the sidebar away and the sheet takes the whole window;
+the same key brings it back. While it is hidden, resting the mouse on the left
+edge makes it **peek** over the sheet for as long as you use it, and
+`Ctrl+Shift+F` brings it up with the cursor in the search. Every passage is
+animated; the note is laid out again once, not at every frame, so long notes
+slide as smoothly as short ones.
 
 While locked, the whole window is one colour and asks for the password in
 place; only the version and day/night stay on top.
@@ -80,9 +90,12 @@ place; only the version and day/night stay on top.
 
 ## Writing
 
-**A sheet is a page of paper**: its title is written on it and renames it, and
-under the title the words, the page number, the time of the last save, the
-zoom and whether the note is encrypted.
+**A sheet is a page of paper**, and the page is all there is: no bar above it,
+no strip below. Its title is written at the top and renames it; under the title
+the words, the page number, the time of the last save, the zoom and whether the
+note is encrypted. Title and margins **scroll away with the text**, so two
+turns of the wheel leave the whole height to what you are writing; the line
+you write on always keeps some air below it.
 
 **The bar formats, the keyboard too.** The formatting bar is built from one
 table in [`NotesPage.Toolbar.cs`](src/DuckNote.App/Pages/NotesPage.Toolbar.cs):
@@ -93,7 +106,8 @@ changed in one place.
   cursor is, and look different from hover;
 - what cannot be used is **greyed out**, not hidden;
 - every tooltip gives the **name and the shortcut**;
-- the bar never wraps: what does not fit goes into the **⋯** menu;
+- the bar sits in the title strip and never wraps: what does not fit goes into
+  the **⋯** menu;
 - with nothing selected, a mark applies to the **word under the cursor**, or to
   what you type next;
 - **Alt+F10** reaches the bar from the keyboard, the arrows move along it, Esc
@@ -106,6 +120,11 @@ code block, the same title.
 **Markdown-style starts**: `#`, `##`, `###`, `-`, `1.`, `[]`, `>` or ` ``` `
 followed by a space at the start of a line turn it into a title, list,
 checklist, quote or code block.
+
+**Nothing the bar cannot show.** The shortcuts the text control has of its own
+for formats DuckNote does not use (superscript, font size, alignment, indents,
+the Ins key that switches to overwriting) do nothing here, so the text never
+ends up in a state the bar cannot display or remove.
 
 **Also in the note**: text colours from the theme, highlight, inline code,
 links (http, https, mailto; Ctrl+click opens them), real tables, separators,
@@ -177,20 +196,23 @@ Cassaforte**, the padlock or the user menu.
 
 | Keys | Action |
 |---|---|
+| `F9` or `Ctrl+\` | hide the sidebar (the sheet takes the whole window) / show it again |
 | `Ctrl+L` | lock now |
 | `Ctrl+F`, `F3`, `Shift+F3`, `Esc` | find in the sheet, next, previous, close |
-| `Ctrl+Shift+F` | search the sheets in the sidebar |
+| `Ctrl+Shift+F` | search the sheets in the sidebar (it peeks out if it is hidden) |
 | `Ctrl+Alt+0` / `1` / `2` / `3` | normal text, title H1, H2, H3 |
 | `Ctrl+B`, `Ctrl+I`, `Ctrl+U`, `Ctrl+Shift+X` | bold, italic, underline, strikethrough |
 | `Ctrl+Alt+H`, `Ctrl+E` | highlight, inline code |
 | `Ctrl+Shift+8` / `7` / `9` | bullet list, numbered list, checklist |
+| `Ctrl+Shift+L`, `Ctrl+Shift+N` | bullet list and normal text, as in Word |
 | `Ctrl+Shift+Q`, `Ctrl+Alt+C`, `Ctrl+Shift+-` | quote, code block, separator |
+| `Ctrl+Z`, `Ctrl+Y` or `Ctrl+Shift+Z` | undo, redo |
 | `Ctrl+K` | link |
 | `Ctrl+Space` | clear formatting |
 | `Enter` / `Shift+Enter` | new clean line / new line keeping the formatting |
 | `Alt+F10`, arrows, `Esc` | onto the formatting bar, along it, back to the text |
 | `Ctrl+Shift+V` | paste as plain text |
-| `Ctrl+wheel`, `Ctrl+plus`, `Ctrl+minus`, `Ctrl+0` | zoom the text |
+| `Ctrl+wheel`, `Ctrl+plus`, `Ctrl+minus`, `Ctrl+0` | zoom the text (the margins stay as they are) |
 
 ---
 
@@ -234,11 +256,16 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
 The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.13 /DSourceExe=..\dist\DuckNote.exe
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.14 /DSourceExe=..\dist\DuckNote.exe
 ```
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the window itself needs Windows.
+
+Releases are built by GitHub Actions: when a push to `main` carries a new
+version in `Directory.Build.props`,
+[`release.yml`](.github/workflows/release.yml) builds both files on Windows and
+publishes them with `SHA256SUMS.txt` and the notes in `docs/release-notes/`.
 
 ---
 
@@ -262,6 +289,8 @@ tests/               185 tests, including the fixtures written by the
 assets/              logo and icon, the README images, and the scripts that
                      draw the avatars, the sheet icon and the README images
 packaging/           the Inno Setup script
+docs/release-notes/  the text of each release
+.github/workflows/   the workflow that builds and publishes the releases
 ```
 
 `DuckNote.Core`, `DuckNote.Scan` and `DuckNote.Notes` do not reference WPF:
