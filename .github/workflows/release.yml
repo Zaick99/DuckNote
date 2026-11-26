@@ -21,6 +21,7 @@ concurrency:
 
 env:
   APP_NAME: 'DuckNote'                         # release title: "<APP_NAME> <version>"
+  AVALONIA_TELEMETRY_OPTOUT: '1'               # no build statistics to avaloniaui.net from the Mac build
   VERSION_FILE: 'Directory.Build.props'        # <Version> for every project of the solution
   PUBLISH_PROJECT: 'src/DuckNote.App'          # dotnet project to publish
   EXE_NAME: 'DuckNote.exe'                     # the portable executable

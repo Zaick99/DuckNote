@@ -70,9 +70,18 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\DuckNote.exe"; Tasks: desktop
 
 [Run]
 Filename: "{app}\DuckNote.exe"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; Aggiornamento chiesto dall'app ("Riavvia e aggiorna"): l'installer gira senza finestre con
+; /RELAUNCH=1 e a fine installazione riapre DuckNote, con i permessi dell'utente.
+Filename: "{app}\DuckNote.exe"; Flags: nowait runasoriginaluser; Check: RelaunchAfterUpdate
 
 [UninstallDelete]
 ; La nota e il contenitore restano: li toglie l'applicazione stessa, da
 ; Impostazioni > Disinstallazione, che sovrascrive i byte prima di cancellarli.
 ; Un installer che li portasse via di nascosto cancellerebbe l'unica copia.
 Type: dirifempty; Name: "{app}"
+
+[Code]
+function RelaunchAfterUpdate: Boolean;
+begin
+  Result := WizardSilent and (ExpandConstant('{param:RELAUNCH|0}') = '1');
+end;

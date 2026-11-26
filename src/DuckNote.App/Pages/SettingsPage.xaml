@@ -398,7 +398,28 @@
         </Border>
           </StackPanel>
           <StackPanel Grid.Column="2">
-        <TextBlock Text="VERIFICA DEL CODICE" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <TextBlock Text="AGGIORNAMENTI" Style="{StaticResource SetHeader}" Margin="16,6,0,8"/>
+        <Border Style="{StaticResource GroupCard}" >
+          <StackPanel Margin="0,4">
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="CheckUpdates" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Controlla all'avvio"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Una richiesta anonima a GitHub per sapere se c'e' una versione nuova: se c'e', si scarica, si verifica con la sua impronta e si installa alla chiusura. La nota non esce mai dal computer."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <Button x:Name="BtnUpdate" DockPanel.Dock="Right" Style="{StaticResource SoftBtn}" Content="Controlla adesso" VerticalAlignment="Center" Margin="16,0,0,0" Click="OnUpdate"/>
+              <StackPanel Style="{StaticResource SetText}">
+                <TextBlock x:Name="UpdateVersion" Style="{StaticResource SetLabel}"/>
+                <TextBlock x:Name="UpdateText" Style="{StaticResource SetNote}"/>
+              </StackPanel>
+            </DockPanel>
+          </StackPanel>
+        </Border>
+        <TextBlock Text="VERIFICA DEL CODICE" Style="{StaticResource SetHeader}"/>
         <Border Style="{StaticResource GroupCard}" >
           <StackPanel Margin="0,4">
             <StackPanel Margin="16,12">

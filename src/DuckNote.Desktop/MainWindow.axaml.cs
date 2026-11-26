@@ -280,6 +280,7 @@ public sealed partial class MainWindow : Window
 
     private void Start()
     {
+        CheckUpdatesSoon();
         _ws.Start();
         ShowHosts();
         ShowMonitor();
@@ -302,6 +303,49 @@ public sealed partial class MainWindow : Window
             _ws.Settings.Save();
             OpenVault();
         }
+    }
+
+    // ------------------------------------------------------------------ aggiornamenti
+
+    private bool _updateTold;
+
+    /// <summary>Pochi secondi dopo l'avvio si chiede a GitHub se c'e' una versione nuova.</summary>
+    private void CheckUpdatesSoon()
+    {
+        Updates.AppUpdates.Session.Changed += () => Dispatcher.UIThread.Post(OnUpdate);
+
+        if (_ws.Settings.CheckUpdates)
+        {
+            DispatcherTimer.RunOnce(() => _ = Updates.AppUpdates.Session.CheckAsync(), TimeSpan.FromSeconds(4));
+        }
+    }
+
+    /// <summary>Una volta per avvio: pronta (si installa alla chiusura, o subito), oppure il link alla release.</summary>
+    private void OnUpdate()
+    {
+        DuckNote.Notes.Updates.UpdateSession updates = Updates.AppUpdates.Session;
+
+        if (_updateTold || updates.IsChecking || updates.Available is not { } release)
+        {
+            return;
+        }
+
+        _updateTold = true;
+        string version = DuckNote.Notes.Updates.UpdateFeed.Describe(release.Version);
+
+        if (updates.IsReady)
+        {
+            _notices.Toast("check", "Green", $"DuckNote {version} e' pronta", "Si installa quando chiudi DuckNote, oppure adesso.", "Riavvia e aggiorna", () =>
+            {
+                if (updates.InstallNow())
+                {
+                    Close();
+                }
+            });
+            return;
+        }
+
+        _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => _ = Launcher.LaunchUriAsync(release.Page));
     }
 
     // ------------------------------------------------------------------ navigazione

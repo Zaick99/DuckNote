@@ -5,6 +5,7 @@ using DuckNote.App.Dialogs;
 using DuckNote.App.Storage;
 using DuckNote.App.Theme;
 using DuckNote.Notes.Settings;
+using DuckNote.Notes.Updates;
 
 namespace DuckNote.App;
 
@@ -28,6 +29,10 @@ public partial class App : Application
         ThemeManager.Initialize(this, settings.ThemePreference);
         Ui.Fx.RegisterPress();
         Ui.Fx.EnableHighFrameRate();
+
+        // riaperta da un aggiornamento: prima esce la copia vecchia, poi via la sua vecchia versione
+        Updates.WindowsInstaller.WaitForPrevious(e.Args);
+        Updates.WindowsInstaller.CleanUp();
 
         _single = OnlyOne.Claim();
 
@@ -57,10 +62,68 @@ public partial class App : Application
 
         MainWindow = window;
         window.Show();
+
+        // pochi secondi dopo l'avvio: c'e' una versione nuova su GitHub?
+        Updates.AppUpdates.Session.Changed += () => Dispatcher.BeginInvoke(OnUpdate);
+
+        if (settings.CheckUpdates)
+        {
+            DispatcherTimer later = new() { Interval = TimeSpan.FromSeconds(4) };
+            later.Tick += async (_, _) =>
+            {
+                later.Stop();
+                await Updates.AppUpdates.Session.CheckAsync();
+            };
+            later.Start();
+        }
+    }
+
+    private bool _updateTold;
+
+    /// <summary>Una volta per avvio: pronta (si installa alla chiusura, o subito), oppure il link alla release.</summary>
+    private void OnUpdate()
+    {
+        UpdateSession updates = Updates.AppUpdates.Session;
+
+        if (_updateTold || updates.IsChecking || updates.Available is not { } release)
+        {
+            return;
+        }
+
+        _updateTold = true;
+        string version = UpdateFeed.Describe(release.Version);
+
+        if (updates.IsReady)
+        {
+            Ui.Toast.Success($"DuckNote {version} e' pronta", "Si installa quando chiudi DuckNote, oppure adesso.", "Riavvia e aggiorna", () =>
+            {
+                if (updates.InstallNow())
+                {
+                    MainWindow?.Close();
+                }
+            });
+            return;
+        }
+
+        Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => OpenPage(release.Page));
+    }
+
+    internal static void OpenPage(Uri page)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(page.ToString()) { UseShellExecute = true });
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            // nessun browser: la pagina e' scritta nelle Impostazioni
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // una versione nuova pronta: adesso, a nota salvata (e si riapre se lo si era chiesto)
+        Updates.AppUpdates.Session.InstallOnExit();
         _single?.Dispose();
         base.OnExit(e);
     }

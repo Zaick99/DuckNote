@@ -52,6 +52,14 @@ The Mac version is the same application rebuilt on Avalonia, with the sheet in
 a native web view: same pages, same files, same vault. On first use macOS 15
 asks whether DuckNote may reach the local network — the scanner needs it.
 
+Since 0.0.18 DuckNote updates itself. A few seconds after startup it asks
+GitHub for the latest release; if it is newer, it downloads the file for this
+installation (portable exe, installer or the disk image for this Mac), keeps it
+only if its SHA-256 matches `SHA256SUMS.txt` of the same release, and installs
+it when DuckNote closes — or at once, with **Riavvia e aggiorna**. A copy that
+cannot replace itself (opened from the disk image, in a read-only folder) shows
+the release page instead.
+
 ---
 
 ## The window
@@ -240,9 +248,11 @@ keeping everything on a USB stick next to the executable. Data from earlier vers
 | `lastscan.json` | the last scan, so states are found again on reopening |
 | `store.bin`, `store.bin.bak` | with encryption on: everything above except the settings |
 
-Nothing leaves the computer: the only connections are towards the hosts you
-scan. Notes, containers and settings written by earlier versions open as they
-were.
+Nothing leaves the computer. The only connections are towards the hosts you
+scan and, a few seconds after startup, one anonymous request to GitHub to see
+whether a newer version exists — **Impostazioni › Sistema › Aggiornamenti**
+turns it off. Notes, containers and settings written by earlier versions open
+as they were.
 
 ---
 
@@ -266,14 +276,16 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
 The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.17 /DSourceExe=..\dist\DuckNote.exe
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.18 /DSourceExe=..\dist\DuckNote.exe
 ```
 
 The Mac application, as `DuckNote.app` in a disk image (ad-hoc signed when
-built on a Mac; elsewhere the same bundle comes out in a zip):
+built on a Mac; elsewhere the same bundle comes out in a zip). The script sets
+`AVALONIA_TELEMETRY_OPTOUT=1`, so Avalonia's build tools send no statistics;
+set it yourself for other builds of `src/DuckNote.Desktop`:
 
 ```bash
-packaging/macos/build-app.sh osx-arm64 0.0.17 dist    # or osx-x64
+packaging/macos/build-app.sh osx-arm64 0.0.18 dist    # or osx-x64
 ```
 
 Its editor is a small web bundle in `src/DuckNote.Desktop/Editor`, already
@@ -309,7 +321,7 @@ src/DuckNote.App     the WPF application, on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table
   Views/               lock screen, dialogs
-tests/               197 tests, including the fixtures written by the
+tests/               213 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README images, and the scripts that
                      draw the avatars, the sheet icon and the README images

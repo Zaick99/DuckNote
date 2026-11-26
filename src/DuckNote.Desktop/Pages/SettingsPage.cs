@@ -13,6 +13,8 @@ using DuckNote.Desktop.Theme;
 using DuckNote.Desktop.Ui;
 using DuckNote.Desktop.Views;
 using DuckNote.Notes.Settings;
+using DuckNote.Notes.Updates;
+using DuckNote.Desktop.Updates;
 
 namespace DuckNote.Desktop.Pages;
 
@@ -83,6 +85,11 @@ public sealed class SettingsPage : UserControl, IDuckPage
     private readonly OnOff _shares;
     private readonly OnOff _wmi;
 
+    // aggiornamenti
+    private readonly OnOff _checkUpdates;
+    private readonly TextBlock _updateText = Kit.Note(string.Empty);
+    private readonly Button _updateButton = new() { Content = "Controlla adesso" };
+
     // sistema
     private readonly TextBlock _dataFolder = Kit.Note(string.Empty);
     private readonly SelectableTextBlock _fingerprint = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
@@ -125,6 +132,10 @@ public sealed class SettingsPage : UserControl, IDuckPage
         _snmp = Kit.Switch(false, _ => OnSwitch());
         _shares = Kit.Switch(false, _ => OnSwitch());
         _wmi = Kit.Switch(false, _ => OnSwitch());
+        _checkUpdates = Kit.Switch(false, _ => OnSwitch());
+        _updateButton.Theme = Themes.Of("Soft");
+        _updateButton.Click += async (_, _) => await OnUpdateButton();
+        AppUpdates.Session.Changed += () => Avalonia.Threading.Dispatcher.UIThread.Post(ShowUpdate);
 
         foreach (TextBox number in new[] { _autosaveMs, _hostMs, _monitorSec, _threads, _sockets, _pingCount, _pingMs, _portMs })
         {
@@ -217,7 +228,12 @@ public sealed class SettingsPage : UserControl, IDuckPage
                     Danger(Kit.Group(Kit.Row("Cancella tutti i dati",
                         "Nota, copie, impostazioni, scansioni e cassaforte: i byte vengono sovrascritti, poi i file rimossi. Non si torna indietro.", wipe)))),
                 Kit.Stack(
-                    Kit.Header("Verifica del codice", first: true),
+                    Kit.Header("Aggiornamenti", first: true),
+                    Kit.Group(
+                        Kit.Row("Controlla all'avvio",
+                            "Una richiesta anonima a GitHub per sapere se c'e' una versione nuova: se c'e', si scarica, si verifica con la sua impronta e si installa alla chiusura. La nota non esce mai dal computer.", _checkUpdates),
+                        Kit.Row($"Versione {UpdateFeed.Describe(AppUpdates.Current)}", null, _updateButton).With(row => ((StackPanel)row.Children[0]).Children.Add(_updateText))),
+                    Kit.Header("Verifica del codice"),
                     Kit.Group(Kit.Block("SHA-256 dell'eseguibile in uso", "Da confrontare con le somme pubblicate con ogni release.", _fingerprint, _fingerprintPath)))))
         ];
 
@@ -335,6 +351,8 @@ public sealed class SettingsPage : UserControl, IDuckPage
         _community.Text = S.SnmpCommunity;
         _shares.IsChecked = S.ProbeShares;
         _wmi.IsChecked = S.ProbeWmi;
+        _checkUpdates.IsChecked = S.CheckUpdates;
+        ShowUpdate();
         ShowOui();
 
         _dataFolder.Text = AppPaths.Folder;
@@ -406,6 +424,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
         S.ProbeSnmp = _snmp.IsChecked == true;
         S.ProbeShares = _shares.IsChecked == true;
         S.ProbeWmi = _wmi.IsChecked == true;
+        S.CheckUpdates = _checkUpdates.IsChecked == true;
         S.Save();
         _ws.StartTimers();
         Changed?.Invoke();
@@ -486,6 +505,46 @@ public sealed class SettingsPage : UserControl, IDuckPage
                 apply();
             }
         };
+    }
+
+    // ------------------------------------------------------------------ aggiornamenti
+
+    private void ShowUpdate()
+    {
+        UpdateSession updates = AppUpdates.Session;
+        _updateText.Text = updates.Message.Length > 0 ? updates.Message : "Non ancora controllato in questo avvio.";
+        _updateButton.IsEnabled = !updates.IsChecking;
+        _updateButton.Content = updates.IsChecking ? "Controllo..."
+            : updates.IsReady ? "Riavvia e aggiorna"
+            : updates.Available is not null ? "Apri la pagina"
+            : "Controlla adesso";
+    }
+
+    private async Task OnUpdateButton()
+    {
+        UpdateSession updates = AppUpdates.Session;
+
+        if (updates.IsReady)
+        {
+            if (updates.InstallNow() && TopLevel.GetTopLevel(this) is Window window)
+            {
+                window.Close();
+            }
+
+            return;
+        }
+
+        if (updates.Available is { } release)
+        {
+            if (TopLevel.GetTopLevel(this)?.Launcher is { } launcher)
+            {
+                await launcher.LaunchUriAsync(release.Page);
+            }
+
+            return;
+        }
+
+        await updates.CheckAsync();
     }
 
     // ------------------------------------------------------------------ produttori

@@ -62,6 +62,8 @@ public sealed class App : Application
             {
                 _ws.Shutdown();
                 _single.Dispose();
+                // una versione nuova pronta e non ancora installata: adesso, a nota salvata
+                Updates.AppUpdates.Session.InstallOnExit();
             };
         }
 

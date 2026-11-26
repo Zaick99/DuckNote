@@ -10,6 +10,7 @@ using DuckNote.App.Dialogs;
 using DuckNote.App.Theme;
 using DuckNote.App.Ui;
 using DuckNote.Notes.Settings;
+using DuckNote.Notes.Updates;
 
 namespace DuckNote.App.Pages;
 
@@ -57,6 +58,8 @@ public partial class SettingsPage : UserControl, IDuckPage
         Load();
         OnSection(this, new RoutedEventArgs());
         _loading = false;
+
+        Updates.AppUpdates.Session.Changed += () => Dispatcher.BeginInvoke(ShowUpdate);
     }
 
     private AppSettings S => _ws.Settings;
@@ -116,6 +119,8 @@ public partial class SettingsPage : UserControl, IDuckPage
         Community.Text = S.SnmpCommunity;
         Shares.IsChecked = S.ProbeShares;
         Wmi.IsChecked = S.ProbeWmi;
+        CheckUpdates.IsChecked = S.CheckUpdates;
+        ShowUpdate();
         ShowOui();
 
         DataFolder.Text = AppPaths.Folder;
@@ -210,6 +215,7 @@ public partial class SettingsPage : UserControl, IDuckPage
         S.ProbeSnmp = Snmp.IsChecked == true;
         S.ProbeShares = Shares.IsChecked == true;
         S.ProbeWmi = Wmi.IsChecked == true;
+        S.CheckUpdates = CheckUpdates.IsChecked == true;
         S.Save();
         _ws.StartTimers();
         Shell()?.ShowMonitor();
@@ -261,6 +267,43 @@ public partial class SettingsPage : UserControl, IDuckPage
     }
 
     private static string Number(int value) => value.ToString(CultureInfo.CurrentCulture);
+
+    // ------------------------------------------------------------------ aggiornamenti
+
+    private void ShowUpdate()
+    {
+        UpdateSession updates = Updates.AppUpdates.Session;
+        UpdateVersion.Text = $"Versione {UpdateFeed.Describe(Updates.AppUpdates.Current)}";
+        UpdateText.Text = updates.Message.Length > 0 ? updates.Message : "Non ancora controllato in questo avvio.";
+        BtnUpdate.IsEnabled = !updates.IsChecking;
+        BtnUpdate.Content = updates.IsChecking ? "Controllo..."
+            : updates.IsReady ? "Riavvia e aggiorna"
+            : updates.Available is not null ? "Apri la pagina"
+            : "Controlla adesso";
+    }
+
+    private async void OnUpdate(object sender, RoutedEventArgs e)
+    {
+        UpdateSession updates = Updates.AppUpdates.Session;
+
+        if (updates.IsReady)
+        {
+            if (updates.InstallNow())
+            {
+                Window.GetWindow(this)?.Close();
+            }
+
+            return;
+        }
+
+        if (updates.Available is { } release)
+        {
+            App.OpenPage(release.Page);
+            return;
+        }
+
+        await updates.CheckAsync();
+    }
 
     // ------------------------------------------------------------------ produttori
 

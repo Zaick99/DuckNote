@@ -2,6 +2,38 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.18] - 2026-11-26
+
+DuckNote updates itself, on Windows and on the Mac.
+
+### Added
+
+- **Updates from GitHub, by themselves.** A few seconds after startup DuckNote
+  asks GitHub for the latest release (`api.github.com`, anonymous). If it is
+  newer, it downloads the file for this installation — the portable exe, the
+  installer, or the disk image for this Mac — keeps it only if its SHA-256
+  matches `SHA256SUMS.txt` of the same release, and installs it when DuckNote
+  closes, with the note already saved; **Riavvia e aggiorna** in the
+  notification does it at once and reopens the app.
+  - Portable exe: the running file moves aside as `DuckNote.exe.old` (removed
+    at the next start) and the new one takes its place; on any error the old
+    one goes back.
+  - Installed copy: the new installer runs silently in the same mode as the
+    existing installation (`/RELAUNCH=1` reopens DuckNote afterwards).
+  - Mac: the new `DuckNote.app` is copied out of the disk image next to the old
+    one, its signature checked, and swapped in once DuckNote has quit. A copy
+    opened from the disk image or in a read-only folder shows the release page.
+  - **Impostazioni › Sistema › Aggiornamenti** turns the check off, shows the
+    state and checks on demand.
+
+### Changed
+
+- Avalonia's build tools no longer send build statistics: the release
+  workflow and `packaging/macos/build-app.sh` set `AVALONIA_TELEMETRY_OPTOUT`.
+
+Copies older than 0.0.18 do not update themselves: 0.0.18 is installed once by
+hand, the next versions arrive on their own.
+
 ## [0.0.17] - 2026-11-26
 
 The Mac window buttons find their place in DuckNote's title strip.

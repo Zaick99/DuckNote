@@ -10,6 +10,9 @@
 # l'eseguibile e' gia' firmato ad hoc da dotnet, il bundle no.
 set -euo pipefail
 
+# le statistiche di compilazione di Avalonia (avaloniaui.net) restano spente
+export AVALONIA_TELEMETRY_OPTOUT=1
+
 rid="${1:?indica osx-arm64 oppure osx-x64}"
 version="${2:?indica la versione}"
 out="${3:?indica la cartella di uscita}"

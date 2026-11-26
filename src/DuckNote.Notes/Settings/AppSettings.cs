@@ -63,6 +63,9 @@ public sealed class AppSettings
     public bool ShowLineHighlight { get; set; } = true;
 
     public bool SecurityPrompted { get; set; }
+
+    /// <summary>All'avvio si chiede a GitHub se c'e' una versione nuova, e la si prepara.</summary>
+    public bool CheckUpdates { get; set; } = true;
     public int AutoLockMinutes { get; set; } = 15;
 
     private static readonly JsonSerializerOptions Format = new()
