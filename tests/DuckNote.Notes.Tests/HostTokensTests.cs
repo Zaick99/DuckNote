@@ -32,6 +32,12 @@ public class HostTokensTests
     public void What_is_not_an_address_stays_out(string text) => Assert.Empty(Values(text));
 
     [Fact]
+    public void Machine_names_that_start_with_a_letter_and_digits_are_hosts() =>
+        Assert.Equal(
+            ["A04523.aouts.it", "A03344.aouts.it", "A04394.aouts.it"],
+            Values("A04523.aouts.it A03344.aouts.it A04394.aouts.it"));
+
+    [Fact]
     public void A_prefix_belongs_to_the_address() => Assert.Equal(["10.0.0.0/8"], Values("rete 10.0.0.0/8 interna"));
 
     [Fact]

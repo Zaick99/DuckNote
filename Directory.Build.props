@@ -5,7 +5,8 @@
     e nessun progetto puo' restare indietro per distrazione.
   -->
   <PropertyGroup>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <!-- librerie e test girano ovunque; l'app WPF (solo Windows) lo ridichiara nel suo progetto -->
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -14,7 +15,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <Product>DuckNote</Product>
     <Company>DuckNote</Company>
-    <Version>0.0.14</Version>
+    <Version>0.0.15</Version>
   </PropertyGroup>
 
 </Project>

@@ -38,10 +38,19 @@ results come back into the note. One executable, nothing to install.
 |---|---|
 | `DuckNote.exe` | portable, about 64 MB — the .NET runtime, WPF and the application in one file. Nothing to install. |
 | `DuckNote-<version>-setup.exe` | installer — installs for the current user, no elevation, with shortcuts and an uninstall entry. |
+| `DuckNote-<version>-macos-arm64.dmg` | macOS, Apple Silicon — drag DuckNote to Applications. |
+| `DuckNote-<version>-macos-x64.dmg` | macOS, Intel. |
 
-Windows 10 or 11, 64-bit. Neither binary is signed, so SmartScreen warns on the
-first run: the SHA-256 of both files is published with every release, and the
-running executable shows its own in **Impostazioni › Sistema**.
+Windows 10 or 11, 64-bit; macOS 14 or later (15 or later recommended, as for
+.NET 10). No binary is signed with a certificate: SmartScreen warns on the
+first run on Windows, and on the Mac the app (ad-hoc signed) is opened the
+first time from **System Settings › Privacy & Security › Open Anyway**. The
+SHA-256 of every file is published with each release, and the running
+executable shows its own in **Impostazioni › Sistema**.
+
+The Mac version is the same application rebuilt on Avalonia, with the sheet in
+a native web view: same pages, same files, same vault. On first use macOS 15
+asks whether DuckNote may reach the local network — the scanner needs it.
 
 ---
 
@@ -218,7 +227,8 @@ Cassaforte**, the padlock or the user menu.
 
 ## Where the data lives
 
-In `%APPDATA%\duck\DuckNote`, or in the folder named by `DUCKNOTE_HOME` — useful for
+In `%APPDATA%\duck\DuckNote` on Windows and `~/Library/Application Support/duck/DuckNote`
+on the Mac, or in the folder named by `DUCKNOTE_HOME` — useful for
 keeping everything on a USB stick next to the executable. Data from earlier versions, kept in
 `%APPDATA%\DuckNote`, is moved there at the first start.
 
@@ -256,16 +266,29 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
 The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.14 /DSourceExe=..\dist\DuckNote.exe
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.15 /DSourceExe=..\dist\DuckNote.exe
 ```
 
+The Mac application, as `DuckNote.app` in a disk image (ad-hoc signed when
+built on a Mac; elsewhere the same bundle comes out in a zip):
+
+```bash
+packaging/macos/build-app.sh osx-arm64 0.0.15 dist    # or osx-x64
+```
+
+Its editor is a small web bundle in `src/DuckNote.Desktop/Editor`, already
+built into `Assets/editor`; after changing it, `npm ci && node build.mjs` and
+`node test/run.mjs` (Playwright) rebuild and test it.
+
 On Linux the solution builds and the tests run with
-`-p:EnableWindowsTargeting=true`; the window itself needs Windows.
+`-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one
+also runs on Linux (with WebKitGTK).
 
 Releases are built by GitHub Actions: when a push to `main` carries a new
 version in `Directory.Build.props`,
-[`release.yml`](.github/workflows/release.yml) builds both files on Windows and
-publishes them with `SHA256SUMS.txt` and the notes in `docs/release-notes/`.
+[`release.yml`](.github/workflows/release.yml) builds the Windows files on
+Windows and the disk images on a Mac, and publishes them together with
+`SHA256SUMS.txt` and the notes in `docs/release-notes/`.
 
 ---
 
@@ -277,6 +300,8 @@ src/DuckNote.Scan    the scan engine and the wire protocols
 src/DuckNote.Notes   what the note knows without a window: addresses in text,
                      code colouring, charts, the note file, the sheet tree,
                      the host filter and CSV, settings
+src/DuckNote.Desktop the macOS application (Avalonia): the same pages, and the
+                     sheet editor in a web view (Editor/, ProseMirror)
 src/DuckNote.App     the WPF application, on the Duck design kit
   Theme/               design tokens, styles, theme manager
   Ui/                  shared controls: toasts, wizard, segmented, animations
@@ -284,17 +309,18 @@ src/DuckNote.App     the WPF application, on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table
   Views/               lock screen, dialogs
-tests/               185 tests, including the fixtures written by the
+tests/               197 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README images, and the scripts that
                      draw the avatars, the sheet icon and the README images
-packaging/           the Inno Setup script
+packaging/           the Inno Setup script; macos/ builds the .app and .dmg
 docs/release-notes/  the text of each release
 .github/workflows/   the workflow that builds and publishes the releases
 ```
 
 `DuckNote.Core`, `DuckNote.Scan` and `DuckNote.Notes` do not reference WPF:
-they run headless, which is what makes the tests possible.
+they run headless, which is what makes the tests possible and lets the Mac
+application share them.
 
 ---
 

@@ -1,5 +1,7 @@
-# Builds on Windows and publishes a release whenever the version in Directory.Build.props
-# changes: the portable executable, the installer and SHA256SUMS.txt.
+# Builds and publishes a release whenever the version in Directory.Build.props changes: the
+# Windows portable executable and installer (WPF app), the macOS disk images for Apple Silicon
+# and Intel (Avalonia app, ad-hoc signed on a Mac runner) and SHA256SUMS.txt for all of them.
+# The release is created only when every build succeeded.
 # One release per version: if the tag vX.Y.Z already has a release, nothing is built.
 # "[rebuild-release]" in the commit message deletes and recreates the release (and its tag)
 # of the current version from the commit just pushed - ask before using it.
@@ -26,8 +28,11 @@ env:
   DOTNET_VERSION: '10.0.x'
 
 jobs:
-  build:
-    runs-on: windows-latest
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+      exists: ${{ steps.ver.outputs.exists }}
     steps:
       - uses: actions/checkout@v4
 
@@ -62,13 +67,45 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMIT_MSG: ${{ github.event.head_commit.message }}
 
+  mac:
+    needs: version
+    if: needs.version.outputs.exists == '0'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
-        if: steps.ver.outputs.exists == '0'
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Disk images
+        shell: bash
+        run: |
+          v='${{ needs.version.outputs.version }}'
+          packaging/macos/build-app.sh osx-arm64 "$v" dist
+          packaging/macos/build-app.sh osx-x64 "$v" dist
+          for arch in arm64 x64; do
+            test -f "dist/$APP_NAME-$v-macos-$arch.dmg" || { echo "::error::$APP_NAME-$v-macos-$arch.dmg was not produced"; exit 1; }
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.dmg
+          if-no-files-found: error
+
+  build:
+    needs: [version, mac]
+    if: needs.version.outputs.exists == '0'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Portable executable
-        if: steps.ver.outputs.exists == '0'
         shell: pwsh
         run: |
           dotnet publish $env:PUBLISH_PROJECT -c Release -r win-x64 -o dist --self-contained true `
@@ -78,10 +115,10 @@ jobs:
           if (-not (Test-Path "dist/$env:EXE_NAME")) { Write-Host "::error::dist/$env:EXE_NAME was not produced"; exit 1 }
 
       - name: Installer
-        if: steps.ver.outputs.exists == '0' && env.INSTALLER_SCRIPT != ''
+        if: env.INSTALLER_SCRIPT != ''
         shell: pwsh
         run: |
-          $v = '${{ steps.ver.outputs.version }}'
+          $v = '${{ needs.version.outputs.version }}'
           $places = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe")
           $iscc = $places | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $iscc) {
@@ -97,11 +134,15 @@ jobs:
           $setup = "dist/$env:APP_NAME-$v-setup.exe"
           if (-not (Test-Path $setup)) { Write-Host "::error::$setup was not produced"; exit 1 }
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: macos
+          path: dist
+
       - name: Release notes
-        if: steps.ver.outputs.exists == '0'
         shell: pwsh
         run: |
-          $v = '${{ steps.ver.outputs.version }}'
+          $v = '${{ needs.version.outputs.version }}'
           $notes = "docs/release-notes/$v.md"
           if (Test-Path $notes) { Copy-Item $notes dist/notes.md }
           else {
@@ -110,7 +151,8 @@ jobs:
             $m = [regex]::Match($c, "(?ms)^## \[$([regex]::Escape($v))\][^\n]*\n(.*?)(?=^## \[|^\[)")
             Set-Content dist/notes.md $m.Groups[1].Value.Trim()
           }
-          $names = @($env:EXE_NAME, "$env:APP_NAME-$v-setup.exe") | Where-Object { Test-Path "dist/$_" }
+          $names = @($env:EXE_NAME, "$env:APP_NAME-$v-setup.exe", "$env:APP_NAME-$v-macos-arm64.dmg", "$env:APP_NAME-$v-macos-x64.dmg") |
+            Where-Object { Test-Path "dist/$_" }
           $sums = foreach ($name in $names) {
             "$((Get-FileHash "dist/$name" -Algorithm SHA256).Hash.ToLowerInvariant())  $name"
           }
@@ -122,13 +164,12 @@ jobs:
           }
 
       - name: Release
-        if: steps.ver.outputs.exists == '0'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $v = '${{ steps.ver.outputs.version }}'
-          $wanted = @($env:EXE_NAME, "$env:APP_NAME-$v-setup.exe", 'SHA256SUMS.txt')
+          $v = '${{ needs.version.outputs.version }}'
+          $wanted = @($env:EXE_NAME, "$env:APP_NAME-$v-setup.exe", "$env:APP_NAME-$v-macos-arm64.dmg", "$env:APP_NAME-$v-macos-x64.dmg", 'SHA256SUMS.txt')
           $files = @(Get-ChildItem dist -File | Where-Object { $_.Name -in $wanted } | ForEach-Object FullName)
           gh release create "v$v" @files --repo "${{ github.repository }}" --target "${{ github.sha }}" `
             --title "$env:APP_NAME $v" --notes-file dist/notes.md --latest

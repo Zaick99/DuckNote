@@ -1,0 +1,77 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="DuckNote.Desktop.App"
+             Name="DuckNote"
+             RequestedThemeVariant="Light">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://DuckNote/Theme/Duck.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+      <FontFamily x:Key="Mono">SF Mono, Menlo, Cascadia Mono, Consolas, DejaVu Sans Mono, monospace</FontFamily>
+    </ResourceDictionary>
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme>
+      <FluentTheme.Palettes>
+        <ColorPaletteResources x:Key="Light" Accent="#FF8C00" ErrorText="#C0392B"/>
+        <ColorPaletteResources x:Key="Dark" Accent="#FF9F0A" ErrorText="#FF6B5E"/>
+      </FluentTheme.Palettes>
+    </FluentTheme>
+    <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+
+    <!-- testi -->
+    <Style Selector="TextBlock.caption"><Setter Property="FontSize" Value="11.5"/><Setter Property="Foreground" Value="{DynamicResource LabelTertiary}"/></Style>
+    <Style Selector="TextBlock.muted"><Setter Property="FontSize" Value="12.5"/><Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/></Style>
+    <Style Selector="TextBlock.title"><Setter Property="FontSize" Value="22"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="{DynamicResource Label}"/></Style>
+    <Style Selector="TextBlock.sub"><Setter Property="FontSize" Value="14"/><Setter Property="FontWeight" Value="SemiBold"/><Setter Property="Foreground" Value="{DynamicResource Label}"/></Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="11"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Foreground" Value="{DynamicResource LabelTertiary}"/>
+      <Setter Property="Margin" Value="4,18,0,7"/>
+    </Style>
+
+    <!-- schede e riquadri -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource BgElevated}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Separator}"/>
+      <Setter Property="BorderThickness" Value="1"/>
+      <Setter Property="CornerRadius" Value="12"/>
+    </Style>
+    <Style Selector="Border.well">
+      <Setter Property="Background" Value="{DynamicResource BgFieldAlt}"/>
+      <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="9"/>
+      <Setter Property="Padding" Value="6,1"/>
+      <Setter Property="MinWidth" Value="20"/>
+      <Setter Property="Height" Value="18"/>
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+      <Setter Property="FontSize" Value="10.5"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="HorizontalAlignment" Value="Center"/>
+      <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Rectangle.sep"><Setter Property="Height" Value="1"/><Setter Property="Fill" Value="{DynamicResource SeparatorSoft}"/></Style>
+
+    <!-- le icone prendono il colore del testo del pulsante -->
+    <Style Selector="ToolTip">
+      <Setter Property="Background" Value="{DynamicResource BgElevated}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Separator}"/>
+      <Setter Property="CornerRadius" Value="8"/>
+      <Setter Property="FontSize" Value="12"/>
+      <Setter Property="MaxWidth" Value="300"/>
+    </Style>
+    <Style Selector="ContextMenu">
+      <Setter Property="CornerRadius" Value="10"/>
+      <Setter Property="Background" Value="{DynamicResource BgElevated}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Separator}"/>
+    </Style>
+    <Style Selector="MenuItem"><Setter Property="FontSize" Value="12.5"/></Style>
+  </Application.Styles>
+</Application>

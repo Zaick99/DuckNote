@@ -12,5 +12,9 @@
   <ItemGroup>
     <ProjectReference Include="..\DuckNote.Scan\DuckNote.Scan.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- i colori del tema, gli stessi dell'app WPF: servono a riconoscere i colori scritti nelle note -->
+    <EmbeddedResource Include="..\DuckNote.App\Theme\tokens.extended.json" Link="Sheets\tokens.extended.json" LogicalName="DuckNote.Notes.tokens.json" />
+  </ItemGroup>
 
 </Project>

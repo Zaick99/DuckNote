@@ -1,15 +1,7 @@
-using System.ComponentModel;
-using System.Runtime.CompilerServices;
 using System.Windows.Controls;
 
 namespace DuckNote.App.Ui;
 
-public abstract class Observable : INotifyPropertyChanged
-{
-    public event PropertyChangedEventHandler? PropertyChanged;
-    protected void Raise([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-    protected void RaiseAll() => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(string.Empty));
-}
 
 public static class Busy
 {

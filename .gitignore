@@ -33,3 +33,7 @@ _testversion/
 # Nessun eseguibile nel repository: si rigenerano con dotnet publish.
 # La regola vale ovunque, non solo nella radice.
 *.exe
+# L'editor della versione Mac: le dipendenze si rimettono con npm ci, le prove scrivono qui le
+# loro immagini. Il pacchetto costruito (Assets/editor) invece si tiene: e' dentro all'app.
+node_modules/
+/src/DuckNote.Desktop/Editor/test/out/

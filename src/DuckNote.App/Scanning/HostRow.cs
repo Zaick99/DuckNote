@@ -9,7 +9,7 @@ namespace DuckNote.App.Scanning;
 /// Una riga della tabella degli host. Nasce da un indirizzo scritto nella nota (in attesa di
 /// essere controllato) o da una scansione, e si aggiorna a ogni nuovo esito.
 /// </summary>
-public sealed class HostRow : Observable
+public sealed partial class HostRow : Observable
 {
     /// <summary>Mai controllato: sotto questo rango c'e' un esito vero.</summary>
     public const int NeverChecked = 4;
@@ -85,7 +85,6 @@ public sealed class HostRow : Observable
     public string Label => Name.Length > 0 ? Name
         : NoteKey.Length > 0 && !System.Net.IPAddress.TryParse(NoteKey, out _) ? NoteKey : string.Empty;
 
-    public System.Windows.Visibility NoteVis => FromNote ? System.Windows.Visibility.Visible : System.Windows.Visibility.Collapsed;
 
     public bool IsUp => Rank <= 1;
 

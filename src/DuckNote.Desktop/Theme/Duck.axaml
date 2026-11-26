@@ -1,0 +1,270 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!--
+    Il tema Duck per Avalonia: gli stessi pulsanti, campi e schede della versione WPF.
+    Colori solo da DynamicResource (i token di Palette.cs): giorno e notte cambiano da soli.
+    Ogni stile e' un ControlTheme con il suo modello: niente dipende dalle parti interne
+    dei temi Fluent, che cambiano da una versione all'altra.
+  -->
+
+  <!-- pulsante a sola icona (barre, finestra): trasparente, grigio al passaggio -->
+  <ControlTheme x:Key="Tool" TargetType="Button">
+    <!-- un clic non porta via la tastiera dalla nota: la nota e' un WebView, e un pulsante col fuoco
+         ripremuto da Spazio o Invio rifarebbe il suo lavoro a ogni parola scritta -->
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="MinWidth" Value="28"/>
+    <Setter Property="Height" Value="28"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgHover}"/></Style>
+    <Style Selector="^:pointerover"><Setter Property="Foreground" Value="{DynamicResource Label}"/></Style>
+    <Style Selector="^:pressed /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgPressed}"/></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.36"/></Style>
+    <Style Selector="^:focus-visible /template/ Border#bd">
+      <Setter Property="BorderBrush" Value="{DynamicResource Accent}"/>
+      <Setter Property="BorderThickness" Value="1.5"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- interruttore della barra (grassetto, titoli...): premuto ha fondo e bordo d'accento -->
+  <ControlTheme x:Key="ToolToggle" TargetType="ToggleButton">
+    <!-- un clic non porta via la tastiera dalla nota: la nota e' un WebView, e un pulsante col fuoco
+         ripremuto da Spazio o Invio rifarebbe il suo lavoro a ogni parola scritta -->
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Width" Value="28"/>
+    <Setter Property="Height" Value="28"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="1" CornerRadius="7">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover"><Setter Property="Background" Value="{DynamicResource BgHover}"/><Setter Property="Foreground" Value="{DynamicResource Label}"/></Style>
+    <Style Selector="^:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBorder}"/>
+      <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    </Style>
+    <Style Selector="^:pressed"><Setter Property="Background" Value="{DynamicResource BgPressed}"/></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.36"/></Style>
+    <Style Selector="^:focus-visible"><Setter Property="BorderBrush" Value="{DynamicResource Accent}"/></Style>
+  </ControlTheme>
+
+  <!-- pulsanti con testo -->
+  <ControlTheme x:Key="Primary" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource AccentFill}"/>
+    <Setter Property="Foreground" Value="{DynamicResource AccentText}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Padding" Value="16,0"/>
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" CornerRadius="9" Padding="{TemplateBinding Padding}"
+                BoxShadow="0 1 3 0 #33000000">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#bd"><Setter Property="Opacity" Value="0.92"/></Style>
+    <Style Selector="^:pressed /template/ Border#bd"><Setter Property="RenderTransform" Value="scale(0.97)"/></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Soft" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Accent}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorder}"/>
+    <Setter Property="FontWeight" Value="SemiBold"/>
+    <Setter Property="Padding" Value="14,0"/>
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                CornerRadius="9" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#bd"><Setter Property="Opacity" Value="0.85"/></Style>
+    <Style Selector="^:pressed /template/ Border#bd"><Setter Property="RenderTransform" Value="scale(0.97)"/></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Quiet" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource BgFieldAlt}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource Separator}"/>
+    <Setter Property="Padding" Value="14,0"/>
+    <Setter Property="Height" Value="32"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                CornerRadius="9" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgHover}"/></Style>
+    <Style Selector="^:pressed /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgPressed}"/></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.45"/></Style>
+  </ControlTheme>
+
+  <ControlTheme x:Key="Danger" TargetType="Button" BasedOn="{StaticResource Quiet}">
+    <Setter Property="Background" Value="{DynamicResource RedSoft}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Red}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource RedBorder}"/>
+  </ControlTheme>
+
+  <!-- voce della sidebar: si colora da sola quando la pagina e' aperta (classe "active") -->
+  <ControlTheme x:Key="Nav" TargetType="Button">
+    <!-- un clic non porta via la tastiera dalla nota: la nota e' un WebView, e un pulsante col fuoco
+         ripremuto da Spazio o Invio rifarebbe il suo lavoro a ogni parola scritta -->
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+    <Setter Property="Height" Value="36"/>
+    <Setter Property="Margin" Value="10,1"/>
+    <Setter Property="Padding" Value="8,0"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="1"
+                CornerRadius="8" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" VerticalAlignment="Center"
+                            HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover"><Setter Property="Background" Value="{DynamicResource BgHover}"/></Style>
+    <Style Selector="^.active">
+      <Setter Property="Background" Value="{DynamicResource AccentSoft}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBorder}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- riga di un menu a comparsa -->
+  <ControlTheme x:Key="MenuRow" TargetType="Button">
+    <!-- un clic non porta via la tastiera dalla nota: la nota e' un WebView, e un pulsante col fuoco
+         ripremuto da Spazio o Invio rifarebbe il suo lavoro a ogni parola scritta -->
+    <Setter Property="Focusable" Value="False"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+    <Setter Property="Padding" Value="10,8"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgHover}"/></Style>
+    <Style Selector="^:pressed /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgPressed}"/></Style>
+  </ControlTheme>
+
+  <!-- segmento di un selettore a pillola (Tutti / Attivi / Spenti...) -->
+  <ControlTheme x:Key="Segment" TargetType="ToggleButton">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="Foreground" Value="{DynamicResource LabelSecondary}"/>
+    <Setter Property="Padding" Value="11,0"/>
+    <Setter Property="Height" Value="26"/>
+    <Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" CornerRadius="7" Padding="{TemplateBinding Padding}">
+          <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:pointerover"><Setter Property="Foreground" Value="{DynamicResource Label}"/></Style>
+    <Style Selector="^:checked">
+      <Setter Property="Background" Value="{DynamicResource AccentFill}"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentText}"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+  </ControlTheme>
+
+  <!-- campo di testo: angoli tondi, bordo d'accento col fuoco, segnaposto grigio -->
+  <ControlTheme x:Key="Field" TargetType="TextBox">
+    <Setter Property="Background" Value="{DynamicResource BgField}"/>
+    <Setter Property="Foreground" Value="{DynamicResource Label}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource BorderControl}"/>
+    <Setter Property="CaretBrush" Value="{DynamicResource Accent}"/>
+    <Setter Property="SelectionBrush" Value="{DynamicResource AccentSoft}"/>
+    <Setter Property="SelectionForegroundBrush" Value="{DynamicResource Label}"/>
+    <Setter Property="Padding" Value="10,0"/>
+    <Setter Property="MinHeight" Value="32"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="1.5" CornerRadius="9" Padding="{TemplateBinding Padding}">
+          <Grid ColumnDefinitions="Auto,*">
+            <ContentPresenter Content="{TemplateBinding InnerLeftContent}" VerticalAlignment="Center"/>
+            <Panel Grid.Column="1">
+              <TextBlock Name="PART_Watermark" Text="{TemplateBinding PlaceholderText}" Foreground="{DynamicResource LabelQuaternary}"
+                         VerticalAlignment="{TemplateBinding VerticalContentAlignment}" IsHitTestVisible="False"
+                         IsVisible="{TemplateBinding Text, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+              <ScrollViewer Name="PART_ScrollViewer"
+                            HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                            VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}">
+                <TextPresenter Name="PART_TextPresenter"
+                               Text="{TemplateBinding Text, Mode=TwoWay}"
+                               CaretIndex="{TemplateBinding CaretIndex}"
+                               SelectionStart="{TemplateBinding SelectionStart}"
+                               SelectionEnd="{TemplateBinding SelectionEnd}"
+                               TextAlignment="{TemplateBinding TextAlignment}"
+                               TextWrapping="{TemplateBinding TextWrapping}"
+                               LineHeight="{TemplateBinding LineHeight}"
+                               PasswordChar="{TemplateBinding PasswordChar}"
+                               RevealPassword="{TemplateBinding RevealPassword}"
+                               SelectionBrush="{TemplateBinding SelectionBrush}"
+                               SelectionForegroundBrush="{TemplateBinding SelectionForegroundBrush}"
+                               CaretBrush="{TemplateBinding CaretBrush}"
+                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+              </ScrollViewer>
+            </Panel>
+          </Grid>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+    <Style Selector="^:focus /template/ Border#bd"><Setter Property="BorderBrush" Value="{DynamicResource Accent}"/></Style>
+    <Style Selector="^:pointerover /template/ Border#bd"><Setter Property="Background" Value="{DynamicResource BgField}"/></Style>
+    <Style Selector="^.error /template/ Border#bd"><Setter Property="BorderBrush" Value="{DynamicResource Red}"/></Style>
+    <Style Selector="^:disabled"><Setter Property="Opacity" Value="0.5"/></Style>
+  </ControlTheme>
+
+  <!-- tutte le caselle di testo dell'app sono "Field", se non dicono altro -->
+  <ControlTheme x:Key="{x:Type TextBox}" TargetType="TextBox" BasedOn="{StaticResource Field}"/>
+
+</ResourceDictionary>

@@ -165,7 +165,7 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             ? SharesProbe.ListAsync(address, TimeSpan.FromSeconds(4), cancellationToken)
             : Task.FromResult<IReadOnlyList<string>>([]);
 
-        Task<WindowsInventory> inventory = options.ProbeWmi && Array.Exists(WinRmPorts, open.Contains)
+        Task<WindowsInventory> inventory = OperatingSystem.IsWindows() && options.ProbeWmi && Array.Exists(WinRmPorts, open.Contains)
             ? WmiProbe.ReadAsync(address, TimeSpan.FromSeconds(8), cancellationToken)
             : Task.FromResult(WindowsInventory.Empty);
 

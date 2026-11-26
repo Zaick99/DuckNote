@@ -63,13 +63,15 @@ public static partial class NeighbourCache
         {
             ProcessStartInfo startup = new()
             {
-                FileName = Path.Combine(Environment.SystemDirectory, "arp.exe"),
+                FileName = OperatingSystem.IsWindows() ? Path.Combine(Environment.SystemDirectory, "arp.exe")
+                    : File.Exists("/usr/sbin/arp") ? "/usr/sbin/arp" : "arp",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
-            startup.ArgumentList.Add("-a");
+            // -n: niente nomi, sarebbe una ricerca DNS per riga
+            startup.ArgumentList.Add(OperatingSystem.IsWindows() ? "-a" : "-an");
 
             using Process? process = Process.Start(startup);
             if (process is null)
@@ -84,9 +86,9 @@ public static partial class NeighbourCache
                 Task<string> output = process.StandardOutput.ReadToEndAsync(deadline.Token);
                 await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
 
-                foreach (Match row in NeighbourRow().Matches(await output.ConfigureAwait(false)))
+                foreach ((string address, string mac) in ParseTable(await output.ConfigureAwait(false)))
                 {
-                    entries[row.Groups[1].Value] = row.Groups[2].Value.ToUpperInvariant().Replace('-', ':');
+                    entries[address] = mac;
                 }
             }
             catch (OperationCanceledException)
@@ -112,6 +114,29 @@ public static partial class NeighbourCache
         }
     }
 
+    /// <summary>
+    /// Le righe della tabella ARP, comunque le scriva il sistema: "192.168.1.1  00-11-22-aa-bb-cc"
+    /// (Windows), "? (192.168.1.1) at 0:11:22:a:bb:cc on en0" (macOS, che toglie gli zeri in
+    /// testa) o "? (192.168.1.1) at 00:11:22:aa:bb:cc [ether] on eth0" (Linux). Il MAC esce
+    /// sempre come 00:11:22:AA:BB:CC; le righe incomplete si saltano.
+    /// </summary>
+    public static IEnumerable<(string Address, string Mac)> ParseTable(string output)
+    {
+        foreach (Match row in NeighbourRow().Matches(output))
+        {
+            yield return (row.Groups[1].Value, row.Groups[2].Value.ToUpperInvariant().Replace('-', ':'));
+        }
+
+        foreach (Match row in UnixRow().Matches(output))
+        {
+            string[] octets = row.Groups[2].Value.Split(':');
+            yield return (row.Groups[1].Value, string.Join(':', octets.Select(octet => octet.PadLeft(2, '0').ToUpperInvariant())));
+        }
+    }
+
     [GeneratedRegex(@"(\d{1,3}(?:\.\d{1,3}){3})\s+([0-9A-Fa-f]{2}(?:[-:][0-9A-Fa-f]{2}){5})")]
     private static partial Regex NeighbourRow();
+
+    [GeneratedRegex(@"\((\d{1,3}(?:\.\d{1,3}){3})\)\s+at\s+([0-9A-Fa-f]{1,2}(?::[0-9A-Fa-f]{1,2}){5})\b")]
+    private static partial Regex UnixRow();
 }

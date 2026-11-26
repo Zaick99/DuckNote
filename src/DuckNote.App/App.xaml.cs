@@ -17,6 +17,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
         DispatcherUnhandledException += OnUiException;
+
+        // i risultati delle scansioni si consegnano sul thread della finestra
+        Scanning.UiThread.Use(() => Dispatcher.CheckAccess(), work => Dispatcher.InvokeAsync(work).Task);
         TaskScheduler.UnobservedTaskException += (_, a) => a.SetObserved();
 
         // ordine obbligato: token prima di qualunque finestra, perche' gli stili li chiedono con

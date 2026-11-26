@@ -52,8 +52,17 @@ public sealed class Workspace
         {
             _fresh.Stop();
 
-            if (Session.IsRunning || IsLocked)
+            if (IsLocked)
             {
+                return;
+            }
+
+            if (Session.IsRunning)
+            {
+                // c'e' gia' un'analisi (quella dell'indirizzo scritto prima, o il monitoraggio):
+                // i nuovi aspettano che finisca, non il giro dopo del monitoraggio. Prima si
+                // perdevano: tre nomi scritti di fila, e solo il primo veniva controllato.
+                _fresh.Start();
                 return;
             }
 
@@ -67,7 +76,11 @@ public sealed class Workspace
 
         _monitor.Tick += async (_, _) =>
         {
-            if (Session.IsRunning || IsLocked || NoteHosts() is not { Count: > 0 } hosts)
+            // tutti gli indirizzi gia' in tabella, anche l'ultimo scritto se il cursore e'
+            // rimasto subito dopo: e' entrato in tabella quando la parola si e' fermata. Fuori
+            // resta solo una parola ancora a meta', che in tabella non c'e'.
+            if (Session.IsRunning || IsLocked
+                || NoteHosts(settled: true).Where(host => Session.Find(host) is not null).ToList() is not { Count: > 0 } hosts)
             {
                 return;
             }
