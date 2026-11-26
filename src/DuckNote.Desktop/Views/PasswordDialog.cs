@@ -110,7 +110,7 @@ public static class PasswordDialog
             Spacing = 10,
             Margin = new Thickness(0, 14, 0, 0),
             IsVisible = false,
-            Children = { new ProgressBar { IsIndeterminate = true, Width = 90, VerticalAlignment = VerticalAlignment.Center }, work }
+            Children = { new WaitRing { Width = 22, Height = 22, Thickness = 3, VerticalAlignment = VerticalAlignment.Center }, work }
         };
 
         Button cancel = Dialog.Button("Annulla", "Quiet", window.Close);

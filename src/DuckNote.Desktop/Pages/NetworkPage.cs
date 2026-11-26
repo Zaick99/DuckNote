@@ -879,23 +879,7 @@ public sealed class NetworkPage : UserControl, IDuckPage
         return button;
     }
 
-    private static Border Well(params Control[] segments)
-    {
-        Border well = new()
-        {
-            Padding = new Thickness(3),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { } }
-        };
-
-        foreach (Control segment in segments)
-        {
-            ((StackPanel)well.Child).Children.Add(segment);
-        }
-
-        well.Classes.Add("well");
-        return well;
-    }
+    private static Border Well(params RadioButton[] segments) => Segments.Well(default, segments);
 
     private static MenuItem MenuEntry(string header, string icon, string? tone, bool enabled, Func<Task> run)
     {

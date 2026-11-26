@@ -1,5 +1,4 @@
-using Avalonia;
-using Avalonia.Animation.Easings;
+using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -7,14 +6,56 @@ using Avalonia.Threading;
 namespace DuckNote.Desktop.Ui;
 
 /// <summary>
-/// Movimento: una tween a fotogrammi per quello che le transizioni di Avalonia non sanno
-/// animare (la larghezza di una colonna), e due gesti ricorrenti, comparire e sparire.
-/// Ogni movimento si puo' interrompere a meta': il successivo riparte da dove si vede.
+/// Le curve della versione WPF, scritte a mano con le stesse formule di ExponentialEase,
+/// ElasticEase, BackEase, CubicEase e SineEase: niente curve gia' pronte, i movimenti hanno lo
+/// stesso carattere che hanno su Windows. Ogni curva va da 0 a 1; le elastiche e "back" escono
+/// un poco oltre l'1 prima di posarsi.
+/// </summary>
+public static class Curves
+{
+    public static double Linear(double t) => t;
+
+    public static double CubicIn(double t) => t * t * t;
+
+    public static readonly Func<double, double> CubicOut = Out(CubicIn);
+
+    public static readonly Func<double, double> CubicInOut = InOut(CubicIn);
+
+    public static double SineIn(double t) => 1 - Math.Sin(Math.PI * 0.5 * (1 - t));
+
+    public static readonly Func<double, double> SineInOut = InOut(SineIn);
+
+    /// <summary>ExponentialEase in uscita: parte deciso e si posa.</summary>
+    public static Func<double, double> ExpoOut(double exponent = 4) =>
+        Out(t => (Math.Exp(exponent * t) - 1) / (Math.Exp(exponent) - 1));
+
+    /// <summary>ElasticEase in uscita: arriva, passa oltre, torna, con le oscillazioni chieste.</summary>
+    public static Func<double, double> ElasticOut(double oscillations = 1, double springiness = 6) =>
+        Out(t =>
+        {
+            double expo = springiness <= 0 ? t : (Math.Exp(springiness * t) - 1) / (Math.Exp(springiness) - 1);
+            return expo * Math.Sin(((2 * Math.PI * oscillations) + (Math.PI * 0.5)) * t);
+        });
+
+    /// <summary>BackEase in uscita: supera di poco l'arrivo e ci torna.</summary>
+    public static Func<double, double> BackOut(double amplitude = 0.35) =>
+        Out(t => (t * t * t) - (t * amplitude * Math.Sin(Math.PI * t)));
+
+    /// <summary>Da una curva "in" la sua uscita, come EasingMode.EaseOut di WPF.</summary>
+    public static Func<double, double> Out(Func<double, double> easeIn) => t => 1 - easeIn(1 - t);
+
+    /// <summary>Entrata e uscita, come EasingMode.EaseInOut di WPF.</summary>
+    public static Func<double, double> InOut(Func<double, double> easeIn) =>
+        t => t < 0.5 ? easeIn(t * 2) * 0.5 : ((1 - easeIn((1 - t) * 2)) * 0.5) + 0.5;
+}
+
+/// <summary>
+/// Movimento: una tween a fotogrammi (circa 120 al secondo, come la versione WPF) e i gesti
+/// ricorrenti, comparire e sparire. Ogni movimento si puo' interrompere a meta': il successivo
+/// con la stessa chiave riparte da dove si vede.
 /// </summary>
 public static class Motion
 {
-    public static readonly Easing Smooth = new CubicEaseOut();
-
     private sealed class Run
     {
         public bool Stopped;
@@ -22,21 +63,29 @@ public static class Motion
 
     private static readonly Dictionary<object, Run> Running = [];
 
+    /// <summary>C'e' una tween in corso con questa chiave.</summary>
+    public static bool IsRunning(object key) => Running.ContainsKey(key);
+
+    /// <summary>Ferma la tween con questa chiave dove si trova.</summary>
+    public static void Stop(object key)
+    {
+        if (Running.Remove(key, out Run? run))
+        {
+            run.Stopped = true;
+        }
+    }
+
     /// <summary>
     /// Porta un valore da <paramref name="from"/> a <paramref name="to"/> in <paramref name="ms"/>
-    /// millisecondi, chiamando <paramref name="step"/> a ogni fotogramma. Un'altra tween con la
-    /// stessa chiave ferma questa.
+    /// millisecondi lungo <paramref name="curve"/> (di serie l'uscita cubica), chiamando
+    /// <paramref name="step"/> a ogni fotogramma.
     /// </summary>
-    public static void Tween(object key, double from, double to, int ms, Action<double> step, Action? done = null, Easing? easing = null)
+    public static void Tween(object key, double from, double to, int ms, Action<double> step, Action? done = null, Func<double, double>? curve = null)
     {
-        if (Running.TryGetValue(key, out Run? previous))
-        {
-            previous.Stopped = true;
-        }
+        Stop(key);
 
-        if (ms <= 0 || Math.Abs(from - to) < 0.01)
+        if (ms <= 0 || Math.Abs(from - to) < 0.0001)
         {
-            Running.Remove(key);
             step(to);
             done?.Invoke();
             return;
@@ -44,8 +93,8 @@ public static class Motion
 
         Run run = new();
         Running[key] = run;
-        easing ??= Smooth;
-        DateTime start = DateTime.UtcNow;
+        curve ??= Curves.CubicOut;
+        Stopwatch clock = Stopwatch.StartNew();
         DispatcherTimer timer = new(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(8) };
 
         timer.Tick += (_, _) =>
@@ -56,13 +105,18 @@ public static class Motion
                 return;
             }
 
-            double t = Math.Min(1, (DateTime.UtcNow - start).TotalMilliseconds / ms);
-            step(from + (to - from) * easing.Ease(t));
+            double t = Math.Min(1, clock.Elapsed.TotalMilliseconds / ms);
+            step(from + ((to - from) * curve(t)));
 
             if (t >= 1)
             {
                 timer.Stop();
-                Running.Remove(key);
+
+                if (Running.TryGetValue(key, out Run? current) && ReferenceEquals(current, run))
+                {
+                    Running.Remove(key);
+                }
+
                 done?.Invoke();
             }
         };
@@ -104,6 +158,6 @@ public static class Motion
         {
             control.IsVisible = false;
             done?.Invoke();
-        }, new CubicEaseIn());
+        }, Curves.CubicIn);
     }
 }

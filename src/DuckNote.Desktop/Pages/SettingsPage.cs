@@ -53,16 +53,16 @@ public sealed class SettingsPage : UserControl, IDuckPage
     private readonly RadioButton _themeDark;
 
     // nota
-    private readonly ToggleSwitch _autosave;
+    private readonly OnOff _autosave;
     private readonly TextBox _autosaveMs = Kit.Number(90, "1200");
     private readonly TextBox _hostMs = Kit.Number(90, "5000");
 
     // scansione
-    private readonly ToggleSwitch _monitor;
+    private readonly OnOff _monitor;
     private readonly TextBox _monitorSec = Kit.Number(90, "60");
     private readonly TextBox _ports = new() { Height = 64, TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, PlaceholderText = "22, 80, 443", Margin = new Thickness(0, 8, 0, 0), VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(10, 8) };
     private readonly TextBlock _portsInfo = Kit.Note(string.Empty);
-    private readonly ToggleSwitch _deadHosts;
+    private readonly OnOff _deadHosts;
     private readonly TextBox _threads = Kit.Number(90, "256");
     private readonly TextBox _sockets = Kit.Number(90, "900");
     private readonly TextBox _pingCount = Kit.Number(90, "2");
@@ -70,18 +70,18 @@ public sealed class SettingsPage : UserControl, IDuckPage
     private readonly TextBox _portMs = Kit.Number(90, "500");
 
     // raccolta
-    private readonly ToggleSwitch _dns;
+    private readonly OnOff _dns;
     private readonly TextBox _dnsServer = new() { Width = 150, PlaceholderText = "1.1.1.1", Height = 32 };
-    private readonly ToggleSwitch _netBios;
-    private readonly ToggleSwitch _mdns;
+    private readonly OnOff _netBios;
+    private readonly OnOff _mdns;
     private readonly Button _oui = new() { Content = "Aggiorna" };
     private readonly TextBlock _ouiInfo = Kit.Note(string.Empty);
-    private readonly ToggleSwitch _ssdp;
-    private readonly ToggleSwitch _banners;
-    private readonly ToggleSwitch _snmp;
+    private readonly OnOff _ssdp;
+    private readonly OnOff _banners;
+    private readonly OnOff _snmp;
     private readonly TextBox _community = new() { Width = 150, PlaceholderText = "public", Height = 32 };
-    private readonly ToggleSwitch _shares;
-    private readonly ToggleSwitch _wmi;
+    private readonly OnOff _shares;
+    private readonly OnOff _wmi;
 
     // sistema
     private readonly TextBlock _dataFolder = Kit.Note(string.Empty);
@@ -364,7 +364,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
             TranslateTransform shift = panel.RenderTransform as TranslateTransform ?? new TranslateTransform();
             panel.RenderTransform = shift;
             double from = index > _section ? 34 : -34;
-            Motion.Tween((panel, "carousel"), from, 0, 280, x => shift.X = x, null, Motion.Smooth);
+            Motion.Tween((panel, "carousel"), from, 0, 280, x => shift.X = x, null, Curves.CubicOut);
             Motion.Show(panel, rise: 0, ms: 220);
         }
 
@@ -610,14 +610,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
     private static RadioButton Segment(string group, string text, bool chosen = false) =>
         new() { Theme = Themes.Of("Segment"), GroupName = group, Content = text, IsChecked = chosen };
 
-    private static Border Well(Thickness margin, params RadioButton[] segments)
-    {
-        StackPanel row = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
-        row.Children.AddRange(segments);
-        Border well = new() { Padding = new Thickness(3), Margin = margin, HorizontalAlignment = HorizontalAlignment.Left, Child = row };
-        well.Classes.Add("well");
-        return well;
-    }
+    private static Border Well(Thickness margin, params RadioButton[] segments) => Segments.Well(margin, segments);
 
     private static string Mod => OperatingSystem.IsMacOS() ? "⌘" : "Ctrl+";
 

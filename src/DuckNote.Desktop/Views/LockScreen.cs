@@ -29,7 +29,7 @@ public sealed class LockScreen : UserControl
     private readonly Button _open = new() { Content = "Apri", Width = 120, Margin = new Thickness(0, 14, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
     private readonly StackPanel _stage = new() { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     // un caricamento classico: la barra che scorre mentre la chiave si forgia
-    private readonly ProgressBar _spinner = new() { IsIndeterminate = true, Width = 220, Height = 4, MinHeight = 4, IsVisible = false, Margin = new Thickness(0, 18, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
+    private readonly WaitRing _spinner = new() { Width = 40, Height = 40, Thickness = 4, IsVisible = false, Margin = new Thickness(0, 18, 0, 0), HorizontalAlignment = HorizontalAlignment.Center };
 
     private Workspace? _ws;
     private bool _working;
@@ -55,7 +55,6 @@ public sealed class LockScreen : UserControl
         Dialog.Tinted(_label, "LabelTertiary");
         Dialog.Tinted(_message, "Red");
         Dialog.Tinted(_work, "LabelSecondary");
-        _spinner.Bind(ProgressBar.ForegroundProperty, _spinner.GetResourceObservable("Accent"));
         _open.Theme = Dialog.Theme("Primary");
 
         _stage.Children.AddRange([art, title, sub, _label, _password, _open, _spinner, _work, _message]);

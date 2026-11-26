@@ -26,6 +26,8 @@ public sealed class App : Application
 
             AppSettings settings = AppSettings.Load();
             Palette.Initialize(settings.ThemePreference);
+            // il tocco dei pulsanti del kit Duck, come Fx.RegisterPress nella versione WPF
+            Ui.Press.Register();
 
             _single = OnlyOne.Claim();
 

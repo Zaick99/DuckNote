@@ -4,9 +4,10 @@
 #   packaging/macos/build-app.sh <osx-arm64|osx-x64> <versione> <cartella di uscita>
 #
 # Sul Mac (codesign e hdiutil) produce DuckNote-<versione>-macos-<arch>.dmg con l'app firmata
-# ad hoc (nessun certificato Apple: la prima apertura passa da Impostazioni di Sistema >
-# Privacy e sicurezza > Apri comunque). Altrove produce lo stesso bundle in uno .zip: l'eseguibile
-# e' gia' firmato ad hoc da dotnet, il bundle no.
+# ad hoc e la finestra disegnata: lo sfondo di make_dmg_background.py, le icone al loro posto
+# (dmg_settings.py). Nessun certificato Apple: la prima apertura passa da Impostazioni di
+# Sistema > Privacy e sicurezza > Apri comunque. Altrove produce lo stesso bundle in uno .zip:
+# l'eseguibile e' gia' firmato ad hoc da dotnet, il bundle no.
 set -euo pipefail
 
 rid="${1:?indica osx-arm64 oppure osx-x64}"
@@ -47,11 +48,25 @@ if command -v codesign >/dev/null && command -v hdiutil >/dev/null; then
   codesign --force --sign - "$app"
   codesign --verify --deep --strict --verbose=1 "$app"
 
+  rm -f "$out/$name.dmg"
+
+  # la finestra del .dmg (lo sfondo con papere e teschi, le icone al loro posto) la scrive
+  # dmgbuild, senza pilotare il Finder; se non si riesce a installarlo resta l'immagine semplice
+  if python3 -m venv "$work/venv" >/dev/null 2>&1 \
+    && "$work/venv/bin/pip" install --quiet "dmgbuild==1.6.7" >/dev/null 2>&1 \
+    && "$work/venv/bin/dmgbuild" -s "$root/packaging/macos/dmg_settings.py" \
+         -D app="$app" -D background="$root/packaging/macos/dmg-background.png" \
+         -D icon="$root/packaging/macos/DuckNote.icns" "DuckNote $version" "$out/$name.dmg" >/dev/null; then
+    echo "$out/$name.dmg"
+    exit 0
+  fi
+
+  echo "::warning::dmgbuild non e' andato: $name.dmg esce senza lo sfondo" >&2
+  rm -f "$out/$name.dmg"
   stage="$work/dmg"
   mkdir -p "$stage"
   cp -R "$app" "$stage/"
-  ln -s /Applications "$stage/Applications"
-  rm -f "$out/$name.dmg"
+  ln -s /Applications "$stage/Applicazioni"
   # hdiutil a volte trova il disco "occupato" (succede sulle macchine di CI): si riprova
   for attempt in 1 2 3; do
     if hdiutil create -volname "DuckNote $version" -srcfolder "$stage" -fs HFS+ -format UDZO -ov "$out/$name.dmg" >/dev/null; then

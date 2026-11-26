@@ -2,6 +2,25 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.16] - 2026-11-26
+
+The Mac version gets its click animations back, a new icon and a disk image
+with a window of its own.
+
+### Changed
+
+- **Buttons answer the click again on the Mac.** Pressed, a button shrinks to
+  95% in 110 ms and springs back on release in 520 ms; the segmented controls
+  (the Rete filters, the Impostazioni tabs, the theme) slide an orange pill
+  under the choice; the switches, the waiting ring and the day/night fade are
+  drawn by DuckNote itself. They follow the curves of the Windows version,
+  written by hand, instead of the toolkit's ready-made animations.
+- **A new Mac icon**: the duck in front of a plain white tile.
+- **The disk image opens on a window of its own**: ducks and the skulls of the
+  author's GitHub profile around the edges, and an orange arrow from DuckNote
+  to the Applicazioni folder (`packaging/macos/make_dmg_background.py`, laid
+  out by dmgbuild).
+
 ## [0.0.15] - 2026-11-26
 
 DuckNote on the Mac, and a fix for addresses written one after another.

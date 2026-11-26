@@ -1,5 +1,5 @@
 using Avalonia;
-using Avalonia.Animation;
+using DuckNote.Desktop.Ui;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Styling;
@@ -56,12 +56,13 @@ public static class Palette
             return;
         }
 
+        List<(SolidColorBrush Brush, Color From, Color To)> fading = [];
+
         foreach ((string token, Color colour) in Targets(effective))
         {
             if (Brushes.TryGetValue(token, out SolidColorBrush? brush))
             {
-                brush.Transitions = animate ? Fade() : null;
-                brush.Color = colour;
+                fading.Add((brush, brush.Color, colour));
                 continue;
             }
 
@@ -70,6 +71,16 @@ public static class Palette
             app.Resources[token] = brush;
             app.Resources[token + "Color"] = colour;
         }
+
+        // giorno e notte si sfumano in 480 ms (seno in entrata e uscita), come nella versione
+        // WPF: la sfumatura la fa questo codice, un fotogramma alla volta
+        Motion.Tween(typeof(Palette), 0, 1, animate ? 480 : 0, t =>
+        {
+            foreach ((SolidColorBrush brush, Color from, Color to) in fading)
+            {
+                brush.Color = Mix(from, to, t);
+            }
+        }, null, Curves.SineInOut);
 
         app.Resources["AccentFill"] ??= new LinearGradientBrush
         {
@@ -128,10 +139,12 @@ public static class Palette
         app.Resources["DataGridRowHoveredBackgroundColor"] = hover;
     }
 
-    private static Transitions Fade() =>
-    [
-        new ColorTransition { Property = SolidColorBrush.ColorProperty, Duration = TimeSpan.FromMilliseconds(480), Easing = new Avalonia.Animation.Easings.SineEaseInOut() }
-    ];
+    private static Color Mix(Color from, Color to, double t)
+    {
+        static byte Channel(byte a, byte b, double t) => (byte)Math.Clamp(Math.Round(a + ((b - a) * t)), 0, 255);
+
+        return Color.FromArgb(Channel(from.A, to.A, t), Channel(from.R, to.R, t), Channel(from.G, to.G, t), Channel(from.B, to.B, t));
+    }
 
     /// <summary>Il pennello di un token (lo stesso oggetto per tutta la vita dell'app).</summary>
     public static IBrush Brush(string token) =>

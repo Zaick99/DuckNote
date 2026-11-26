@@ -112,9 +112,9 @@ public static class Kit
         return line;
     }
 
-    public static ToggleSwitch Switch(bool on, Action<bool> changed, string tone = "Accent")
+    public static OnOff Switch(bool on, Action<bool> changed)
     {
-        ToggleSwitch toggle = new() { IsChecked = on, OnContent = null, OffContent = null, MinWidth = 0, Padding = new Thickness(0) };
+        OnOff toggle = new() { IsChecked = on };
         toggle.IsCheckedChanged += (_, _) => changed(toggle.IsChecked == true);
         return toggle;
     }

@@ -44,7 +44,7 @@ public sealed class VaultPanel : UserControl
     private readonly StrengthBar _strength = new() { Margin = new Thickness(2, 8, 0, 0) };
     private readonly Border _pwdProblem;
     private readonly TextBlock _pwdProblemText = new() { TextWrapping = TextWrapping.Wrap };
-    private readonly ToggleSwitch _understood;
+    private readonly OnOff _understood;
     private readonly StackPanel _forging;
     private readonly TextBlock _forgingText = new() { VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, MaxWidth = 560 };
     private readonly Grid _nav;
@@ -136,7 +136,7 @@ public sealed class VaultPanel : UserControl
             Spacing = 12,
             Margin = new Thickness(0, 18, 0, 0),
             IsVisible = false,
-            Children = { new ProgressBar { IsIndeterminate = true, Width = 120, VerticalAlignment = VerticalAlignment.Center }, _forgingText }
+            Children = { new WaitRing { Width = 26, Height = 26, Thickness = 3.5, VerticalAlignment = VerticalAlignment.Center }, _forgingText }
         };
 
         Control why = Step("art/lock.png", "Chiudi la nota a chiave",
@@ -315,7 +315,7 @@ public sealed class VaultPanel : UserControl
     {
         TranslateTransform shift = step.RenderTransform as TranslateTransform ?? new TranslateTransform();
         step.RenderTransform = shift;
-        Motion.Tween((step, "slide"), from, 0, 260, x => shift.X = x, null, Motion.Smooth);
+        Motion.Tween((step, "slide"), from, 0, 260, x => shift.X = x, null, Curves.CubicOut);
     }
 
     /// <summary>I passi in alto: fatti in verde con la spunta, il corrente d'accento, i prossimi grigi.</summary>
