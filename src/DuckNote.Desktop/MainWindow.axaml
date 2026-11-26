@@ -1,0 +1,147 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="using:DuckNote.Desktop.Ui"
+        xmlns:views="using:DuckNote.Desktop.Views"
+        x:Class="DuckNote.Desktop.MainWindow"
+        Title="DuckNote" Width="1240" Height="800" MinWidth="900" MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource BgWindow}"
+        FontSize="12.5"
+        Icon="avares://DuckNote/Assets/duck.ico">
+  <!--
+    La shell di DuckNote: sidebar a tutta altezza (DuckNote, l'utente, Rete, i fogli con i loro
+    titoli, il monitoraggio), a destra la fascia del titolo (la barra di formattazione della nota,
+    il pallino del salvataggio, versione, lucchetto, Impostazioni, giorno/notte) e sotto la pagina.
+    Sul Mac i semafori sono quelli del sistema; altrove li disegna DuckNote.
+    La nota e' un WebView: niente della finestra puo' stargli sopra (sarebbe nascosto), quindi
+    avvisi e menu sono finestrelle a parte e la sidebar, quando entra, spinge il foglio.
+  -->
+  <Panel>
+    <Grid x:Name="Shell" ColumnDefinitions="266,*">
+
+      <!-- ===================== sidebar ===================== -->
+      <Border x:Name="Sidebar" Background="{DynamicResource BgSidebar}" BorderBrush="{DynamicResource Separator}" BorderThickness="0,0,1,0"
+              ClipToBounds="True">
+        <DockPanel Width="265" HorizontalAlignment="Left">
+          <Panel DockPanel.Dock="Top" Height="46" Background="Transparent" PointerPressed="OnTitleDrag" DoubleTapped="OnTitleDouble"/>
+
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="18,0,12,12" Spacing="10">
+            <Image Source="avares://DuckNote/Assets/duck.png" Width="34" Height="34" RenderOptions.BitmapInterpolationMode="HighQuality"/>
+            <TextBlock Text="DuckNote" FontSize="17" FontWeight="Bold" Foreground="{DynamicResource Label}" VerticalAlignment="Center"/>
+          </StackPanel>
+
+          <!-- chi sta usando DuckNote, con la sua papera e lo stato della cassaforte -->
+          <Button x:Name="BtnAccount" DockPanel.Dock="Top" Theme="{StaticResource MenuRow}" Margin="12,0,12,10" Padding="10,9"
+                  Background="{DynamicResource BgFieldAlt}" Click="OnAccount">
+            <Grid ColumnDefinitions="Auto,*">
+              <Panel Width="38" Height="38" VerticalAlignment="Center">
+                <Ellipse x:Name="AccountPhoto" Width="38" Height="38"/>
+                <Border x:Name="AccountBadge" Width="17" Height="17" CornerRadius="8.5" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                        Margin="0,0,-3,-3" BorderThickness="2" BorderBrush="{DynamicResource BgFieldAlt}" Background="{DynamicResource LabelQuaternary}">
+                  <ui:Glyph x:Name="AccountBadgeGlyph" Kind="unlock" Width="9" Height="9" Foreground="{DynamicResource LabelOnAccent}" Thickness="1.6"/>
+                </Border>
+              </Panel>
+              <StackPanel Grid.Column="1" Margin="11,0,0,0" VerticalAlignment="Center">
+                <TextBlock x:Name="AccountName" FontWeight="SemiBold" Foreground="{DynamicResource Label}" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="AccountSub" Classes="caption" TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="AccountVault" Classes="caption" TextTrimming="CharacterEllipsis" Margin="0,1,0,0"/>
+              </StackPanel>
+            </Grid>
+          </Button>
+
+          <!-- Rete, con gli host spenti (rosso) e attivi (verde) -->
+          <Button x:Name="NavNetwork" DockPanel.Dock="Top" Theme="{StaticResource Nav}" Click="OnNetwork">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="24" Height="24" CornerRadius="6" Background="{DynamicResource Blue}">
+                <ui:Glyph Kind="network" Width="14" Height="14" Foreground="White"/>
+              </Border>
+              <TextBlock Grid.Column="1" Text="Rete" Margin="10,0,0,0" VerticalAlignment="Center"/>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4">
+                <Border x:Name="BadgeDown" Classes="badge" Background="{DynamicResource RedSoft}" IsVisible="False">
+                  <TextBlock x:Name="BadgeDownText" Foreground="{DynamicResource Red}"/>
+                </Border>
+                <Border x:Name="BadgeUp" Classes="badge" Background="{DynamicResource GreenSoft}" IsVisible="False">
+                  <TextBlock x:Name="BadgeUpText" Foreground="{DynamicResource Green}"/>
+                </Border>
+              </StackPanel>
+            </Grid>
+          </Button>
+
+          <!-- in fondo: il monitoraggio, con il pulsante che controlla gli host dei fogli -->
+          <Border DockPanel.Dock="Bottom" Classes="well" Margin="12,6,12,12" Padding="11,8">
+            <StackPanel>
+              <Grid ColumnDefinitions="*,Auto,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                  <Ellipse x:Name="CardDot" Width="8" Height="8" Fill="{DynamicResource Green}" VerticalAlignment="Center"/>
+                  <TextBlock x:Name="CardTitle" Text="Monitoraggio" FontWeight="SemiBold" FontSize="11.5" Foreground="{DynamicResource Label}"/>
+                </StackPanel>
+                <TextBlock x:Name="CardRight" Grid.Column="1" Classes="caption" VerticalAlignment="Center" Margin="6,0,4,0"/>
+                <ContentControl x:Name="CommandsHost" Grid.Column="2" VerticalAlignment="Center"/>
+              </Grid>
+              <ProgressBar x:Name="CardProgress" Margin="0,8,0,6" Maximum="1" Height="4" MinHeight="4" IsVisible="False"
+                           Foreground="{DynamicResource Accent}" Background="{DynamicResource BgPressed}"/>
+              <TextBlock x:Name="CardText" Classes="caption" TextWrapping="Wrap" Margin="0,3,0,0"/>
+            </StackPanel>
+          </Border>
+          <Rectangle DockPanel.Dock="Bottom" Classes="sep" Margin="16,0"/>
+
+          <!-- al centro: i fogli con i loro titoli H1/H2 -->
+          <ContentControl x:Name="NavigatorHost"/>
+        </DockPanel>
+      </Border>
+
+      <!-- ===================== contenuto ===================== -->
+      <Grid Grid.Column="1" RowDefinitions="46,*">
+        <Grid x:Name="TitleStrip" ColumnDefinitions="Auto,*,Auto" Background="Transparent" PointerPressed="OnTitleDrag" DoubleTapped="OnTitleDouble">
+          <!-- a sidebar nascosta: lo spazio dei semafori e del pulsante della sidebar -->
+          <Panel x:Name="TitleGap" Width="0"/>
+          <ContentControl x:Name="ToolbarHost" Grid.Column="1" Margin="10,0,8,0" VerticalAlignment="Center"/>
+          <StackPanel x:Name="TitleRight" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0" Spacing="2">
+            <Ellipse x:Name="SaveDot" Width="7" Height="7" VerticalAlignment="Center" Margin="0,1,8,0" Fill="{DynamicResource Green}" IsVisible="False"/>
+            <TextBlock x:Name="Version" Classes="caption" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <Button x:Name="BtnLock" Theme="{StaticResource Tool}" Width="30" Click="OnLockButton">
+              <ui:Glyph x:Name="LockGlyph" Kind="unlock"/>
+            </Button>
+            <Button x:Name="BtnSettings" Theme="{StaticResource Tool}" Width="30" Click="OnSettings" ToolTip.Tip="Impostazioni (premuto di nuovo torna alla pagina di prima)">
+              <ui:Glyph Kind="settings"/>
+            </Button>
+            <Button x:Name="BtnTheme" Theme="{StaticResource Tool}" Width="30" Click="OnTheme" ToolTip.Tip="Aspetto chiaro / scuro">
+              <ui:Glyph x:Name="ThemeGlyph" Kind="moon"/>
+            </Button>
+          </StackPanel>
+        </Grid>
+
+        <Panel x:Name="PageHost" Grid.Row="1"/>
+      </Grid>
+    </Grid>
+
+    <!-- in alto a sinistra, sopra a tutto: i semafori (dove non li disegna il sistema) e la sidebar -->
+    <StackPanel x:Name="TitleLeft" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top" Height="46" Margin="16,0,0,0" Spacing="8">
+      <StackPanel x:Name="Lights" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <Button Classes="light" Background="#FF5F57" Click="OnClose" ToolTip.Tip="Chiudi"/>
+        <Button Classes="light" Background="#FEBC2E" Click="OnMinimize" ToolTip.Tip="Riduci a icona"/>
+        <Button Classes="light" Background="#28C840" Click="OnMaximize" ToolTip.Tip="Ingrandisci"/>
+      </StackPanel>
+      <Button x:Name="BtnSidebar" Theme="{StaticResource Tool}" Width="30" VerticalAlignment="Center" Margin="4,0,0,0" Click="OnSidebarToggle">
+        <ui:Glyph Kind="sidebar"/>
+      </Button>
+    </StackPanel>
+
+    <!-- la schermata di sblocco: copre tutta la finestra (il foglio, che e' un WebView, si nasconde) -->
+    <views:LockScreen x:Name="Lock" IsVisible="False"/>
+  </Panel>
+
+  <Window.Styles>
+    <Style Selector="Button.light">
+      <Setter Property="Width" Value="12"/>
+      <Setter Property="Height" Value="12"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="Template">
+        <ControlTemplate>
+          <Ellipse Fill="{TemplateBinding Background}" Stroke="#1F000000" StrokeThickness="0.5"/>
+        </ControlTemplate>
+      </Setter>
+    </Style>
+  </Window.Styles>
+</Window>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Il bundle di DuckNote per macOS. __VERSION__ lo sostituisce build-app.sh. -->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>it</string>
+  <key>CFBundleName</key>
+  <string>DuckNote</string>
+  <key>CFBundleDisplayName</key>
+  <string>DuckNote</string>
+  <key>CFBundleExecutable</key>
+  <string>DuckNote</string>
+  <key>CFBundleIdentifier</key>
+  <string>io.github.zaick99.ducknote</string>
+  <key>CFBundleIconFile</key>
+  <string>DuckNote</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>__VERSION__</string>
+  <key>CFBundleVersion</key>
+  <string>__VERSION__</string>
+  <key>LSMinimumSystemVersion</key>
+  <string>14.0</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.productivity</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>NSPrincipalClass</key>
+  <string>NSApplication</string>
+  <key>NSRequiresAquaSystemAppearance</key>
+  <false/>
+  <key>NSSupportsAutomaticGraphicsSwitching</key>
+  <true/>
+  <!-- da macOS 15 parlare con la rete locale richiede il permesso: senza questa frase la
+       richiesta non compare e ping, porte e nomi degli host della LAN falliscono in silenzio -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>DuckNote controlla gli indirizzi scritti nella nota e analizza la rete locale: ping, porte aperte, nomi (DNS, NetBIOS, mDNS) e servizi degli host.</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>DuckNote</string>
+</dict>
+</plist>

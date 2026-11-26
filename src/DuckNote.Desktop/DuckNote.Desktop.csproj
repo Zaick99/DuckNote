@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    DuckNote per macOS (e Linux, e Windows): la stessa nota, la stessa cassaforte, lo stesso
+    scanner della versione WPF, con l'interfaccia in Avalonia e l'editor della nota in un
+    WebView (WKWebView sul Mac). Il codice senza finestra sta nelle librerie e, per quel che
+    l'app WPF ha gia' scritto senza WPF (cassaforte, salvataggi, scansione), si condivide da li'.
+  -->
+  <PropertyGroup>
+    <!-- La finestra principale riceve il Workspace dal costruttore: non si carica mai per URI. -->
+    <NoWarn>$(NoWarn);AVLN3001</NoWarn>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>DuckNote.Desktop</RootNamespace>
+    <AssemblyName>DuckNote</AssemblyName>
+    <ApplicationIcon>..\DuckNote.App\Assets\duck.ico</ApplicationIcon>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <!-- l'editor (Node) non e' codice dell'app -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Editor\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DuckNote.Core\DuckNote.Core.csproj" />
+    <ProjectReference Include="..\DuckNote.Scan\DuckNote.Scan.csproj" />
+    <ProjectReference Include="..\DuckNote.Notes\DuckNote.Notes.csproj" />
+  </ItemGroup>
+
+  <!-- in comune con l'app WPF: niente WPF dentro -->
+  <ItemGroup>
+    <Compile Include="..\DuckNote.App\Vault\Passwords.cs;..\DuckNote.App\Vault\VaultSession.cs" Link="Shared\Vault\%(Filename)%(Extension)" />
+    <Compile Include="..\DuckNote.App\Storage\AppWipe.cs;..\DuckNote.App\Storage\CurrentUser.cs;..\DuckNote.App\Storage\IoQueue.cs;..\DuckNote.App\Storage\OnlyOne.cs" Link="Shared\Storage\%(Filename)%(Extension)" />
+    <Compile Include="..\DuckNote.App\Scanning\HostRow.cs;..\DuckNote.App\Scanning\ScanSession.cs;..\DuckNote.App\Scanning\UiThread.cs" Link="Shared\Scanning\%(Filename)%(Extension)" />
+    <Compile Include="..\DuckNote.App\Ui\Observable.cs" Link="Shared\Ui\Observable.cs" />
+  </ItemGroup>
+
+  <!-- le illustrazioni, le papere e l'icona sono quelle dell'app WPF -->
+  <ItemGroup>
+    <AvaloniaResource Include="..\DuckNote.App\Assets\*.png" Link="Assets\%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\DuckNote.App\Assets\art\*.png" Link="Assets\art\%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\DuckNote.App\Assets\avatars\*.png" Link="Assets\avatars\%(Filename)%(Extension)" />
+    <AvaloniaResource Include="..\DuckNote.App\Assets\duck.ico" Link="Assets\duck.ico" />
+    <EmbeddedResource Include="Assets\editor\editor.js" LogicalName="editor.js" />
+    <EmbeddedResource Include="Assets\editor\editor.css" LogicalName="editor.css" />
+  </ItemGroup>
+
+</Project>

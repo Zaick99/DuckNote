@@ -2,6 +2,42 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.15] - 2026-11-26
+
+DuckNote on the Mac, and a fix for addresses written one after another.
+
+### Added
+
+- **A macOS application** (`src/DuckNote.Desktop`), for Apple Silicon and
+  Intel: the interface rebuilt on Avalonia 12, the sheet a native web view
+  (WKWebView) running a ProseMirror editor built for DuckNote. Pages, address
+  colouring, Rete with the host card, Impostazioni and the Cassaforte wizard
+  work as on Windows and read and write the same files: a note or a
+  `store.bin` written by one version opens on the other (drawings excepted:
+  Windows ink shows as a placeholder on the Mac, a Mac drawing shows empty on
+  Windows, and both are kept until drawn again). The menu bar has
+  Nota, Modifica and Vista; copy and paste in the sheet go through the
+  Modifica menu, as Cocoa expects.
+- **macOS packaging**: `packaging/macos/build-app.sh` builds `DuckNote.app`
+  (Info.plist with the local network permission text, icon, ad-hoc
+  signature) and a disk image per architecture; the release workflow builds
+  them on a Mac runner and publishes them with the Windows files.
+- The sheet format is readable without WPF: `DuckNote.Notes` reads and writes
+  the sheets of `note.xaml` (FlowDocument XAML) and converts them to and from
+  the editor's document, so both applications share one file format.
+
+### Fixed
+
+- **Addresses written one after another are all checked.** A host that
+  appeared while another analysis was running (typically the one written just
+  before) was dropped by the "new host" timer and waited for the next
+  monitoring round, or forever with monitoring off; the periodic check also
+  skipped the last address while the cursor was still next to it. Both
+  applications now retry as soon as the running analysis ends, and monitor
+  every address already in the table.
+- The scan summary counted the up hosts of the whole table against the hosts
+  of the last round ("3 host attivi su 1").
+
 ## [0.0.14] - 2026-11-19
 
 Found by running the application and driving it with a simulated keyboard and

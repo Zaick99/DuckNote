@@ -279,7 +279,9 @@ public sealed class ScanSession : Observable
             _total = light.Count + full.Count;
             await Pass(full, options, detailed: true);
 
-            Say(string.Create(CultureInfo.CurrentCulture, $"{UpCount} host attivi su {queue.Count}, in {clock.Elapsed.TotalSeconds:F1} s."));
+            // attivi fra quelli di questo giro: con keep la tabella ne ha anche altri
+            int up = queue.Count(host => Find(host) is { IsUp: true });
+            Say(string.Create(CultureInfo.CurrentCulture, $"{up} host attivi su {queue.Count}, in {clock.Elapsed.TotalSeconds:F1} s."));
         }
         catch (OperationCanceledException)
         {
@@ -315,9 +317,9 @@ public sealed class ScanSession : Observable
         await foreach (HostScanResult result in new NetworkScanner(options, _vendors).ScanAsync(hosts, _stop.Token))
         {
             // la tabella e' dell'interfaccia: i risultati si consegnano sempre sul suo thread
-            if (System.Windows.Application.Current?.Dispatcher is { } ui && !ui.CheckAccess())
+            if (UiThread.Elsewhere())
             {
-                await ui.InvokeAsync(() => Take(result, detailed, wokeUp));
+                await UiThread.Run(() => Take(result, detailed, wokeUp));
             }
             else
             {

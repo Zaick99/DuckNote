@@ -1,7 +1,8 @@
 namespace DuckNote.Notes.Settings;
 
 /// <summary>
-/// Dove vivono i dati: %APPDATA%\duck\DuckNote, accanto alle altre app duck, oppure la
+/// Dove vivono i dati: %APPDATA%\duck\DuckNote su Windows, ~/Library/Application Support/duck/DuckNote
+/// su macOS, ~/.config/duck/DuckNote su Linux, accanto alle altre app duck, oppure la
 /// cartella in DUCKNOTE_HOME (per tenere nota e cassaforte su una chiavetta accanto
 /// all'eseguibile). I dati delle versioni che scrivevano in %APPDATA%\DuckNote vengono
 /// spostati al primo avvio.
@@ -27,7 +28,15 @@ public static class AppPaths
     public static void Ensure() => Directory.CreateDirectory(Folder);
 
     private static string Home() =>
-        Resolve(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), Environment.GetEnvironmentVariable("DUCKNOTE_HOME"));
+        Resolve(SystemData(), Environment.GetEnvironmentVariable("DUCKNOTE_HOME"));
+
+    /// <summary>
+    /// La cartella dei dati delle applicazioni del sistema. Su macOS e' Application Support nella
+    /// Libreria dell'utente (.NET li' risponderebbe ~/.config, che e' l'uso di Linux).
+    /// </summary>
+    private static string SystemData() => OperatingSystem.IsMacOS()
+        ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library", "Application Support")
+        : Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
     /// <summary>
     /// La cartella dei dati. Con DUCKNOTE_HOME quella; altrimenti appData\duck\DuckNote. Se
