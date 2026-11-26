@@ -420,7 +420,7 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
 The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.19 /DSourceExe=..\dist\DuckNote.exe
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.20 /DSourceExe=..\dist\DuckNote.exe
 ```
 
 The Mac application, as `DuckNote.app` in a disk image (ad-hoc signed when
@@ -429,7 +429,7 @@ built on a Mac; elsewhere the same bundle comes out in a zip). The script sets
 set it yourself for other builds of `src/DuckNote.Desktop`:
 
 ```bash
-packaging/macos/build-app.sh osx-arm64 0.0.19 dist    # or osx-x64
+packaging/macos/build-app.sh osx-arm64 0.0.20 dist    # or osx-x64
 ```
 
 Two small web bundles are built into the applications and kept in the

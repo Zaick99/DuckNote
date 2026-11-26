@@ -200,7 +200,19 @@ public partial class MainWindow : Window
 
         var page = Open(key);
         Title = $"{AppTitle} - {info.Title}";
-        PageHost.Content = page;
+
+        if (page is MapPage)
+        {
+            MapHost.Content ??= page;
+            MapHost.Visibility = Visibility.Visible;
+            PageHost.Content = null;
+        }
+        else
+        {
+            PageHost.Content = page;
+            MapHost.Visibility = Visibility.Collapsed;
+        }
+
         ShowToolbar(page is NotesPage);
         var order = _pages.Select(p => p.Key).ToList();
         // direzionale: verso il basso della sidebar entra da destra, verso l'alto da sinistra

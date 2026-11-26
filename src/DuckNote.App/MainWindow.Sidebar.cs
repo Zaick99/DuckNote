@@ -276,6 +276,12 @@ public partial class MainWindow
             return;
         }
 
+        if (MapHost.Visibility == Visibility.Visible && MapHost.Content is MapPage map)
+        {
+            map.OnShown();
+            return;
+        }
+
         if (PageHost.Content is FrameworkElement page && page.MoveFocus(new TraversalRequest(FocusNavigationDirection.First)))
         {
             return;

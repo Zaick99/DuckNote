@@ -93,6 +93,11 @@ public sealed class MapPage : UserControl, IDuckPage
             _web.Focus();
             Call("dm.focus()");
         }
+        else if (!_starting && IsLoaded)
+        {
+            // il motore non c'e' (non e' ancora partito, o si e' fermato): riparte
+            _ = Start();
+        }
     }
 
     public void OnHidden() => _front = false;

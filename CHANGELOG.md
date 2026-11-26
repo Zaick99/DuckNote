@@ -2,6 +2,16 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.20] - 2026-11-26
+
+### Changed
+
+- **On Windows the map stays open while you visit the other pages.** Once
+  opened, the **Mappa** page keeps its web engine running and is only hidden:
+  coming back is instant, with the map exactly as it was, and WebView2 is never
+  taken out of the window and started again. If the engine stops on its own,
+  it starts again the next time the page is shown.
+
 ## [0.0.19] - 2026-11-26
 
 **The network map: draw the network next to the note, and every device shows its state.**

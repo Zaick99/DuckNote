@@ -40,6 +40,10 @@
 
         <ContentControl x:Name="PageHost" Grid.Row="1" Focusable="False"/>
 
+        <!-- la mappa: una volta aperta resta caricata e si nasconde soltanto. Il suo WebView2 non
+             deve uscire dall'albero visivo a ogni cambio di pagina, o il motore web ripartirebbe -->
+        <ContentControl x:Name="MapHost" Grid.Row="1" Focusable="False" Visibility="Collapsed"/>
+
         <!-- l'ultimo evento: compare in basso a sinistra, resta il tempo di leggerlo e se ne va.
              Non prende il mouse: quello che c'e' sotto resta cliccabile. -->
         <Border x:Name="StatusPill" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="22,0,22,20"
