@@ -2,6 +2,21 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.17] - 2026-11-26
+
+The Mac window buttons find their place in DuckNote's title strip.
+
+### Changed
+
+- **Close, minimise and zoom sit in the title strip on the Mac**: centred in
+  its 46 points and aligned with the sidebar button, instead of hugging the top
+  edge as in a standard 28-point title bar. They are placed through AppKit, as
+  Electron's `trafficLightPosition` does, and put back after every resize and
+  after leaving full screen.
+- **Full screen gives the space back**: when macOS hides the window buttons,
+  the buttons at the top slide left to take their place, and slide back right
+  when the window leaves full screen.
+
 ## [0.0.16] - 2026-11-26
 
 The Mac version gets its click animations back, a new icon and a disk image

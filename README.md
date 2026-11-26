@@ -266,14 +266,14 @@ dotnet publish src/DuckNote.App -c Release -r win-x64 --self-contained true `
 The installer, with [Inno Setup 6](https://jrsoftware.org/isinfo.php):
 
 ```powershell
-ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.16 /DSourceExe=..\dist\DuckNote.exe
+ISCC.exe packaging\DuckNote.iss /DAppVersion=0.0.17 /DSourceExe=..\dist\DuckNote.exe
 ```
 
 The Mac application, as `DuckNote.app` in a disk image (ad-hoc signed when
 built on a Mac; elsewhere the same bundle comes out in a zip):
 
 ```bash
-packaging/macos/build-app.sh osx-arm64 0.0.16 dist    # or osx-x64
+packaging/macos/build-app.sh osx-arm64 0.0.17 dist    # or osx-x64
 ```
 
 Its editor is a small web bundle in `src/DuckNote.Desktop/Editor`, already

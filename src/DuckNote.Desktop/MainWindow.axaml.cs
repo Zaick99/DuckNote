@@ -24,6 +24,13 @@ public sealed partial class MainWindow : Window
 {
     private const double SideWidth = 266;
 
+    // sul Mac: il primo semaforo a 14 punti dal bordo, i nostri pulsanti dopo il terzo; a tutto
+    // schermo i semafori spariscono e i pulsanti scivolano al loro posto
+    private const double TitleHeight = 46;
+    private const double MacLightsLeft = 14;
+    private const double MacTitleLeft = 78;
+    private const double MacTitleLeftFull = 10;
+
     private readonly Workspace _ws;
     private readonly NotesPage _notes;
     private readonly NetworkPage _network;
@@ -42,6 +49,7 @@ public sealed partial class MainWindow : Window
         _ws = ws;
         InitializeComponent();
         Chrome();
+        WatchMacWindow();
 
         _notes = new NotesPage(ws);
         _network = new NetworkPage(ws);
@@ -96,7 +104,7 @@ public sealed partial class MainWindow : Window
             ExtendClientAreaToDecorationsHint = true;
             ExtendClientAreaTitleBarHeightHint = 46;
             Lights.IsVisible = false;
-            TitleLeft.Margin = new Thickness(78, 0, 0, 0);
+            TitleLeft.Margin = new Thickness(MacTitleLeft, 0, 0, 0);
         }
         else if (OperatingSystem.IsWindows())
         {
@@ -109,6 +117,72 @@ public sealed partial class MainWindow : Window
         else
         {
             WindowDecorations = WindowDecorations.None;
+        }
+    }
+
+    private bool _fullScreen;
+
+    /// <summary>I semafori del Mac al loro posto, e la fascia del titolo che segue il tutto schermo.</summary>
+    private void WatchMacWindow()
+    {
+        if (!OperatingSystem.IsMacOS())
+        {
+            return;
+        }
+
+        Opened += (_, _) => LightsSoon();
+        Activated += (_, _) => LightsSoon();
+        Resized += (_, _) => PlaceLights();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == WindowStateProperty)
+            {
+                OnWindowState();
+            }
+        };
+    }
+
+    private void PlaceLights() => TrafficLights.Place(this, TitleHeight, MacLightsLeft);
+
+    /// <summary>AppKit ridispone la barra del titolo anche dopo di noi: si ripassa per un attimo.</summary>
+    private void LightsSoon()
+    {
+        PlaceLights();
+
+        foreach (int ms in (int[])[60, 250, 600])
+        {
+            DispatcherTimer.RunOnce(PlaceLights, TimeSpan.FromMilliseconds(ms));
+        }
+    }
+
+    /// <summary>
+    /// A tutto schermo il sistema toglie i semafori: i pulsanti in alto scivolano a sinistra a
+    /// prendersi lo spazio; usciti, tornano a destra a farglielo.
+    /// </summary>
+    private void OnWindowState()
+    {
+        bool full = WindowState == WindowState.FullScreen;
+
+        if (full != _fullScreen)
+        {
+            _fullScreen = full;
+            double from = TitleLeft.Margin.Left;
+            double to = full ? MacTitleLeftFull : MacTitleLeft;
+
+            Motion.Tween((this, "title-left"), from, to, 320, x =>
+            {
+                TitleLeft.Margin = new Thickness(x, 0, 0, 0);
+
+                if (!_sidebarShown)
+                {
+                    TitleGap.Width = TitleLeft.Bounds.Width + x + 6;
+                }
+            }, null, Curves.CubicOut);
+        }
+
+        if (!full)
+        {
+            LightsSoon();
         }
     }
 
