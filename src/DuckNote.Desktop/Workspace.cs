@@ -4,6 +4,7 @@ using DuckNote.App.Storage;
 using DuckNote.App.Vault;
 using DuckNote.Desktop.Notes;
 using DuckNote.Notes.Hosts;
+using DuckNote.Notes.Maps;
 using DuckNote.Notes.Notebook;
 using DuckNote.Notes.Scanning;
 using DuckNote.Notes.Settings;
@@ -250,6 +251,33 @@ public sealed class Workspace
         }
     }
 
+    /// <summary>
+    /// Le mappe della rete sono cambiate nella loro pagina: si tengono (se sono davvero un
+    /// documento di mappe) e si salvano fra poco, come un foglio, dentro la nota e quindi nella
+    /// cassaforte. Gli indirizzi degli apparati entrano fra quelli che DuckNote controlla.
+    /// </summary>
+    public void UpdateMap(string json)
+    {
+        if (IsLocked || IsDamaged || NetworkMap.Clean(json) is not { } clean)
+        {
+            return;
+        }
+
+        byte[]? next = NetworkMap.IsBlank(clean) ? null : clean;
+
+        if (Book.Map is { } current ? next is not null && current.AsSpan().SequenceEqual(next) : next is null)
+        {
+            return;
+        }
+
+        Book.Map = next;
+        Touch();
+        SyncHosts();
+    }
+
+    /// <summary>Le mappe della nota per la pagina della mappa (null: la nota non ne ha).</summary>
+    public string? MapJson => Book.Map is { Length: > 0 } map ? System.Text.Encoding.UTF8.GetString(map) : null;
+
     /// <summary>Il foglio e' cambiato nell'editor: si tiene il documento nuovo e si salva fra poco.</summary>
     public void Update(Sheet sheet, SheetDoc doc)
     {
@@ -355,7 +383,7 @@ public sealed class Workspace
 
     private List<string>? _noteHosts;
 
-    /// <summary>Gli indirizzi scritti in tutti i fogli (non nel codice), senza quelli messi da parte.</summary>
+    /// <summary>Gli indirizzi scritti in tutti i fogli (non nel codice) e quelli degli apparati della mappa, senza quelli messi da parte.</summary>
     public IReadOnlyList<string> NoteHosts()
     {
         _noteHosts ??= Written();
@@ -389,6 +417,15 @@ public sealed class Workspace
                         }
                     }
                 }
+            }
+        }
+
+        // gli apparati della mappa si controllano come gli indirizzi scritti
+        foreach (string host in NetworkMap.Hosts(Book.Map))
+        {
+            if (seen.Add(host))
+            {
+                hosts.Add(host);
             }
         }
 

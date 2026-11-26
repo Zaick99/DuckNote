@@ -2,6 +2,57 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.19] - 2026-11-26
+
+**The network map: draw the network next to the note, and every device shows its state.**
+
+### Added
+
+- **Mappa, a canvas for the network as it is cabled.** A new page under
+  **Rete**, on Windows and on the Mac: devices of 14 kinds (Internet,
+  firewall, router, switch, access point, server, NAS, PC, laptop, phone,
+  printer, camera, IoT, other), cables and zones. Devices are dragged from the
+  library or from **Dalla rete** — the hosts DuckNote already knows, which
+  arrive with their name, address, MAC, vendor and the kind of device the scan
+  recognised; **Aggiungi tutti** brings in all those missing, each into the
+  zone of its subnet. A note can hold several maps.
+- **The devices of the map are checked like the addresses of the sheets.**
+  Green up, red down, grey never checked; a cable to a device that is down
+  turns red and dashed. The monitor pings them with the hosts of the sheets,
+  and they count in the **Rete** badges. The sidebar shows how many devices
+  are drawn.
+- **Cables with ports, speed and VLANs.** Copper, fibre, Wi-Fi, VPN and WAN,
+  each drawn its own way; the speed sets the thickness; the port at each end
+  and the VLANs (`10,20,30-35`, `trunk`) are labelled on the cable. Labels
+  never cover each other or the devices: each finds the first free place along
+  its cable, then beside it, tied to it by a dotted thread when it has to stand
+  aside. Two cables between the same devices run side by side.
+- **Switches show their front panel.** With a number of ports, the card of a
+  switch, router or firewall draws them, filled where a cable names them
+  (`Gi1/0/12` is port 12; fibre uplinks are counted apart).
+- **Zones for the subnets**, with network, VLAN and colour; moving a zone
+  moves its devices. A **VLAN** filter, a search, **Disponi** (lays the
+  network out from Internet down), align and distribute, snapping with guide
+  lines, copy and paste with cables, undo and redo.
+- **Export** to PNG, SVG and two CSV files: the device inventory and the cable
+  list.
+- The map lives inside the note file (`mappa.json`), so with encryption on it
+  is in the vault with everything else, and it is wiped from the page when the
+  note locks. The map page loads nothing from the network.
+
+### Changed
+
+- **The note file keeps what it does not know.** Entries written by a newer
+  version are carried over unchanged when this one saves, instead of being
+  dropped. (Versions before 0.0.19 do not know the map and leave it out when
+  they save.)
+- On Windows the map runs in Microsoft Edge WebView2, part of Windows 10 and
+  11, in private mode; its working files stay in
+  `%LOCALAPPDATA%\duck\DuckNote\WebView2`, and **Cancella tutto...** removes
+  them with the rest. Without WebView2 the map page says what to install.
+- The README is rewritten, with screenshots of the real application taken on a
+  demo note.
+
 ## [0.0.18] - 2026-11-26
 
 DuckNote updates itself, on Windows and on the Mac.

@@ -25,6 +25,13 @@ public static class AppPaths
 
     public static string Lock => Path.Combine(Folder, "aperto.lock");
 
+    /// <summary>
+    /// La cartella del motore web della mappa su Windows (WebView2), che ne vuole una sua anche
+    /// in modalita' privata: fra i dati locali (%LOCALAPPDATA%\duck\DuckNote\WebView2), non nella
+    /// cartella del programma, che puo' essere in sola lettura. Dentro non resta niente della nota.
+    /// </summary>
+    public static string WebEngine { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "duck", "DuckNote", "WebView2");
+
     public static void Ensure() => Directory.CreateDirectory(Folder);
 
     private static string Home() =>

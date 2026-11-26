@@ -1,0 +1,13 @@
+{
+  "name": "ducknote-map",
+  "private": true,
+  "description": "La mappa della rete di DuckNote (SVG), impacchettata in un file solo per il WebView di Mac e Windows.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

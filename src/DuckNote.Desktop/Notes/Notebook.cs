@@ -59,6 +59,12 @@ public sealed class Notebook
     /// <summary>I byte dei riquadri, per voce dello zip (riquadri/id.tipo).</summary>
     public Dictionary<string, byte[]> Insets { get; } = new(StringComparer.Ordinal);
 
+    /// <summary>Le mappe della rete (mappa.json), se la nota ne ha.</summary>
+    public byte[]? Map { get; set; }
+
+    /// <summary>Le voci del file scritte da una versione piu' nuova: si riscrivono tali e quali.</summary>
+    public Dictionary<string, byte[]> Extras { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Il file letto era di prima dei fogli: va riscritto.</summary>
     public bool NeedsRewrite { get; private set; }
 
@@ -109,6 +115,13 @@ public sealed class Notebook
             book.Insets[entry] = value;
         }
 
+        foreach ((string entry, byte[] value) in archive.Extras)
+        {
+            book.Extras[entry] = value;
+        }
+
+        book.Map = archive.Map;
+
         return book._sheets.Count > 0 ? book : null;
     }
 
@@ -133,6 +146,14 @@ public sealed class Notebook
             }
         }
 
+        // la mappa si sostituisce intera (mai riscritta sul posto): la foto puo' tenerne i byte
+        archive.Map = Map;
+
+        foreach ((string entry, byte[] bytes) in Extras)
+        {
+            archive.Extras[entry] = bytes;
+        }
+
         return archive;
     }
 
@@ -141,12 +162,19 @@ public sealed class Notebook
     /// <summary>Via la nota dalla memoria: i byte dei riquadri azzerati, i fogli dimenticati.</summary>
     public void Forget()
     {
-        foreach (byte[] bytes in Insets.Values)
+        foreach (byte[] bytes in Insets.Values.Concat(Extras.Values))
         {
             CryptographicOperations.ZeroMemory(bytes);
         }
 
+        if (Map is { } map)
+        {
+            CryptographicOperations.ZeroMemory(map);
+        }
+
         Insets.Clear();
+        Extras.Clear();
+        Map = null;
         _sheets.Clear();
     }
 

@@ -174,7 +174,7 @@ public sealed partial class NotesPage : UserControl, IDuckPage
     /// Niente della nota resta su disco per colpa del motore web: niente cache, niente archivi
     /// persistenti (la nota cifrata resta cifrata anche li').
     /// </summary>
-    private static void OnEnvironment(object? sender, WebViewEnvironmentRequestedEventArgs e)
+    internal static void OnEnvironment(object? sender, WebViewEnvironmentRequestedEventArgs e)
     {
         e.EnableDevTools = false;
 

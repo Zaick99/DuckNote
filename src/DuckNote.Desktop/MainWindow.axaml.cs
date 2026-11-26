@@ -34,6 +34,7 @@ public sealed partial class MainWindow : Window
     private readonly Workspace _ws;
     private readonly NotesPage _notes;
     private readonly NetworkPage _network;
+    private readonly MapPage _map;
     private readonly SettingsPage _settings;
     private readonly Notices _notices;
     private readonly Dictionary<string, Control> _pages;
@@ -53,11 +54,13 @@ public sealed partial class MainWindow : Window
 
         _notes = new NotesPage(ws);
         _network = new NetworkPage(ws);
-        _settings = new SettingsPage(ws, () => _notes.Flush(), LockNow, () => Navigate("notes"));
+        _map = new MapPage(ws);
+        _settings = new SettingsPage(ws, FlushAll, LockNow, () => Navigate("notes"));
         _pages = new Dictionary<string, Control>(StringComparer.Ordinal)
         {
             ["notes"] = _notes,
             ["network"] = _network,
+            ["map"] = _map,
             ["settings"] = _settings
         };
 
@@ -214,8 +217,15 @@ public sealed partial class MainWindow : Window
         e.Cancel = true;
         _closing = true;
         _notices.Close();
-        await _notes.Flush();
+        await FlushAll();
         Close();
+    }
+
+    /// <summary>Quello che sta ancora nelle pagine web (il foglio, la mappa), dentro la nota.</summary>
+    private async Task FlushAll()
+    {
+        await _notes.Flush();
+        await _map.Flush();
     }
 
     // ------------------------------------------------------------------ avvio
@@ -234,7 +244,10 @@ public sealed partial class MainWindow : Window
         {
             ShowMonitor();
             ShowHosts();
+            ShowMapCount();
         };
+        _ws.Unsaved += () => Dispatcher.UIThread.Post(ShowMapCount);
+        _ws.NoteReplaced += () => Dispatcher.UIThread.Post(ShowMapCount);
         _ws.Session.Finished += message =>
         {
             if (!_ws.ScanIsAutomatic)
@@ -264,6 +277,16 @@ public sealed partial class MainWindow : Window
         };
         _notes.WindowKey += OnWindowKey;
         _notes.SidebarWanted += () => SetSidebar(true);
+        _map.WindowKey += OnWindowKey;
+        _map.NetworkWanted += host =>
+        {
+            Navigate("network");
+
+            if (host is not null)
+            {
+                _network.Reveal(host);
+            }
+        };
 
         Lock.Opened += () =>
         {
@@ -378,12 +401,13 @@ public sealed partial class MainWindow : Window
         Title = key switch
         {
             "network" => "DuckNote - Rete",
+            "map" => "DuckNote - Mappa",
             "settings" => "DuckNote - Impostazioni",
             _ => "DuckNote"
         };
 
-        // la nota e' un WebView: si mostra e basta (un controllo nativo non sfuma)
-        if (key == "notes")
+        // la nota e la mappa sono WebView: si mostrano e basta (un controllo nativo non sfuma)
+        if (key is "notes" or "map")
         {
             page.IsVisible = true;
         }
@@ -393,6 +417,7 @@ public sealed partial class MainWindow : Window
         }
 
         NavNetwork.Classes.Set("active", key == "network");
+        NavMap.Classes.Set("active", key == "map");
         ShowToolbar(key == "notes");
         (page as IDuckPage)?.OnShown();
     }
@@ -410,6 +435,8 @@ public sealed partial class MainWindow : Window
     }
 
     private void OnNetwork(object? sender, RoutedEventArgs e) => Navigate("network");
+
+    private void OnMap(object? sender, RoutedEventArgs e) => Navigate("map");
 
     private void OnSettings(object? sender, RoutedEventArgs e) =>
         Navigate(_current == "settings" ? _beforeSettings : "settings");
@@ -511,7 +538,7 @@ public sealed partial class MainWindow : Window
     /// <summary>Blocca: il foglio com'e' nell'editor si salva, poi la cassaforte si chiude.</summary>
     private async Task LockNow()
     {
-        await _notes.Flush();
+        await FlushAll();
         _ws.Lock("a mano");
     }
 
@@ -594,6 +621,10 @@ public sealed partial class MainWindow : Window
         {
             _notes.Edit(action);
         }
+        else if (_current == "map" && !_ws.IsLocked)
+        {
+            _map.Edit(action);
+        }
     }
 
     // ------------------------------------------------------------------ blocco
@@ -601,6 +632,7 @@ public sealed partial class MainWindow : Window
     private void ShowLock()
     {
         _notes.Forget();
+        _map.Forget();
 
         foreach (Control page in _pages.Values)
         {
@@ -777,6 +809,21 @@ public sealed partial class MainWindow : Window
         BadgeUp.IsVisible = up > 0;
         BadgeUpText.Text = up > 999 ? "999+" : up.ToString(CultureInfo.CurrentCulture);
         ToolTip.SetTip(BadgeUp, up == 1 ? "1 host attivo" : $"{up} host attivi");
+    }
+
+    /// <summary>Accanto a Mappa: quanti apparati ci sono disegnati, e quanti sono spenti.</summary>
+    private void ShowMapCount()
+    {
+        if (_ws.IsLocked)
+        {
+            BadgeMap.IsVisible = false;
+            return;
+        }
+
+        int devices = DuckNote.Notes.Maps.NetworkMap.Devices(_ws.Book.Map);
+        BadgeMap.IsVisible = devices > 0;
+        BadgeMapText.Text = devices > 999 ? "999+" : devices.ToString(CultureInfo.CurrentCulture);
+        ToolTip.SetTip(BadgeMap, devices == 1 ? "1 apparato sulla mappa" : $"{devices} apparati sulla mappa");
     }
 
     /// <summary>La scheda in fondo alla sidebar: monitoraggio a riposo, oppure la scansione in corso.</summary>

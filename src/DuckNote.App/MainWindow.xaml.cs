@@ -74,6 +74,7 @@ public partial class MainWindow : Window
     private void RegisterPages()
     {
         AddPage("network", "Rete", "\uE774", "Blue", () => new NetworkPage(_ws), NavTop);
+        AddPage("map", "Mappa", MapGlyph, "Teal", CreateMap, NavTop);
         AddPage("notes", "Note", "\uE70F", "Orange", () => new NotesPage(_ws), null);
         AddPage("settings", "Impostazioni", "\uE713", "Gray", () => new SettingsPage(_ws), null);
     }
@@ -92,12 +93,12 @@ public partial class MainWindow : Window
 
         var tile = new Border { Style = (Style)FindResource("IconTile") };
         tile.SetResourceReference(Border.BackgroundProperty, tileToken);
-        tile.Child = new TextBlock { Text = glyph, Style = (Style)FindResource("TileGlyph") };
+        tile.Child = Glyph(glyph);
         if (iconOnly)
         {
             tile.Margin = new Thickness(0);
             tile.Width = tile.Height = 28;
-            ((TextBlock)tile.Child).FontSize = 14;
+            if (tile.Child is TextBlock text) text.FontSize = 14;
             var square = new Button
             {
                 Style = (Style)FindResource("IconNavItem"), Content = tile, ToolTip = title,
@@ -113,12 +114,13 @@ public partial class MainWindow : Window
         // contatori a destra della voce, uno per tono (Red, Green...), nascosti a zero
         var counters = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Center };
         var tones = new Dictionary<string, (Border Box, TextBlock Text)>();
-        foreach (var tone in new[] { "Red", "Green", "Blue", "Orange" })
+        foreach (var tone in new[] { "Red", "Green", "Blue", "Orange", "Gray" })
         {
             var badgeText = new TextBlock { FontSize = 10.5, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-            badgeText.SetResourceReference(TextBlock.ForegroundProperty, tone);
+            // il grigio e' per i numeri e basta (gli apparati della mappa): nessuno stato da segnalare
+            badgeText.SetResourceReference(TextBlock.ForegroundProperty, tone == "Gray" ? "LabelSecondary" : tone);
             var badge = new Border { Style = (Style)FindResource("Badge"), Visibility = Visibility.Collapsed, Child = badgeText, Margin = new Thickness(4, 0, 0, 0) };
-            badge.SetResourceReference(Border.BackgroundProperty, tone + "Soft");
+            badge.SetResourceReference(Border.BackgroundProperty, tone == "Gray" ? "BgFieldAlt" : tone + "Soft");
             tones[tone] = (badge, badgeText);
             counters.Children.Add(badge);
         }
@@ -134,7 +136,35 @@ public partial class MainWindow : Window
         host.Children.Add(b);
     }
 
-    /// <summary>Un contatore sulla voce (0 = nascosto). tone: Red | Green | Blue | Orange; i toni convivono.</summary>
+    /// <summary>
+    /// Il simbolo della tessera: un glifo di Segoe Fluent Icons, oppure un disegno a tratto su
+    /// 16x16 (una geometria che comincia con M), per quello che il font non ha.
+    /// </summary>
+    private FrameworkElement Glyph(string glyph)
+    {
+        if (!glyph.StartsWith('M'))
+        {
+            return new TextBlock { Text = glyph, Style = (Style)FindResource("TileGlyph") };
+        }
+
+        var path = new System.Windows.Shapes.Path
+        {
+            Data = Geometry.Parse(glyph),
+            Width = 14,
+            Height = 14,
+            Stretch = Stretch.Uniform,
+            StrokeThickness = 1.5,
+            StrokeStartLineCap = PenLineCap.Round,
+            StrokeEndLineCap = PenLineCap.Round,
+            StrokeLineJoin = PenLineJoin.Round,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        path.SetResourceReference(Shape.StrokeProperty, "LabelOnAccent");
+        return path;
+    }
+
+    /// <summary>Un contatore sulla voce (0 = nascosto). tone: Red | Green | Blue | Orange | Gray; i toni convivono.</summary>
     public void SetBadge(string key, int count, string tone = "Blue", string? tooltip = null)
     {
         if (!_badges.TryGetValue(key, out var tones) || !tones.TryGetValue(tone, out var bd)) return;
@@ -159,6 +189,7 @@ public partial class MainWindow : Window
     {
         if (_pages.FirstOrDefault(p => p.Key == key) is not { } info) return;
         if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is NotesPage leaving) leaving.OnHidden();
+        if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is MapPage leavingMap) leavingMap.OnHidden();
         if (key == "settings" && _current is not null && _current != "settings") _beforeSettings = _current;
 
         _current = key;
@@ -267,8 +298,20 @@ public partial class MainWindow : Window
         Close();
     }
 
-    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    private bool _mapFlushed;
+
+    protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
+        // la mappa e' una pagina web: quello che ci sta ancora dentro va nella nota prima di chiudere
+        if (!_mapFlushed && Page("map") is MapPage map)
+        {
+            e.Cancel = true;
+            _mapFlushed = true;
+            await map.Flush();
+            Close();
+            return;
+        }
+
         _flock.Animate = false;
         _ws.Shutdown();
         base.OnClosing(e);

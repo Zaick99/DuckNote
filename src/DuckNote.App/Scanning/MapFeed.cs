@@ -1,0 +1,45 @@
+namespace DuckNote.App.Scanning;
+
+/// <summary>
+/// Gli host della tabella come li vuole la pagina della mappa (dm.hosts): chiave (com'e'
+/// scritto, o l'IP), IP, nome, MAC, marca, tipo, sistema, stato e risposta. Serve alla libreria
+/// "Dalla rete" e al colore degli apparati. Niente WPF qui: lo usano le due app.
+/// </summary>
+public static class MapFeed
+{
+    /// <summary>Oltre questo numero la libreria non serve piu' a scegliere: si tengono i primi.</summary>
+    private const int Most = 4000;
+
+    public static List<Dictionary<string, string>> Hosts(ScanSession session)
+    {
+        List<Dictionary<string, string>> list = [];
+
+        foreach (HostRow row in session.Rows)
+        {
+            if (list.Count >= Most)
+            {
+                break;
+            }
+
+            if (row.Shown.Length == 0 || session.IsHidden(row.Shown))
+            {
+                continue;
+            }
+
+            list.Add(new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["key"] = row.Shown,
+                ["ip"] = row.IP,
+                ["name"] = row.Label,
+                ["mac"] = row.Mac,
+                ["vendor"] = row.Vendor,
+                ["type"] = row.DeviceType,
+                ["os"] = row.Os,
+                ["state"] = row.IsUp ? "up" : row.IsDown ? "down" : row.IsChecked ? "wait" : "unknown",
+                ["rtt"] = row.IsUp ? row.RoundTripShort : string.Empty
+            });
+        }
+
+        return list;
+    }
+}

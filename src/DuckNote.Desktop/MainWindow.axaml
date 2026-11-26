@@ -67,6 +67,19 @@
             </Grid>
           </Button>
 
+          <!-- Mappa: il disegno della rete, col numero degli apparati -->
+          <Button x:Name="NavMap" DockPanel.Dock="Top" Theme="{StaticResource Nav}" Click="OnMap">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="24" Height="24" CornerRadius="6" Background="{DynamicResource Teal}">
+                <ui:Glyph Kind="map" Width="14" Height="14" Foreground="White"/>
+              </Border>
+              <TextBlock Grid.Column="1" Text="Mappa" Margin="10,0,0,0" VerticalAlignment="Center"/>
+              <Border x:Name="BadgeMap" Grid.Column="2" Classes="badge" Background="{DynamicResource BgFieldAlt}" IsVisible="False">
+                <TextBlock x:Name="BadgeMapText" Foreground="{DynamicResource LabelSecondary}"/>
+              </Border>
+            </Grid>
+          </Button>
+
           <!-- in fondo: il monitoraggio, con il pulsante che controlla gli host dei fogli -->
           <Border DockPanel.Dock="Bottom" Classes="well" Margin="12,6,12,12" Padding="11,8">
             <StackPanel>

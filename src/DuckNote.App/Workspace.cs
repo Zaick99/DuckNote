@@ -5,6 +5,7 @@ using DuckNote.App.Editor;
 using DuckNote.App.Scanning;
 using DuckNote.App.Vault;
 using DuckNote.Notes.Hosts;
+using DuckNote.Notes.Maps;
 using DuckNote.Notes.Notebook;
 using DuckNote.Notes.Scanning;
 using DuckNote.Notes.Settings;
@@ -259,6 +260,7 @@ public sealed class Workspace
 
         _dirty = fresh || Book.NeedsRewrite;
         _noteHosts = null;
+        _mapHosts = null;
         CurrentSheet = null;
         NoteReplaced?.Invoke();
         SyncHosts();
@@ -413,8 +415,50 @@ public sealed class Workspace
             }
         }
 
+        // gli apparati della mappa si controllano come gli indirizzi scritti
+        foreach (string host in MapHosts())
+        {
+            if (seen.Add(host) && !Session.IsHidden(host))
+            {
+                hosts.Add(host);
+            }
+        }
+
         return hosts;
     }
+
+    private IReadOnlyList<string>? _mapHosts;
+
+    /// <summary>Gli indirizzi degli apparati della mappa (letti una volta per modifica della mappa).</summary>
+    private IReadOnlyList<string> MapHosts() => _mapHosts ??= NetworkMap.Hosts(Book.Map);
+
+    /// <summary>
+    /// Le mappe della rete sono cambiate nella loro pagina: si tengono (se sono davvero un
+    /// documento di mappe) e si salvano fra poco, come un foglio, dentro la nota e quindi nella
+    /// cassaforte. Gli indirizzi degli apparati entrano fra quelli che DuckNote controlla.
+    /// </summary>
+    public void UpdateMap(string json)
+    {
+        if (IsLocked || IsDamaged || NetworkMap.Clean(json) is not { } clean)
+        {
+            return;
+        }
+
+        byte[]? next = NetworkMap.IsBlank(clean) ? null : clean;
+
+        if (Book.Map is { } current ? next is not null && current.AsSpan().SequenceEqual(next) : next is null)
+        {
+            return;
+        }
+
+        Book.Map = next;
+        _mapHosts = null;
+        Touch();
+        SyncHosts(settled: true);
+    }
+
+    /// <summary>Le mappe della nota per la pagina della mappa (null: la nota non ne ha).</summary>
+    public string? MapJson => Book.Map is { Length: > 0 } map ? System.Text.Encoding.UTF8.GetString(map) : null;
 
     private List<(Paragraph Row, HostToken Token)>? _noteHosts;
 
@@ -454,7 +498,7 @@ public sealed class Workspace
             }
         }
 
-        NoteHostCount = found.Select(pair => pair.Item2.Value).Distinct(StringComparer.OrdinalIgnoreCase).Count(host => !Session.IsHidden(host));
+        NoteHostCount = found.Select(pair => pair.Item2.Value).Concat(MapHosts()).Distinct(StringComparer.OrdinalIgnoreCase).Count(host => !Session.IsHidden(host));
 
         return _noteHosts = found;
     }
@@ -659,6 +703,7 @@ public sealed class Workspace
         Session.Clear();
         IsLocked = true;
         _noteHosts = null;
+        _mapHosts = null;
         CurrentSheet = null;
 
         NoteReplaced?.Invoke();

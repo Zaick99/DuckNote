@@ -14,6 +14,10 @@
       CultureInfo("en") all'avvio e in quella modalita' non esiste.
     -->
     <InvariantGlobalization>false</InvariantGlobalization>
+
+    <!-- la documentazione XML dei pacchetti (WebView2) non va accanto all'eseguibile -->
+    <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+    <CopyDocumentationFilesFromPackages>false</CopyDocumentationFilesFromPackages>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,6 +27,11 @@
     <Resource Include="Assets\art\*.png" />
     <Resource Include="Assets\avatars\*.png" />
     <Resource Include="Assets\duck.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- la mappa della rete e' una pagina web (la stessa del Mac): il motore e' WebView2, gia' in Windows 10 e 11 -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
   </ItemGroup>
 
   <ItemGroup>

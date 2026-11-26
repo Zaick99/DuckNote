@@ -7,6 +7,8 @@
   -->
   <PropertyGroup>
     <RootNamespace>DuckNote.Notes</RootNamespace>
+    <!-- la mappa (Node) non e' codice della libreria: ne entra solo il pacchetto costruito -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Maps\Web\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -15,6 +17,9 @@
   <ItemGroup>
     <!-- i colori del tema, gli stessi dell'app WPF: servono a riconoscere i colori scritti nelle note -->
     <EmbeddedResource Include="..\DuckNote.App\Theme\tokens.extended.json" Link="Sheets\tokens.extended.json" LogicalName="DuckNote.Notes.tokens.json" />
+    <!-- la pagina della mappa della rete (Maps/Web, "npm run build"), la stessa per Mac e Windows -->
+    <EmbeddedResource Include="Maps\Assets\map.js" LogicalName="DuckNote.Notes.map.js" />
+    <EmbeddedResource Include="Maps\Assets\map.css" LogicalName="DuckNote.Notes.map.css" />
   </ItemGroup>
 
 </Project>

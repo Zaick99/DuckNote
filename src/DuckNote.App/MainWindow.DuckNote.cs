@@ -42,7 +42,10 @@ public partial class MainWindow
         {
             ShowMonitor();
             ShowHosts();
+            ShowMapCount();
         };
+        _ws.Unsaved += () => Dispatcher.BeginInvoke(ShowMapCount);
+        _ws.NoteReplaced += () => Dispatcher.BeginInvoke(ShowMapCount);
         _ws.Session.Finished += message =>
         {
             // le analisi partite da sole (monitoraggio, indirizzi appena scritti) non disturbano:
@@ -78,7 +81,7 @@ public partial class MainWindow
         {
             if (_ws.Vault.IsOpen && Keyboard.Modifiers == ModifierKeys.Shift)
             {
-                _ws.Lock("a mano");
+                LockNow();
                 return;
             }
 
@@ -192,7 +195,7 @@ public partial class MainWindow
 
         if (_ws.Vault.IsOpen)
         {
-            _ws.Lock("a mano");
+            LockNow();
             return;
         }
 
@@ -202,7 +205,74 @@ public partial class MainWindow
     private void OnMenuLock(object sender, RoutedEventArgs e)
     {
         AccountMenu.IsOpen = false;
+        LockNow();
+    }
+
+    /// <summary>Blocca a mano: prima quello che sta ancora nella pagina della mappa va nella nota.</summary>
+    private async void LockNow()
+    {
+        if (Page("map") is MapPage map)
+        {
+            await map.Flush();
+        }
+
         _ws.Lock("a mano");
+    }
+
+    // ---------------------------------------------------------------- la mappa
+
+    /// <summary>Il disegno a tratto della voce Mappa (lo stesso glifo dell'app per Mac).</summary>
+    private const string MapGlyph = "M2.5,2.5 H6 V6 H2.5 Z M10,2.5 H13.5 V6 H10 Z M6.25,10 H9.75 V13.5 H6.25 Z M6,4.25 H10 M4.25,6 L7,10 M11.75,6 L9,10";
+
+    /// <summary>L'ultima scorciatoia della finestra e quando: la mappa a volte la ripassa, e non deve valere due volte.</summary>
+    private (string Key, DateTime At) _lastShortcut = (string.Empty, DateTime.MinValue);
+
+    private MapPage CreateMap()
+    {
+        MapPage map = new(_ws);
+        map.WindowKey += OnMapKey;
+        map.NetworkWanted += host =>
+        {
+            Navigate("network");
+
+            if (host is not null && Page("network") is NetworkPage network)
+            {
+                network.Reveal(host);
+            }
+        };
+        return map;
+    }
+
+    /// <summary>I tasti della finestra premuti mentre si lavora sulla mappa (dal WebView non arrivano da soli).</summary>
+    private void OnMapKey(string key)
+    {
+        if (_lastShortcut.Key == key && DateTime.UtcNow - _lastShortcut.At < TimeSpan.FromMilliseconds(400))
+        {
+            return;
+        }
+
+        switch (key)
+        {
+            case "sidebar" when !_ws.IsLocked:
+                ToggleSidebar();
+                break;
+            case "lock" when _ws.Vault.IsOpen:
+                LockNow();
+                break;
+            case "settings" when !_ws.IsLocked:
+                Navigate(_current == "settings" ? _beforeSettings : "settings");
+                break;
+            case "searchSheets" when !_ws.IsLocked:
+                Navigate("notes");
+                break;
+        }
+    }
+
+    /// <summary>Accanto a Mappa: quanti apparati ci sono disegnati.</summary>
+    private void ShowMapCount()
+    {
+        int devices = _ws.IsLocked ? 0 : DuckNote.Notes.Maps.NetworkMap.Devices(_ws.Book.Map);
+        SetBadge("map", devices, "Gray", devices == 1 ? "1 apparato sulla mappa" : $"{devices} apparati sulla mappa");
     }
 
     private void OnMenuVault(object sender, RoutedEventArgs e)
@@ -231,6 +301,8 @@ public partial class MainWindow
 
     private void ShowLock()
     {
+        (Page("map") as MapPage)?.Forget();
+
         // affacciata non resta: a nota riaperta la si ritrova nascosta com'era
         if (_side == Side.Peek)
         {
@@ -340,7 +412,8 @@ public partial class MainWindow
 
         if (e.Key == Key.L && Keyboard.Modifiers == ModifierKeys.Control && _ws.Vault.IsOpen)
         {
-            _ws.Lock("a mano");
+            _lastShortcut = ("lock", DateTime.UtcNow);
+            LockNow();
             e.Handled = true;
             return;
         }
@@ -353,6 +426,7 @@ public partial class MainWindow
         // la sidebar: F9, oppure Ctrl+\ come negli editor (il tasto accanto all'1 sulla tastiera italiana)
         if ((e.Key == Key.F9 && Keyboard.Modifiers == ModifierKeys.None) || (e.Key == Key.Oem5 && Keyboard.Modifiers == ModifierKeys.Control))
         {
+            _lastShortcut = ("sidebar", DateTime.UtcNow);
             ToggleSidebar();
             e.Handled = true;
             return;

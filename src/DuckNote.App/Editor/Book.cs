@@ -94,6 +94,12 @@ public sealed class Book
     /// <summary>Il file letto era di prima delle pagine, o portava margini vecchi: va riscritto.</summary>
     public bool NeedsRewrite { get; private set; }
 
+    /// <summary>Le mappe della rete (mappa.json), se la nota ne ha: si sostituiscono intere, mai sul posto.</summary>
+    public byte[]? Map { get; set; }
+
+    /// <summary>Le voci del file scritte da una versione piu' nuova: si riscrivono tali e quali.</summary>
+    public Dictionary<string, byte[]> Extras { get; } = new(StringComparer.Ordinal);
+
     public static Book Of(FlowDocument first)
     {
         Book book = new();
@@ -138,6 +144,13 @@ public sealed class Book
             book._sheets.Add(new Sheet(page.Id, document, page.Name));
         }
 
+        book.Map = archive.Map;
+
+        foreach ((string entry, byte[] value) in archive.Extras)
+        {
+            book.Extras[entry] = value;
+        }
+
         return book._sheets.Count > 0 ? book : null;
     }
 
@@ -165,6 +178,13 @@ public sealed class Book
             }
         }
 
+        archive.Map = Map;
+
+        foreach ((string entry, byte[] bytes) in Extras)
+        {
+            archive.Extras[entry] = bytes;
+        }
+
         return archive;
     }
 
@@ -181,6 +201,18 @@ public sealed class Book
             sheet.Document.Blocks.Clear();
         }
 
+        foreach (byte[] bytes in Extras.Values)
+        {
+            CryptographicOperations.ZeroMemory(bytes);
+        }
+
+        if (Map is { } map)
+        {
+            CryptographicOperations.ZeroMemory(map);
+        }
+
+        Extras.Clear();
+        Map = null;
         _sheets.Clear();
     }
 
