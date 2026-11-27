@@ -72,6 +72,10 @@ jobs:
     needs: version
     if: needs.version.outputs.exists == '0'
     runs-on: macos-latest
+    env:
+      # con un certificato Developer ID nei segreti del repository l'app si firma e si notarizza:
+      # si apre al primo doppio clic. Senza, resta la firma ad hoc (Privacy e sicurezza > Apri comunque)
+      HAS_DEVELOPER_ID: ${{ secrets.MACOS_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -79,8 +83,33 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
+      - name: Developer ID certificate
+        if: env.HAS_DEVELOPER_ID == 'true'
+        shell: bash
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/ducknote.keychain-db"
+          pass="$(openssl rand -hex 24)"
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$pass" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$pass" "$keychain"
+          security import "$RUNNER_TEMP/developer-id.p12" -P "$MACOS_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain"
+          rm -f "$RUNNER_TEMP/developer-id.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$pass" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          identity="$(security find-identity -v -p codesigning "$keychain" | grep -o '"Developer ID Application: [^"]*"' | head -1 | tr -d '"')"
+          if [ -z "$identity" ]; then echo "::error::MACOS_CERTIFICATE has no 'Developer ID Application' identity"; exit 1; fi
+          echo "DUCKNOTE_SIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
       - name: Disk images
         shell: bash
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           v='${{ needs.version.outputs.version }}'
           packaging/macos/build-app.sh osx-arm64 "$v" dist

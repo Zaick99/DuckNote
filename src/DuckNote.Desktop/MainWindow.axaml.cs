@@ -330,12 +330,24 @@ public sealed partial class MainWindow : Window
 
     // ------------------------------------------------------------------ aggiornamenti
 
-    private bool _updateTold;
+    private string? _updateTold;
+    private readonly DispatcherTimer _updateClock = new() { Interval = TimeSpan.FromHours(6) };
 
-    /// <summary>Pochi secondi dopo l'avvio si chiede a GitHub se c'e' una versione nuova.</summary>
+    /// <summary>
+    /// Pochi secondi dopo l'avvio si chiede a GitHub se c'e' una versione nuova, e poi ogni sei
+    /// ore: anche DuckNote lasciata aperta per giorni si aggiorna.
+    /// </summary>
     private void CheckUpdatesSoon()
     {
         Updates.AppUpdates.Session.Changed += () => Dispatcher.UIThread.Post(OnUpdate);
+        _updateClock.Tick += (_, _) =>
+        {
+            if (_ws.Settings.CheckUpdates && !Updates.AppUpdates.Session.IsReady)
+            {
+                _ = Updates.AppUpdates.Session.CheckAsync();
+            }
+        };
+        _updateClock.Start();
 
         if (_ws.Settings.CheckUpdates)
         {
@@ -343,18 +355,25 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Una volta per avvio: pronta (si installa alla chiusura, o subito), oppure il link alla release.</summary>
+    /// <summary>Una volta per versione: pronta (si installa alla chiusura, o subito), da aprire a mano, oppure il link alla release.</summary>
     private void OnUpdate()
     {
         DuckNote.Notes.Updates.UpdateSession updates = Updates.AppUpdates.Session;
 
-        if (_updateTold || updates.IsChecking || updates.Available is not { } release)
+        if (updates.IsChecking || updates.Available is not { } release)
         {
             return;
         }
 
-        _updateTold = true;
         string version = DuckNote.Notes.Updates.UpdateFeed.Describe(release.Version);
+        string told = $"{version}{(updates.IsReady ? "+" : updates.CanOpenDownloaded ? "~" : string.Empty)}";
+
+        if (_updateTold == told)
+        {
+            return;
+        }
+
+        _updateTold = told;
 
         if (updates.IsReady)
         {
@@ -365,6 +384,12 @@ public sealed partial class MainWindow : Window
                     Close();
                 }
             });
+            return;
+        }
+
+        if (updates.CanOpenDownloaded)
+        {
+            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded());
             return;
         }
 

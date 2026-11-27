@@ -100,11 +100,15 @@ public partial class NotesPage : UserControl, IDuckPage
     /// <summary>Serve l'indice dei fogli (la ricerca da tastiera): se la sidebar e' nascosta deve affacciarsi.</summary>
     public event Action? SidebarWanted;
 
-    /// <summary>Un'altra pagina e' in primo piano: nell'indice resta solo il pallino del foglio aperto.</summary>
+    /// <summary>
+    /// Un'altra pagina (Rete, Mappa, Impostazioni) e' in primo piano: nell'indice nessun foglio
+    /// resta evidenziato, nemmeno col pallino, come se fosse aperto.
+    /// </summary>
     public void OnHidden()
     {
         _front = false;
         OutlineList.SelectedItem = null;
+        RefreshOutline();
     }
 
     /// <summary>La pagina della nota e' quella in primo piano.</summary>

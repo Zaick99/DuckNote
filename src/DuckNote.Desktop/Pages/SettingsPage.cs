@@ -516,6 +516,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
         _updateButton.IsEnabled = !updates.IsChecking;
         _updateButton.Content = updates.IsChecking ? "Controllo..."
             : updates.IsReady ? "Riavvia e aggiorna"
+            : updates.CanOpenDownloaded ? "Apri l'aggiornamento"
             : updates.Available is not null ? "Apri la pagina"
             : "Controlla adesso";
     }
@@ -531,6 +532,12 @@ public sealed class SettingsPage : UserControl, IDuckPage
                 window.Close();
             }
 
+            return;
+        }
+
+        if (updates.CanOpenDownloaded)
+        {
+            updates.OpenDownloaded();
             return;
         }
 

@@ -101,7 +101,7 @@ public sealed partial class NotesPage
     private void RefreshOutline()
     {
         string wanted = _filter.Text ?? string.Empty;
-        IReadOnlyList<OutlineRow> rows = _ws.IsLocked ? [] : OutlineTree.Build(_ws.Book.Sheets.Select(sheet => sheet.Outline()), _sheet?.Id, wanted, _open);
+        IReadOnlyList<OutlineRow> rows = _ws.IsLocked ? [] : OutlineTree.Build(_ws.Book.Sheets.Select(sheet => sheet.Outline()), _front ? _sheet?.Id : null, wanted, _open);
 
         int pages = _ws.Book.Sheets.Count;
         string many = pages == 1 ? "1 foglio" : string.Create(CultureInfo.CurrentCulture, $"{pages} fogli");

@@ -44,10 +44,37 @@ internal sealed class WindowsInstaller : IUpdateInstaller
 
     public string? Blocker { get; }
 
+    public string? Failure { get; private set; }
+
+    /// <summary>Se non si installa da sola: l'installer si apre (guidato), il nuovo eseguibile si mostra in Esplora file.</summary>
+    public string? OpenHint => Target switch
+    {
+        UpdateTarget.WindowsInstaller => "apri l'aggiornamento: l'installazione e' guidata",
+        UpdateTarget.WindowsPortable => "apri l'aggiornamento: e' il nuovo DuckNote.exe, da mettere al posto di quello in uso",
+        _ => null
+    };
+
+    public bool OpenDownloaded(string downloaded)
+    {
+        try
+        {
+            ProcessStartInfo open = Target == UpdateTarget.WindowsInstaller
+                ? new ProcessStartInfo(downloaded) { UseShellExecute = true }
+                : new ProcessStartInfo("explorer.exe") { UseShellExecute = false, Arguments = $"/select,\"{downloaded}\"" };
+            using Process? started = Process.Start(open);
+            return started is not null;
+        }
+        catch (Exception problem) when (problem is IOException or Win32Exception)
+        {
+            return false;
+        }
+    }
+
     public Task<bool> PrepareAsync(string downloaded, ReleaseInfo release, CancellationToken cancel)
     {
         _downloaded = downloaded;
-        return Task.FromResult(File.Exists(downloaded));
+        Failure = File.Exists(downloaded) ? null : "il file scaricato non c'e' piu'";
+        return Task.FromResult(Failure is null);
     }
 
     public bool Install(bool relaunch)

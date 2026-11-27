@@ -12,7 +12,7 @@ For Windows and macOS. One file, nothing to install.
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![macOS](https://img.shields.io/badge/macOS-14%2B-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-228-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-232-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
@@ -53,20 +53,26 @@ Windows 10 or 11, 64-bit; macOS 14 or later (15 or later recommended, as for
 Windows 10 and 11; where it is missing, the map page says what to install and
 the rest of DuckNote works without it.
 
-No binary is signed with a certificate: SmartScreen warns on the first run on
-Windows, and on the Mac the app (ad-hoc signed) is opened the first time from
-**System Settings › Privacy & Security › Open Anyway**. The SHA-256 of every
-file is published with each release, and the running executable shows its own
-in **Impostazioni › Sistema** (Settings › System).
+No binary is signed with a certificate yet: SmartScreen warns on the first run
+on Windows, and on the Mac the app (ad-hoc signed) is opened the first time from
+**System Settings › Privacy & Security › Open Anyway**. Only the first
+installation needs it: the versions DuckNote downloads and installs itself open
+directly. The SHA-256 of every file is published with each release, and the
+running executable shows its own in **Impostazioni › Sistema** (Settings ›
+System).
 
 **DuckNote updates itself.** A few seconds after startup it asks GitHub for
 the latest release; if it is newer, it downloads the file for this installation
 (portable exe, installer or the disk image for this Mac), keeps it only if its
 SHA-256 matches `SHA256SUMS.txt` of the same release, and installs it when
 DuckNote closes — or at once, with **Riavvia e aggiorna** (restart and update).
-A copy that cannot replace itself (opened from the disk image, in a read-only
-folder) shows the release page instead. Automatic updates start from 0.0.18:
-older copies are replaced by hand once.
+It checks again every six hours, so a DuckNote left open for days updates too.
+If the new version cannot replace the old one by itself, DuckNote says why and
+opens what it downloaded (**Apri l'aggiornamento**): on the Mac the disk image —
+drag DuckNote to Applications — on Windows the installer, or the new
+`DuckNote.exe` in Explorer. A copy opened from the disk image or kept in a
+read-only folder shows the release page instead. Automatic updates start from
+0.0.18; on the Mac they are reliable from 0.0.20.
 
 The Mac version is the same application rebuilt on Avalonia, with the sheet
 and the map in the native web view: same pages, same files, same vault. On
@@ -442,12 +448,26 @@ repository, so building them needs no Node.js:
 
 After changing one, `npm ci && node build.mjs` rebuilds it and
 `node test/run.mjs` tests it in Chromium with Playwright (mouse and keyboard
-as a person uses them: 28 scenarios for the map, 19 for the editor).
+as a person uses them: 29 scenarios for the map, 19 for the editor).
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one
 also runs on Linux (with WebKitGTK), which is how the screenshots here were
 taken.
+
+**Signing for macOS.** With these repository secrets the release workflow signs
+the Mac app with a Developer ID certificate and the hardened runtime
+([`DuckNote.entitlements`](packaging/macos/DuckNote.entitlements)), has Apple
+notarize the app and the disk image and staples the ticket, so the app opens at
+the first double click; without them it stays ad-hoc signed.
+
+| Secret | What it is |
+|---|---|
+| `MACOS_CERTIFICATE` | the *Developer ID Application* certificate with its private key, exported as `.p12` and encoded in base64 |
+| `MACOS_CERTIFICATE_PASSWORD` | the password of the `.p12` |
+| `APPLE_ID` | the Apple Account of the developer membership |
+| `APPLE_TEAM_ID` | the ten-character team ID |
+| `APPLE_APP_PASSWORD` | an app-specific password for that account, from account.apple.com |
 
 Releases are built by GitHub Actions: when a push to `main` carries a new
 version in `Directory.Build.props`,
@@ -476,7 +496,7 @@ src/DuckNote.App     the Windows application (WPF), on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table and the map
   Views/               lock screen, dialogs
-tests/               228 tests, including the fixtures written by the
+tests/               232 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README pictures, and the scripts that
                      draw the avatars and the sheet icon

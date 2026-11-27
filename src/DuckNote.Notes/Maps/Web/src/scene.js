@@ -2,7 +2,7 @@
 // modello ha il suo elemento, creato una volta e poi solo aggiornato (render si chiama spesso:
 // a ogni fotogramma di un trascinamento).
 
-import { s, attr, text, toggleClass, fit, measure } from './dom.js';
+import { s, attr, text, toggleClass, fit, measure, shown } from './dom.js';
 import { NODE_W, NODE_H, KIND, MIN_ZOOM, MAX_ZOOM, PORTED, carriesVlan, parseVlans } from './model.js';
 import { kinds as kindIcons } from './icons.js';
 import { bundles, linkPath } from './geometry.js';
@@ -335,9 +335,9 @@ export class Scene {
       let tags = this.els.labels.get(link.id);
       if (!tags) {
         tags = s('g', { class: 'dm-link-labels', 'data-type': 'link', 'data-id': link.id });
-        tags.innerHTML = '<g class="dm-chip dm-link-chip"><line class="dm-leader"/><rect height="18" rx="6"/><text y="12.5"></text></g>'
-          + '<g class="dm-chip dm-port dm-port-a"><line class="dm-leader"/><rect height="16" rx="5"/><text y="11.5"></text></g>'
-          + '<g class="dm-chip dm-port dm-port-b"><line class="dm-leader"/><rect height="16" rx="5"/><text y="11.5"></text></g>';
+        tags.innerHTML = '<g class="dm-tag dm-link-chip"><line class="dm-leader"/><rect height="18" rx="6"/><text y="12.5"></text></g>'
+          + '<g class="dm-tag dm-port dm-port-a"><line class="dm-leader"/><rect height="16" rx="5"/><text y="11.5"></text></g>'
+          + '<g class="dm-tag dm-port dm-port-b"><line class="dm-leader"/><rect height="16" rx="5"/><text y="11.5"></text></g>';
         this.els.labels.set(link.id, tags);
         this.layers.labels.append(tags);
       }
@@ -355,12 +355,12 @@ export class Scene {
     attr(line, 'class', `dm-link k-${link.kind}${sel ? ' selected' : ''}${down ? ' down' : ''}${dim ? ' dim' : ''}`);
     attr(tags, 'class', `dm-link-labels${sel ? ' selected' : ''}${dim ? ' dim' : ''}`);
     if (!path) {
-      attr(line, 'display', 'none');
-      attr(tags, 'display', 'none');
+      shown(line, false);
+      shown(tags, false);
       return;
     }
-    attr(line, 'display', null);
-    attr(tags, 'display', null);
+    shown(line, true);
+    shown(tags, true);
     const d = `M${path.p.x.toFixed(1)} ${path.p.y.toFixed(1)} L${path.q.x.toFixed(1)} ${path.q.y.toFixed(1)}`;
     attr(line.children[0], 'd', d);
     attr(line.children[1], 'd', d);
@@ -376,10 +376,10 @@ export class Scene {
    */
   chip(g, label, spot) {
     if (!label || !spot) {
-      attr(g, 'display', 'none');
+      shown(g, false);
       return;
     }
-    attr(g, 'display', null);
+    shown(g, true);
     const width = Math.ceil(measure(label, CHIP_FONT)) + 12;
     const rect = g.querySelector('rect');
     const height = Number(rect.getAttribute('height'));
@@ -389,13 +389,13 @@ export class Scene {
     attr(rect, 'width', width);
     const leader = g.querySelector('.dm-leader');
     if (spot.lead) {
-      attr(leader, 'display', null);
+      shown(leader, true);
       attr(leader, 'x1', (spot.anchor.x - left).toFixed(1));
       attr(leader, 'y1', (spot.anchor.y - top).toFixed(1));
       attr(leader, 'x2', (width / 2).toFixed(1));
       attr(leader, 'y2', (height / 2).toFixed(1));
     } else {
-      attr(leader, 'display', 'none');
+      shown(leader, false);
     }
     const t = g.querySelector('text');
     attr(t, 'x', 6);

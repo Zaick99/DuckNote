@@ -43,7 +43,7 @@ public partial class NotesPage
         }
 
         IReadOnlyList<OutlineRow> rows = OutlineTree.Build(
-            _ws.Book.Sheets.Select(sheet => sheet.Outline()), _sheet?.Id, OutlineFilter.Text, _openBranches);
+            _ws.Book.Sheets.Select(sheet => sheet.Outline()), _front ? _sheet?.Id : null, OutlineFilter.Text, _openBranches);
 
         HashSet<string> keys = [.. rows.Select(row => row.Key)];
 

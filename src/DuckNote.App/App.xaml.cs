@@ -76,22 +76,40 @@ public partial class App : Application
             };
             later.Start();
         }
+
+        // e poi ogni sei ore: anche DuckNote lasciata aperta per giorni si aggiorna
+        DispatcherTimer clock = new() { Interval = TimeSpan.FromHours(6) };
+        clock.Tick += async (_, _) =>
+        {
+            if (settings.CheckUpdates && !Updates.AppUpdates.Session.IsReady)
+            {
+                await Updates.AppUpdates.Session.CheckAsync();
+            }
+        };
+        clock.Start();
     }
 
-    private bool _updateTold;
+    private string? _updateTold;
 
-    /// <summary>Una volta per avvio: pronta (si installa alla chiusura, o subito), oppure il link alla release.</summary>
+    /// <summary>Una volta per versione: pronta (si installa alla chiusura, o subito), da aprire a mano, oppure il link alla release.</summary>
     private void OnUpdate()
     {
         UpdateSession updates = Updates.AppUpdates.Session;
 
-        if (_updateTold || updates.IsChecking || updates.Available is not { } release)
+        if (updates.IsChecking || updates.Available is not { } release)
         {
             return;
         }
 
-        _updateTold = true;
         string version = UpdateFeed.Describe(release.Version);
+        string told = $"{version}{(updates.IsReady ? "+" : updates.CanOpenDownloaded ? "~" : string.Empty)}";
+
+        if (_updateTold == told)
+        {
+            return;
+        }
+
+        _updateTold = told;
 
         if (updates.IsReady)
         {
@@ -102,6 +120,12 @@ public partial class App : Application
                     MainWindow?.Close();
                 }
             });
+            return;
+        }
+
+        if (updates.CanOpenDownloaded)
+        {
+            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded());
             return;
         }
 

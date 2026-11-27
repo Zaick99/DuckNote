@@ -60,6 +60,15 @@ export function attr(el, name, value) {
   else el.setAttribute(name, text);
 }
 
+/**
+ * Mostra o nasconde un elemento (anche SVG) con lo stile in linea: vince su ogni regola dei fogli
+ * di stile, che invece passerebbe sopra all'attributo display.
+ */
+export function shown(el, on) {
+  const value = on ? '' : 'none';
+  if (el.style.display !== value) el.style.display = value;
+}
+
 export function text(el, value) {
   const t = value ?? '';
   if (el.textContent !== t) el.textContent = t;

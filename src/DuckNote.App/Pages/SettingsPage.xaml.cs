@@ -278,6 +278,7 @@ public partial class SettingsPage : UserControl, IDuckPage
         BtnUpdate.IsEnabled = !updates.IsChecking;
         BtnUpdate.Content = updates.IsChecking ? "Controllo..."
             : updates.IsReady ? "Riavvia e aggiorna"
+            : updates.CanOpenDownloaded ? "Apri l'aggiornamento"
             : updates.Available is not null ? "Apri la pagina"
             : "Controlla adesso";
     }
@@ -293,6 +294,12 @@ public partial class SettingsPage : UserControl, IDuckPage
                 Window.GetWindow(this)?.Close();
             }
 
+            return;
+        }
+
+        if (updates.CanOpenDownloaded)
+        {
+            updates.OpenDownloaded();
             return;
         }
 

@@ -113,7 +113,15 @@ public sealed partial class NotesPage : UserControl, IDuckPage
         FocusText();
     }
 
-    public void OnHidden() => _front = false;
+    /// <summary>
+    /// Un'altra pagina (Rete, Mappa, Impostazioni) e' in primo piano: nell'indice nessun foglio
+    /// resta evidenziato, come se fosse aperto.
+    /// </summary>
+    public void OnHidden()
+    {
+        _front = false;
+        RefreshOutline();
+    }
 
     /// <summary>Il cursore nel testo.</summary>
     public void FocusText()

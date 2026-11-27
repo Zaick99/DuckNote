@@ -2,15 +2,47 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.0.20] - 2026-11-26
+## [0.0.20] - 2026-11-27
+
+**Updates that do not get stuck on the Mac, and a map that shows what is really there.**
+
+### Fixed
+
+- **A field emptied in the card disappears from the map too.** Clearing the
+  speed, the VLAN or a port of a cable left its old label on the map: the
+  labels drawn on the map shared a style name with the state chips of the card,
+  and that style kept them visible. Every field is checked now — cables (speed,
+  VLAN, ports), zones (network, VLAN, name) and devices (address, number of
+  ports) — by a new test that empties them one by one.
+- **The Mac could not install an update by itself.** From 0.0.18, the update
+  to 0.0.19 stopped at "non si e' potuta preparare" without saying why. Now
+  every step has a second way — the disk image mounted where macOS chooses if
+  it refuses DuckNote's folder, the new app copied into the temporary folder if
+  it cannot go next to the old one — and the message says which step failed and
+  what macOS answered; the details go to `DuckNote-update/aggiornamento.log` in
+  the temporary folder.
 
 ### Changed
 
+- **If the update cannot install itself, it opens.** On the Mac the verified
+  disk image opens in the Finder (**Apri l'aggiornamento**): drag DuckNote to
+  Applications. On Windows the installer opens, or the new `DuckNote.exe` is
+  shown in Explorer. Either way nothing is downloaded again, and the copy
+  downloaded by DuckNote opens without the **Privacy e sicurezza** detour.
+- **Updates are checked every six hours**, not only at startup: a DuckNote
+  left open for days updates too. A version that could not be prepared is not
+  downloaded again in the same session.
+- **Nothing stays highlighted in the sidebar while Rete, Mappa or Impostazioni
+  is open.** The open sheet is marked again when you go back to the note.
 - **On Windows the map stays open while you visit the other pages.** Once
   opened, the **Mappa** page keeps its web engine running and is only hidden:
-  coming back is instant, with the map exactly as it was, and WebView2 is never
-  taken out of the window and started again. If the engine stops on its own,
-  it starts again the next time the page is shown.
+  coming back is instant, with the map as it was. If the engine stops on its
+  own, it starts again the next time the page is shown.
+- **Ready for Apple notarization.** With a Developer ID certificate in the
+  repository secrets (see *Building*), the release workflow signs the Mac app
+  with the hardened runtime, has Apple notarize the app and the disk image, and
+  staples the ticket: the app then opens at the first double click. Without the
+  secrets nothing changes.
 
 ## [0.0.19] - 2026-11-26
 

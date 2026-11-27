@@ -327,9 +327,9 @@ await check('le etichette di porte e VLAN non si coprono e restano visibili', as
   await reset({ v: 1, current: 'mlab', maps: [{ id: 'mlab', name: 'Etichette', nodes, links, zones: [], view: { x: 640, y: 240, k: 1 } }] });
   await frame();
   // la pillola, non il gruppo: il filo che lega un'etichetta lontana al suo cavo puo' passare sotto le altre
-  const boxes = await page.$$eval('.dm-labels .dm-chip', (els) => els.map((el) => {
+  const boxes = await page.$$eval('.dm-labels .dm-tag', (els) => els.map((el) => {
     const r = el.querySelector('rect').getBoundingClientRect();
-    return { id: el.closest('[data-id]').dataset.id, cls: el.getAttribute('class'), shown: el.getAttribute('display') !== 'none', x: r.x, y: r.y, w: r.width, h: r.height };
+    return { id: el.closest('[data-id]').dataset.id, cls: el.getAttribute('class'), shown: getComputedStyle(el).display !== 'none', x: r.x, y: r.y, w: r.width, h: r.height };
   }));
   const expected = links.length * 3;
   const shown = boxes.filter((b) => b.shown);
@@ -343,6 +343,48 @@ await check('le etichette di porte e VLAN non si coprono e restano visibili', as
   }
   assert(clashes.length === 0, clashes.join(', '));
   await page.screenshot({ path: `${out}etichette.png` });
+});
+
+await check('togliere un dato dalla scheda lo toglie anche dalla mappa', async () => {
+  const visible = (selector) => page.$eval(selector, (el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0);
+  const far = two.maps[0].nodes.map((n) => (n.id === 'nswitch' ? { ...n, y: 320, ports: 8 } : { ...n }));
+  await reset({ ...two, maps: [{ ...two.maps[0], nodes: far, links: [{ id: 'lone', a: 'nrouter', b: 'nswitch', speed: '1G', vlan: '10', pa: 'eth1', pb: 'Gi0/1' }],
+    zones: [{ id: 'zlan', name: 'LAN', cidr: '10.0.0.0/24', vlan: '10', x: -40, y: -60, w: 300, h: 460 }] }] });
+  await frame();
+  assert(await visible('[data-id="lone"] .dm-link-chip') && await visible('[data-id="lone"] .dm-port-a') && await visible('[data-id="lone"] .dm-port-b'), 'etichette mancanti all inizio');
+
+  await page.click('[data-id="lone"] .dm-link-hit', { force: true });
+  await page.selectOption('.dm-inspector select', '');
+  await frame();
+  assert((await page.textContent('[data-id="lone"] .dm-link-chip text')) === 'VLAN 10', 'la velocita\' e\' rimasta');
+  await page.fill('.dm-inspector [data-field="vlan"]', '');
+  await page.fill('.dm-inspector [data-field="pa"]', '');
+  await page.fill('.dm-inspector [data-field="pb"]', '');
+  await frame();
+  for (const part of ['.dm-link-chip', '.dm-port-a', '.dm-port-b']) assert(!(await visible(`[data-id="lone"] ${part}`)), `${part} ancora visibile`);
+
+  // la zona: senza rete e senza VLAN resta solo il nome
+  await page.evaluate(() => dm.store.select(['zlan']));
+  await page.fill('.dm-inspector [data-field="cidr"]', '');
+  await page.fill('.dm-inspector [data-field="vlan"]', '');
+  await frame();
+  assert((await page.textContent('[data-id="zlan"] .dm-zone-sub')) === '', 'la rete della zona e\' rimasta');
+
+  // l'apparato: senza indirizzo niente pallino, la seconda riga torna il tipo; senza porte il pannello sparisce
+  await page.evaluate(() => dm.store.select(['nrouter']));
+  await page.fill('.dm-inspector [data-field="host"]', '');
+  await page.keyboard.press('Tab');
+  await frame();
+  assert((await page.getAttribute('[data-id="nrouter"]', 'class')).includes('st-none'), 'il pallino di stato e\' rimasto');
+  await page.evaluate(() => dm.store.select(['nswitch']));
+  assert(await page.isVisible('.dm-ports-grid'), 'pannello delle porte mancante');
+  await page.fill('.dm-inspector [data-field="ports"]', '0');
+  await page.keyboard.press('Tab');
+  await frame();
+  assert(!(await page.isVisible('.dm-ports-grid')), 'il pannello delle porte e\' rimasto');
+  const doc = await map();
+  const link = doc.links[0];
+  assert(!link.speed && !link.vlan && !link.pa && !link.pb && doc.zones[0].cidr === '' && doc.nodes.find((n) => n.id === 'nrouter').host === '', JSON.stringify(doc));
 });
 
 await check('incollare un elenco di indirizzi crea gli apparati', async () => {
