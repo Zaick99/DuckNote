@@ -2,6 +2,28 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.21] - 2026-11-27
+
+**The map opens on Windows.**
+
+### Fixed
+
+- **On Windows the Mappa page did not load.** Opening it stopped with an error
+  about windows that cannot be shown ("Cannot set Visibility to Visible or call
+  Show, ShowDialog…") and the map stayed empty. The web view that draws the map
+  inside DuckNote's transparent window needs a piece of Windows (the WinRT
+  graphics projection, `Microsoft.Windows.SDK.NET`) that the build did not
+  include; the executable now carries it, for Windows 10 1809 and later. The
+  portable `DuckNote.exe` grows by about 6 MB.
+- **A web engine that cannot start no longer stops the window.** If the map's
+  engine still fails (an old or reduced Windows, WebView2 Runtime missing), the
+  Mappa page says what went wrong and the rest of DuckNote keeps working; the
+  map saved in the note is untouched.
+- **One error, one dialog.** An error raised while the error dialog was already
+  open stacked a second dialog on the first, and the stack ended in the same
+  "cannot show a window while it is closing" message. Now only the first one is
+  shown.
+
 ## [0.0.20] - 2026-11-27
 
 **Updates that do not get stuck on the Mac, and a map that shows what is really there.**

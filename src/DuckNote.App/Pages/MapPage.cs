@@ -30,8 +30,10 @@ public sealed class MapPage : UserControl, IDuckPage
     private const string Address = "https://ducknote.invalid/mappa";
 
     private readonly Workspace _ws;
-    private readonly WebView2CompositionControl _web = new() { Focusable = true };
+    private readonly SafeWebView _web = new() { Focusable = true };
     private readonly Border _missing;
+    private readonly TextBlock _missingTitle = new();
+    private readonly TextBlock _missingText = new();
     private readonly DispatcherTimer _hosts = new() { Interval = TimeSpan.FromMilliseconds(400) };
 
     private bool _starting;
@@ -52,6 +54,7 @@ public sealed class MapPage : UserControl, IDuckPage
         _web.SetResourceReference(BackgroundProperty, "BgContent");
 
         _missing = Missing();
+        _web.Failed += ShowMissing;
         Grid root = new();
         root.Children.Add(_web);
         root.Children.Add(_missing);
@@ -93,7 +96,7 @@ public sealed class MapPage : UserControl, IDuckPage
             _web.Focus();
             Call("dm.focus()");
         }
-        else if (!_starting && IsLoaded)
+        else if (!_starting && IsLoaded && _web.Problem is null)
         {
             // il motore non c'e' (non e' ancora partito, o si e' fermato): riparte
             _ = Start();
@@ -106,7 +109,7 @@ public sealed class MapPage : UserControl, IDuckPage
 
     private async Task Start()
     {
-        if (_starting)
+        if (_starting || _web.Problem is not null)
         {
             return;
         }
@@ -117,10 +120,10 @@ public sealed class MapPage : UserControl, IDuckPage
         {
             await _web.EnsureCoreWebView2Async();
         }
-        catch (Exception problem) when (problem is WebView2RuntimeNotFoundException or System.Runtime.InteropServices.COMException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception problem) when (SafeWebView.IsEngineProblem(problem) || problem is IOException or UnauthorizedAccessException)
         {
             _starting = false;
-            _missing.Visibility = Visibility.Visible;
+            ShowMissing(problem);
             return;
         }
 
@@ -189,26 +192,42 @@ public sealed class MapPage : UserControl, IDuckPage
         return MapWeb.Html(art);
     }
 
-    /// <summary>Senza il motore WebView2 (Windows vecchi o ridotti) la mappa dice cosa installare.</summary>
+    /// <summary>Senza il motore WebView2 (Windows vecchi o ridotti) la mappa dice cosa manca, invece di fermare la finestra.</summary>
     private Border Missing()
     {
-        TextBlock title = new() { Text = "Per la mappa serve Microsoft Edge WebView2", FontSize = 17, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center };
-        title.SetResourceReference(TextBlock.ForegroundProperty, "Label");
-        TextBlock text = new()
-        {
-            Text = "E' gia' in Windows 10 e 11 aggiornati. Se manca si installa gratis da Microsoft (\"WebView2 Runtime\"); poi riapri DuckNote. Il resto di DuckNote funziona anche senza.",
-            TextWrapping = TextWrapping.Wrap,
-            TextAlignment = TextAlignment.Center,
-            Margin = new Thickness(0, 8, 0, 0),
-            MaxWidth = 420
-        };
-        text.SetResourceReference(TextBlock.ForegroundProperty, "LabelSecondary");
+        _missingTitle.FontSize = 17;
+        _missingTitle.FontWeight = FontWeights.Bold;
+        _missingTitle.TextAlignment = TextAlignment.Center;
+        _missingTitle.SetResourceReference(TextBlock.ForegroundProperty, "Label");
+        _missingText.TextWrapping = TextWrapping.Wrap;
+        _missingText.TextAlignment = TextAlignment.Center;
+        _missingText.Margin = new Thickness(0, 8, 0, 0);
+        _missingText.MaxWidth = 460;
+        _missingText.SetResourceReference(TextBlock.ForegroundProperty, "LabelSecondary");
 
         return new Border
         {
             Visibility = Visibility.Collapsed,
-            Child = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Children = { title, text } }
+            Child = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Children = { _missingTitle, _missingText } }
         };
+    }
+
+    private void ShowMissing(Exception problem)
+    {
+        if (problem is WebView2RuntimeNotFoundException)
+        {
+            _missingTitle.Text = "Per la mappa serve Microsoft Edge WebView2";
+            _missingText.Text = "E' gia' in Windows 10 e 11 aggiornati. Se manca si installa gratis da Microsoft (\"WebView2 Runtime\"); poi riapri DuckNote. Il resto di DuckNote funziona anche senza.";
+        }
+        else
+        {
+            _missingTitle.Text = "La mappa non e' partita";
+            _missingText.Text = $"Il motore della pagina (WebView2) ha dato un errore: {problem.Message} Aggiorna Windows e WebView2 Runtime, poi riapri DuckNote. Il resto di DuckNote funziona anche senza; la mappa salvata nella nota resta com'e'.";
+        }
+
+        _ready = false;
+        _web.Visibility = Visibility.Collapsed;
+        _missing.Visibility = Visibility.Visible;
     }
 
     // ------------------------------------------------------------------ verso la pagina

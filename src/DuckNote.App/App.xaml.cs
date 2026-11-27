@@ -152,6 +152,9 @@ public partial class App : Application
         base.OnExit(e);
     }
 
+    /// <summary>C'e' gia' un dialogo d'errore aperto.</summary>
+    private bool _reporting;
+
     /// <summary>
     /// Nessun crash muto: la nota si salva, poi un dialogo con messaggio, tipo e primo frame del
     /// codice dell'app. Se il dialogo stesso non si costruisce, resta il MessageBox di sistema.
@@ -159,7 +162,37 @@ public partial class App : Application
     private void OnUiException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
         e.Handled = true;
-        Exception ex = e.Exception.GetBaseException();
+
+        // il motore delle pagine web (WebView2) che non parte non e' un crash di DuckNote: la
+        // pagina della mappa si spegne e dice cosa manca, il resto continua
+        if (Ui.SafeWebView.FromWebView(e.Exception))
+        {
+            Ui.SafeWebView.Report(e.Exception.GetBaseException());
+            return;
+        }
+
+        // un errore mentre se ne sta gia' mostrando un altro: un dialogo solo, non una cascata
+        // (che finirebbe in "non si puo' mostrare una finestra mentre si chiude")
+        if (_reporting)
+        {
+            return;
+        }
+
+        _reporting = true;
+
+        try
+        {
+            Report(e.Exception);
+        }
+        finally
+        {
+            _reporting = false;
+        }
+    }
+
+    private void Report(Exception thrown)
+    {
+        Exception ex = thrown.GetBaseException();
         string ns = typeof(App).Namespace!;
         string where = (ex.StackTrace ?? string.Empty).Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Contains(ns + ".", StringComparison.Ordinal)) ?? string.Empty;
         bool saved = false;

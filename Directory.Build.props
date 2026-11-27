@@ -15,7 +15,7 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <Product>DuckNote</Product>
     <Company>DuckNote</Company>
-    <Version>0.0.20</Version>
+    <Version>0.0.21</Version>
   </PropertyGroup>
 
 </Project>

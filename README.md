@@ -43,15 +43,16 @@ For Windows and macOS. One file, nothing to install.
 
 | File | What it is |
 |---|---|
-| `DuckNote.exe` | Windows, portable, about 67 MB — the .NET runtime, WPF and the application in one file. Nothing to install. |
+| `DuckNote.exe` | Windows, portable, about 74 MB — the .NET runtime, WPF and the application in one file. Nothing to install. |
 | `DuckNote-<version>-setup.exe` | Windows installer — installs for the current user, no elevation, with shortcuts and an uninstall entry. |
 | `DuckNote-<version>-macos-arm64.dmg` | macOS, Apple Silicon — drag DuckNote to Applications. |
 | `DuckNote-<version>-macos-x64.dmg` | macOS, Intel. |
 
-Windows 10 or 11, 64-bit; macOS 14 or later (15 or later recommended, as for
-.NET 10). On Windows the map uses Microsoft Edge WebView2, already part of
-Windows 10 and 11; where it is missing, the map page says what to install and
-the rest of DuckNote works without it.
+Windows 10 (version 1809 or later) or 11, 64-bit; macOS 14 or later (15 or
+later recommended, as for .NET 10). On Windows the map uses Microsoft Edge
+WebView2, already part of Windows 10 and 11; where it is missing or cannot
+start, the map page says what went wrong and the rest of DuckNote works
+without it.
 
 No binary is signed with a certificate yet: SmartScreen warns on the first run
 on Windows, and on the Mac the app (ad-hoc signed) is opened the first time from
