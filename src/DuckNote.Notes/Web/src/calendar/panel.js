@@ -5,7 +5,7 @@ import { h, icon } from '../common/dom.js';
 import { ui as uiIcons } from '../common/icons.js';
 import {
   addDays, partsOf, occurrences, allItems, nextDate, longDay, shortDay, relative, repeatLabel,
-  reminderLabel, MONTHS, WEEKDAYS, weekday, dayNumber,
+  reminderLabel, MONTHS, WEEKDAYS, weekday, dayNumber, KIND,
 } from './model.js';
 import { kindIcon } from './editor.js';
 import { toneOf } from './month.js';
@@ -112,6 +112,59 @@ export function searchView(state, actions) {
     found.length
       ? h('div', { class: 'dc-list' }, found.slice(0, 200).map((o) => itemRow(o, state, actions, { showDate: true })))
       : h('div', { class: 'dc-empty' }, 'Nessuna voce corrisponde.'));
+}
+
+/**
+ * La scheda di una voce, da leggere: quando, ogni quanto, i promemoria, a cosa e' legata, gli
+ * appunti. Si modifica solo dalla matita.
+ */
+export function detailView(state, occurrence, actions) {
+  const { item } = occurrence;
+  const tone = toneOf(item);
+  const checkable = item.kind === 'todo' || item.kind === 'deadline';
+  const thisYear = partsOf(state.today)[0];
+  const host = item.link ? state.hostState(item.link) : null;
+  const late = checkable && !occurrence.done && occurrence.date < state.today;
+
+  const when = `${longDay(occurrence.date)}${item.time ? `, alle ${item.time}` : ', tutto il giorno'}`;
+  const facts = [
+    ['Quando', h('span', {}, when, h('span', { class: `dc-detail-when${late ? ' late' : ''}` }, ` · ${relative(occurrence.date, state.today)}`))],
+    item.repeat ? ['Ripete', repeatLabel(item, thisYear)] : null,
+    ['Promemoria', item.remind.length ? item.remind.map((m) => reminderLabel(m, !item.time)).join(', ') : 'nessuno'],
+    item.link ? ['Collegato a', h('button', {
+      class: 'dc-detail-link',
+      type: 'button',
+      title: item.link.kind === 'node' ? 'Mostralo sulla mappa' : 'Mostralo nella pagina Rete',
+      onclick: () => actions.reveal(item.link),
+    },
+    host ? h('span', { class: `dm-dot st-${host}` }) : icon(item.link.kind === 'node' ? uiIcons.map : uiIcons.network, 12),
+    h('span', { class: 'dc-link-name' }, item.link.name || item.link.host),
+    item.link.name && item.link.host ? h('span', { class: 'dc-link-host' }, item.link.host) : null)] : null,
+  ].filter(Boolean);
+
+  return h('div', { class: 'dc-view dc-detail' },
+    h('div', { class: 'dc-detail-head' },
+      h('div', { class: 'dc-detail-tile', style: { '--tone': `var(--c-${tone})`, '--tone-soft': `var(--t-${tone}-soft)` } }, icon(kindIcon(item.kind), 20)),
+      h('div', { class: 'dc-detail-titles' },
+        h('div', { class: `dc-detail-title${occurrence.done ? ' done' : ''}` }, item.title || 'Senza titolo'),
+        h('div', { class: 'dc-detail-sub' }, KIND[item.kind]?.label ?? 'Appuntamento', occurrence.done ? ' · fatto' : '')),
+      state.readonly ? null : h('button', {
+        class: 'dm-tool dm-press dc-edit',
+        type: 'button',
+        title: 'Modifica (E)',
+        'aria-label': 'Modifica',
+        onclick: () => actions.edit(occurrence),
+      }, icon(uiIcons.pen, 15))),
+    h('dl', { class: 'dc-facts' }, facts.map(([label, value]) => [h('dt', {}, label), h('dd', {}, value)])),
+    item.notes ? h('div', { class: 'dm-row' }, h('span', { class: 'dm-label' }, 'Appunti'), h('div', { class: 'dc-notes' }, item.notes)) : null,
+    h('div', { class: 'dc-editor-buttons' },
+      checkable && !state.readonly ? h('button', {
+        class: `dm-button small${occurrence.done ? '' : ' primary'}`,
+        type: 'button',
+        onclick: () => actions.done(occurrence, !occurrence.done),
+      }, icon(uiIcons.check, 12), h('span', {}, occurrence.done ? 'Da fare di nuovo' : 'Fatto')) : null,
+      h('span', { class: 'dm-spacer' }),
+      h('button', { class: 'dm-button small', type: 'button', onclick: () => actions.back() }, 'Chiudi')));
 }
 
 /** La scheda di un certificato: quando scade, chi e', e cosa farne. */

@@ -10,11 +10,11 @@ import { show as appear, hide as vanish } from '../common/motion.js';
 import { send, takeOutbox, activity, windowKey, applyTheme } from '../common/bridge.js';
 import {
   normalizeDoc, applyOp, writeItem, normalizeItem, localToday, parseDay, addDays, addMonths, partsOf,
-  makeDay, daysIn, MONTHS, newId, allItems, occurrences, shortDay,
+  makeDay, daysIn, MONTHS, newId, allItems, occurrences, shortDay, dates, nextDate,
 } from './model.js';
 import { Month } from './month.js';
 import { editor, linkPicker, DEFAULT_REMIND } from './editor.js';
-import { dayView, searchView, certView, certSettings } from './panel.js';
+import { dayView, searchView, certView, certSettings, detailView } from './panel.js';
 
 // ------------------------------------------------------------------ lo stato
 
@@ -29,10 +29,12 @@ const state = {
   hosts: [],
   devices: [],
   query: '',
-  /** day, search, edit, cert */
+  /** day, search, detail, edit, cert */
   view: 'day',
   editing: null,
   cert: '',
+  /** La volta mostrata nella scheda ("id@giorno"). */
+  detail: '',
   /** Lo stato dell'host legato (up, down, wait, unknown), se DuckNote lo conosce. */
   hostState(link) {
     const key = String(link?.host ?? '').toLowerCase();
@@ -81,6 +83,7 @@ const actions = {
     }
   },
   done: (occurrence, on) => change({ op: 'done', id: occurrence.item.id, date: occurrence.date, on }),
+  edit: (occurrence) => editOccurrence(occurrence),
   reveal: (link) => reveal(link),
   ignore: (host) => {
     if (change({ op: 'ignore', host, on: true })) {
@@ -120,6 +123,14 @@ function render() {
 
 function renderPanel() {
   if (state.view === 'edit' && state.editing) return;
+  if (state.view === 'detail') {
+    const occurrence = findOccurrence(state.detail);
+    if (occurrence && !occurrence.item.cert) {
+      fill(panel, detailView(state, occurrence, actions));
+      return;
+    }
+    state.view = 'day';
+  }
   if (state.view === 'cert') {
     const occurrence = findOccurrence(state.cert);
     if (occurrence?.item.cert) {
@@ -151,7 +162,7 @@ function findOccurrence(key) {
 function pick(day) {
   if (!parseDay(day)) return;
   state.selected = day;
-  if (state.view === 'search' || state.view === 'cert') state.view = 'day';
+  if (state.view === 'search' || state.view === 'cert' || state.view === 'detail') state.view = 'day';
   if (day.slice(0, 7) === state.month && month.select(day)) {
     renderPanel();
     return;
@@ -179,6 +190,7 @@ function back() {
   state.view = state.query.trim() ? 'search' : 'day';
   state.editing = null;
   state.cert = '';
+  state.detail = '';
   render();
 }
 
@@ -194,8 +206,39 @@ function open(occurrence) {
     render();
     return;
   }
+  showDetail(occurrence.item.id, occurrence.date);
+}
+
+/** La scheda della volta "id@giorno"; se non c'e' piu', il giorno. */
+function showDetail(id, date) {
+  const occurrence = findOccurrence(`${id}@${date}`);
+  if (!occurrence || occurrence.item.cert) {
+    back();
+    return;
+  }
+  popups.close();
+  state.view = 'detail';
+  state.detail = occurrence.key;
+  state.editing = null;
+  state.cert = '';
+  state.selected = occurrence.date;
+  state.month = occurrence.date.slice(0, 7);
+  render();
+  panel.scrollTop = 0;
+  appear(panel.firstElementChild, { dy: 6, ms: 200 });
+}
+
+/** La matita: la voce si apre per essere modificata. */
+function editOccurrence(occurrence) {
+  if (state.readonly) return;
   const item = state.doc.items.find((one) => one.id === occurrence.item.id);
   if (item) edit(structuredClone(item), false, occurrence.date);
+}
+
+/** Dopo una modifica: la volta che si guardava, se c'e' ancora, altrimenti la prossima. */
+function dateAfterEdit(item, date) {
+  if (!item.repeat) return item.date;
+  return dates(item, date, date).length ? date : nextDate(item, state.today);
 }
 
 function blank(day, seed = {}) {
@@ -236,14 +279,19 @@ function edit(draft, isNew, date) {
     readonly: state.readonly,
     pickLink: (anchor, choose) => linkPicker(popups, anchor, state, choose),
     reveal: (link) => reveal(link),
-    cancel: () => back(),
+    // una voce gia' scritta torna alla sua scheda; una nuova al giorno
+    cancel: () => (isNew ? back() : showDetail(draft.id, date)),
     save: (saved) => {
       const item = normalizeItem(writeItem(saved));
       if (!item) return;
       if (change({ op: 'put', item: writeItem(item) }) || !isNew) {
-        state.selected = item.date;
-        state.month = item.date.slice(0, 7);
-        back();
+        if (isNew) {
+          state.selected = item.date;
+          state.month = item.date.slice(0, 7);
+          back();
+        } else {
+          showDetail(item.id, dateAfterEdit(item, date));
+        }
       }
     },
     remove: (anchor) => remove(draft.id, date, anchor),
@@ -379,6 +427,10 @@ document.addEventListener('keydown', (event) => {
   } else if ((event.key === 'n' || event.key === 'N') && !state.readonly) {
     event.preventDefault();
     create(state.selected);
+  } else if ((event.key === 'e' || event.key === 'E' || event.key === 'Enter') && state.view === 'detail' && !state.readonly) {
+    event.preventDefault();
+    const occurrence = findOccurrence(state.detail);
+    if (occurrence) editOccurrence(occurrence);
   } else if (event.key === 'Escape' && state.view !== 'day') {
     event.preventDefault();
     back();

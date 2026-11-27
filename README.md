@@ -371,6 +371,7 @@ DuckNote is open.
 | top bar | previous and next month, **Oggi** (today), the search, **Certificati** (certificates), **Nuovo** (new) |
 | the month | six weeks from Monday; each day with its items, timed ones with their hour, and `+N` for the rest. A click chooses the day, a double click adds an item to it, an item that does not repeat is dragged to another day |
 | right | the chosen day; **In ritardo** (late: things to do and deadlines not done, up to 30 days back); the next 14 days. A tick marks a thing to do as done |
+| an item | a click opens its card, to read: when, how often, reminders, what it is linked to, notes. The pencil (or `E`) edits it; **Annulla** and **Salva** come back to the card |
 
 **Four kinds of item**: **Appuntamento** (an appointment, with its hour),
 **Da fare** (a thing to do), **Scadenza** (a deadline) and **Appunto** (a note
@@ -481,9 +482,10 @@ In the calendar:
 | `Page Up`, `Page Down` | previous month, next month |
 | `T` | today |
 | `N` | a new item on the chosen day |
+| `E` or `Enter` | edit the item whose card is open |
 | `Ctrl+Enter` | save the item being edited |
 | `Ctrl+F` | search the calendar |
-| `Esc` | close the item, clear the search |
+| `Esc` | close the card or the item being edited, clear the search |
 
 ---
 
@@ -560,7 +562,7 @@ repository, so building them needs no Node.js:
 
 After changing one, `npm ci && node build.mjs` rebuilds it and `npm test`
 tests it in Chromium with Playwright (mouse and keyboard as a person uses
-them: 32 scenarios for the map, 18 for the calendar, 19 for the editor).
+them: 32 scenarios for the map, 20 for the calendar, 19 for the editor).
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one

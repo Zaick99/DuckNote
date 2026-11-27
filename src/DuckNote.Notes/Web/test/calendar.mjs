@@ -106,6 +106,17 @@ await check('ogni settimana: le volte nel mese e la spunta di una volta', async 
   assert(cls.includes('done'), cls);
 });
 
+await check('la scheda di una cosa da fare la segna come fatta', async () => {
+  const todo = item({ kind: 'todo', title: 'Toner stampante', date: '2027-04-12' });
+  await load({ items: [todo] });
+  await page.click(`${cell('2027-04-12')} .dc-pill`);
+  assert((await page.textContent('.dc-detail .dc-facts')).includes('2 giorni fa'), 'in ritardo');
+  await page.click('.dc-detail .dm-button:has-text("Fatto")');
+  const [op] = await ops();
+  assert(op.op === 'done' && op.id === todo.id && op.date === '2027-04-12' && op.on === true, JSON.stringify(op));
+  assert(await page.isVisible('.dc-detail-title.done') && await page.isVisible('.dc-detail .dm-button:has-text("Da fare di nuovo")'), 'segnata');
+});
+
 await check('ogni mese il 31: il 30 aprile e di nuovo il 31 maggio', async () => {
   await load({ items: [item({ title: 'Fattura', date: '2027-01-31', repeat: 'month' })] });
   assert((await pills('2027-03-31')).includes('Fattura'), '31 marzo');
@@ -119,6 +130,7 @@ await check('eliminare una volta sola e poi annullare', async () => {
   const weekly = item({ title: 'Stand-up', date: '2027-04-05', time: '09:15', repeat: 'week' });
   await load({ items: [weekly] });
   await page.click(`${cell('2027-04-19')} .dc-pill`);
+  await page.click('.dc-detail .dc-edit');
   await page.click('.dc-editor .dm-button.danger');
   await page.click('.dm-menu .dm-menu-row:has-text("Solo la volta")');
   let [op] = await ops();
@@ -128,6 +140,38 @@ await check('eliminare una volta sola e poi annullare', async () => {
   [op] = await ops();
   assert(op.op === 'put' && (op.item.skip ?? []).length === 0, JSON.stringify(op));
   assert((await pills('2027-04-19')).includes('Stand-up'), 'tornata');
+});
+
+await check('un clic su una voce mostra la scheda, la matita la modifica', async () => {
+  const meeting = item({
+    title: 'Manutenzione UPS', date: '2027-04-05', time: '18:00', repeat: 'week', remind: [60], notes: 'portare le batterie\nchiave della sala server',
+    link: { kind: 'host', host: '192.168.40.10', name: 'Server' },
+  });
+  await load({ items: [meeting] }, { hosts: [{ key: '192.168.40.10', ip: '192.168.40.10', name: 'Server', state: 'up' }] });
+  await page.click(`${cell('2027-04-19')} .dc-pill`);
+  assert(await page.isVisible('.dc-detail') && !(await page.isVisible('.dc-editor')), 'scheda, non modifica');
+  assert((await page.textContent('.dc-detail-title')) === 'Manutenzione UPS', 'titolo');
+  const facts = await page.textContent('.dc-detail .dc-facts');
+  assert(facts.includes('lunedì 19 aprile 2027, alle 18:00') && facts.includes('Ogni settimana') && facts.includes('1 ora prima'), facts);
+  assert((await page.textContent('.dc-notes')) === 'portare le batterie\nchiave della sala server', 'appunti');
+  assert(await page.isVisible('.dc-detail-link .dm-dot.st-up'), 'stato dell host');
+  await page.click('.dc-detail-link');
+  const reveal = (await messages()).find((m) => m.t === 'reveal');
+  assert(reveal?.host === '192.168.40.10', JSON.stringify(reveal));
+  // dalla tastiera: E apre la modifica, Annulla torna alla scheda
+  await page.keyboard.press('e');
+  assert(await page.isVisible('.dc-editor') && (await page.inputValue('.dc-editor .dm-field.big')) === 'Manutenzione UPS', 'modifica');
+  await page.click('.dc-editor .dm-button:has-text("Annulla")');
+  assert(await page.isVisible('.dc-detail') && !(await page.isVisible('.dc-editor')), 'di nuovo la scheda');
+  // la matita, una modifica, Salva: si torna alla scheda aggiornata
+  await page.click('.dc-detail .dc-edit');
+  await page.fill('.dc-editor .dm-field.big', 'Manutenzione UPS sala server');
+  await page.click('.dc-editor .dm-button.primary');
+  const [op] = await ops();
+  assert(op?.op === 'put' && op.item.title === 'Manutenzione UPS sala server', JSON.stringify(op));
+  assert((await page.textContent('.dc-detail-title')) === 'Manutenzione UPS sala server', 'scheda aggiornata');
+  await page.keyboard.press('Escape');
+  assert(await page.isVisible('.dc-day-head'), 'Esc torna al giorno');
 });
 
 await check('trascinare una voce la sposta a un altro giorno', async () => {
@@ -197,7 +241,7 @@ await check('la ricerca trova le voci e Esc la chiude', async () => {
   const rows = await page.$$eval('.dc-row .dc-row-title', (els) => els.map((e) => e.textContent));
   assert(rows.join(',') === 'Rinnovo licenze', rows.join(','));
   await page.click('.dc-row:has-text("Rinnovo licenze")');
-  assert((await page.textContent('.dc-title')) === 'Giugno 2027' && await page.isVisible('.dc-editor'), 'aperta al suo giorno');
+  assert((await page.textContent('.dc-title')) === 'Giugno 2027' && await page.isVisible('.dc-detail'), 'aperta al suo giorno');
   await page.keyboard.press('Escape');
   await page.click('.dm-search');
   await page.keyboard.press('Escape');
@@ -246,6 +290,7 @@ await check('il calendario aggiornato dalla finestra chiude l editor di una voce
   const gone = item({ title: 'Da togliere' });
   await load({ items: [gone] });
   await page.click(`${cell(TODAY)} .dc-pill`);
+  await page.click('.dc-detail .dc-edit');
   assert(await page.isVisible('.dc-editor'), 'editor aperto');
   await page.evaluate(() => dc.data({ items: [] }));
   assert(!(await page.isVisible('.dc-editor')) && (await pills(TODAY)).length === 0, 'editor chiuso');
@@ -255,7 +300,9 @@ await check('sola lettura: niente si modifica', async () => {
   await load({ items: [item({ title: 'Ferma' })] }, { readonly: true });
   assert(await page.isVisible('.dm-chip:has-text("Sola lettura")') && await page.isDisabled('.dc-new'), 'Nuovo spento');
   await page.click(`${cell(TODAY)} .dc-pill`);
-  assert(!(await page.isVisible('.dc-editor .dm-button.primary')), 'niente Salva');
+  assert(await page.isVisible('.dc-detail') && !(await page.isVisible('.dc-detail .dc-edit')), 'la scheda senza matita');
+  await page.keyboard.press('e');
+  assert(!(await page.isVisible('.dc-editor')), 'niente modifica');
   await page.dblclick(cell('2027-04-21'));
   assert((await ops()).length === 0, 'niente cambiamenti');
 });

@@ -2,6 +2,20 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.23] - 2026-11-27
+
+**In the calendar, a click shows an item; the pencil edits it.**
+
+### Changed
+
+- **A click on an item opens its card, not the editor.** In the month, in the
+  list of the day, in the search results and from **Apri** of a reminder, an
+  item now opens a card to read: the day and hour of that time, how often it
+  repeats, its reminders, the host or device it is linked to (with its state,
+  one click opens it) and its notes. A thing to do or a deadline is marked
+  **Fatto** from the card. The editor opens only from the pencil (or with `E`);
+  **Annulla** and **Salva** come back to the card, `Esc` to the day.
+
 ## [0.0.22] - 2026-11-27
 
 **A calendar with reminders, and scans organised in groups.**

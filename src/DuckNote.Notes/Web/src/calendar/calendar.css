@@ -113,6 +113,23 @@
 .dc-section-title { display: flex; align-items: center; min-height: 22px; color: var(--c-LabelSecondary); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
 .dc-section-title.late { color: var(--c-Red); }
 
+/* ------------------------------------------------------------------ la scheda di una voce */
+
+.dc-detail-head { display: flex; align-items: flex-start; gap: 12px; }
+.dc-detail-tile { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 12px; background: var(--tone-soft); color: var(--tone); }
+.dc-detail-tile .dm-icon { stroke-width: 1.6; }
+.dc-detail-titles { flex: 1; min-width: 0; padding-top: 2px; }
+.dc-detail-title { font-size: 15px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+.dc-detail-title.done { color: var(--c-LabelTertiary); text-decoration: line-through; }
+.dc-detail-sub { color: var(--c-LabelTertiary); font-size: 11.5px; }
+.dc-edit { flex: none; width: 32px; height: 32px; border: 1px solid var(--c-Separator); border-radius: 8px; color: var(--c-Label); }
+.dc-edit:hover:not(:disabled) { border-color: var(--c-AccentBorder); background: var(--c-AccentSoft); color: var(--c-Accent); }
+.dc-detail-when { color: var(--c-LabelTertiary); }
+.dc-detail-when.late { color: var(--c-Red); font-weight: 600; }
+.dc-detail-link { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: default; }
+.dc-detail-link:hover .dc-link-name { color: var(--c-Accent); text-decoration: underline; }
+.dc-notes { padding: 9px 11px; border: 1px solid var(--c-Separator); border-radius: 10px; background: var(--c-BgField); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; user-select: text; -webkit-user-select: text; }
+
 /* ------------------------------------------------------------------ l'editor */
 
 .dc-editor { display: flex; flex-direction: column; gap: 12px; padding: 14px 14px 18px; }
