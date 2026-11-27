@@ -102,17 +102,16 @@ public sealed class ScanSession : Observable
     public HostRow? Find(string host) => _index.GetValueOrDefault(host);
 
     /// <summary>
-    /// Allinea la tabella alla nota: una riga nata da un indirizzo scritto lo segue, cancellato
-    /// l'indirizzo se ne va. Una riga nata da un intervallo resta, se ha un esito.
+    /// Restano solo gli host scritti nella nota (e quelli che <paramref name="alsoKeep"/> vuole
+    /// tenere: gli host dei gruppi): quelli trovati per intervallo escono.
     /// </summary>
-    /// <summary>Restano solo gli host scritti nella nota: quelli trovati per intervallo escono.</summary>
-    public int KeepOnlyNote()
+    public int KeepOnlyNote(Func<HostRow, bool>? alsoKeep = null)
     {
         int dropped = 0;
 
         for (int i = Rows.Count - 1; i >= 0; i--)
         {
-            if (Rows[i].NoteKey.Length == 0)
+            if (Rows[i].NoteKey.Length == 0 && alsoKeep?.Invoke(Rows[i]) != true)
             {
                 Drop(i);
                 dropped++;
@@ -127,7 +126,14 @@ public sealed class ScanSession : Observable
         return dropped;
     }
 
-    public void Prune(IEnumerable<string> written)
+    /// <summary>
+    /// Allinea la tabella alla nota: una riga nata da un indirizzo scritto lo segue, cancellato
+    /// l'indirizzo se ne va. Una riga nata da un intervallo resta, se ha un esito.
+    /// </summary>
+    /// <param name="alsoKeep">Le righe gia' controllate che restano anche quando il loro
+    /// indirizzo non e' piu' tenuto d'occhio: quelle dei gruppi. Restano sciolte, come se le
+    /// avesse trovate un'analisi per intervallo.</param>
+    public void Prune(IEnumerable<string> written, Func<HostRow, bool>? alsoKeep = null)
     {
         HashSet<string> keep = new(written, StringComparer.OrdinalIgnoreCase);
 
@@ -136,10 +142,44 @@ public sealed class ScanSession : Observable
             HostRow row = Rows[i];
             bool stays = row.NoteKey.Length > 0 ? keep.Contains(row.NoteKey) : row.IsChecked;
 
-            if (!stays)
+            if (stays)
             {
-                Drop(i);
+                continue;
             }
+
+            if (row.NoteKey.Length > 0 && row.IsChecked && alsoKeep?.Invoke(row) == true)
+            {
+                Unbind(row);
+                continue;
+            }
+
+            Drop(i);
+        }
+    }
+
+    /// <summary>
+    /// Segna quali righe tenute d'occhio sono scritte nella nota e quali ci stanno solo per un
+    /// gruppo monitorato: solo le prime hanno la matita e passano dal filtro "Nota".
+    /// </summary>
+    public void MarkWritten(IEnumerable<string> note)
+    {
+        HashSet<string> written = new(note, StringComparer.OrdinalIgnoreCase);
+
+        foreach (HostRow row in Rows)
+        {
+            row.Written = row.NoteKey.Length == 0 || written.Contains(row.NoteKey);
+        }
+    }
+
+    private void Unbind(HostRow row)
+    {
+        string key = row.NoteKey;
+        row.Unbind();
+
+        if (!row.Names().Contains(key, StringComparer.OrdinalIgnoreCase)
+            && _index.TryGetValue(key, out HostRow? known) && ReferenceEquals(known, row))
+        {
+            _index.Remove(key);
         }
     }
 
@@ -219,7 +259,8 @@ public sealed class ScanSession : Observable
     /// <param name="keep">false: un'analisi per intervallo toglie le righe che non c'entrano.</param>
     /// <param name="force">true: analisi completa anche di chi e' gia' stato analizzato (il
     /// comando "Analizza adesso" su un host).</param>
-    public async Task RunAsync(string targets, ScanOptions options, bool keep, bool force = false)
+    /// <param name="alsoKeep">Con keep false, le righe che restano comunque: quelle dei gruppi.</param>
+    public async Task RunAsync(string targets, ScanOptions options, bool keep, bool force = false, Func<HostRow, bool>? alsoKeep = null)
     {
         if (IsRunning)
         {
@@ -253,7 +294,7 @@ public sealed class ScanSession : Observable
 
             for (int i = Rows.Count - 1; i >= 0; i--)
             {
-                if (Rows[i].NoteKey.Length == 0 && !Rows[i].Names().Any(wanted.Contains))
+                if (Rows[i].NoteKey.Length == 0 && !Rows[i].Names().Any(wanted.Contains) && alsoKeep?.Invoke(Rows[i]) != true)
                 {
                     Drop(i);
                 }

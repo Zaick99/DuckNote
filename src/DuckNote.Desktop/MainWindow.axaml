@@ -80,6 +80,19 @@
             </Grid>
           </Button>
 
+          <!-- Calendario: appuntamenti, cose da fare e scadenze (anche dei certificati), col numero di oggi -->
+          <Button x:Name="NavCalendar" DockPanel.Dock="Top" Theme="{StaticResource Nav}" Click="OnCalendar">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+              <Border Width="24" Height="24" CornerRadius="6" Background="{DynamicResource Orange}">
+                <ui:Glyph Kind="calendar" Width="14" Height="14" Foreground="White"/>
+              </Border>
+              <TextBlock Grid.Column="1" Text="Calendario" Margin="10,0,0,0" VerticalAlignment="Center"/>
+              <Border x:Name="BadgeCalendar" Grid.Column="2" Classes="badge" Background="{DynamicResource OrangeSoft}" IsVisible="False">
+                <TextBlock x:Name="BadgeCalendarText" Foreground="{DynamicResource Orange}"/>
+              </Border>
+            </Grid>
+          </Button>
+
           <!-- in fondo: il monitoraggio, con il pulsante che controlla gli host dei fogli -->
           <Border DockPanel.Dock="Bottom" Classes="well" Margin="12,6,12,12" Padding="11,8">
             <StackPanel>

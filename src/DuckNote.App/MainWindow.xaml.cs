@@ -73,8 +73,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void RegisterPages()
     {
-        AddPage("network", "Rete", "\uE774", "Blue", () => new NetworkPage(_ws), NavTop);
+        AddPage("network", "Rete", "\uE774", "Blue", CreateNetwork, NavTop);
         AddPage("map", "Mappa", MapGlyph, "Teal", CreateMap, NavTop);
+        AddPage("calendar", "Calendario", "\uE787", "Orange", CreateCalendar, NavTop);
         AddPage("notes", "Note", "\uE70F", "Orange", () => new NotesPage(_ws), null);
         AddPage("settings", "Impostazioni", "\uE713", "Gray", () => new SettingsPage(_ws), null);
     }
@@ -190,6 +191,7 @@ public partial class MainWindow : Window
         if (_pages.FirstOrDefault(p => p.Key == key) is not { } info) return;
         if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is NotesPage leaving) leaving.OnHidden();
         if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is MapPage leavingMap) leavingMap.OnHidden();
+        if (_current is not null && _current != key && _cache.GetValueOrDefault(_current) is CalendarPage leavingCalendar) leavingCalendar.OnHidden();
         if (key == "settings" && _current is not null && _current != "settings") _beforeSettings = _current;
 
         _current = key;
@@ -201,16 +203,26 @@ public partial class MainWindow : Window
         var page = Open(key);
         Title = $"{AppTitle} - {info.Title}";
 
+        // le pagine web (mappa, calendario) restano caricate nel loro posto e si nascondono soltanto
         if (page is MapPage)
         {
             MapHost.Content ??= page;
             MapHost.Visibility = Visibility.Visible;
+            CalendarHost.Visibility = Visibility.Collapsed;
+            PageHost.Content = null;
+        }
+        else if (page is CalendarPage)
+        {
+            CalendarHost.Content ??= page;
+            CalendarHost.Visibility = Visibility.Visible;
+            MapHost.Visibility = Visibility.Collapsed;
             PageHost.Content = null;
         }
         else
         {
             PageHost.Content = page;
             MapHost.Visibility = Visibility.Collapsed;
+            CalendarHost.Visibility = Visibility.Collapsed;
         }
 
         ShowToolbar(page is NotesPage);

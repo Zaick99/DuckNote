@@ -17,6 +17,8 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using DuckNote.App.Scanning;
 using DuckNote.Desktop.Ui;
+using DuckNote.Desktop.Views;
+using DuckNote.Notes.Groups;
 using DuckNote.Notes.Scanning;
 
 namespace DuckNote.Desktop.Pages;
@@ -30,6 +32,10 @@ public sealed class NetworkPage : UserControl, IDuckPage
 {
     private static readonly string[] CsvHeader =
         ["Indirizzo", "Stato", "Nome", "NetBIOS", "mDNS", "MAC", "Produttore", "Risposta", "TTL", "Sistema", "Tipo", "Porte aperte", "Servizi", "Titolo web", "Ultima verifica"];
+
+    /// <summary>Il filtro per gruppo: tutti gli host, o quelli fuori dalla nota e dai gruppi.</summary>
+    private const string AllGroups = "*";
+    private const string NoGroup = "-";
 
     private readonly Workspace _ws;
 
@@ -46,6 +52,8 @@ public sealed class NetworkPage : UserControl, IDuckPage
     private readonly TextBox _range;
     private readonly Button _scan;
     private readonly Button _note;
+    private readonly Glyph _noteIcon = Icon("note", 11);
+    private readonly TextBlock _noteText = new() { Text = "Host della nota", VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _stop;
 
     private readonly RadioButton _all;
@@ -56,9 +64,9 @@ public sealed class NetworkPage : UserControl, IDuckPage
     private readonly Run _countUp = new("0") { FontWeight = FontWeight.Bold };
     private readonly Run _countDown = new("0") { FontWeight = FontWeight.Bold };
     private readonly Run _countWait = new("0") { FontWeight = FontWeight.Bold };
-    private readonly RadioButton _fromAll;
-    private readonly RadioButton _onlyNote;
-    private readonly RadioButton _onlySearch;
+    private readonly Button _groupButton;
+    private readonly TextBlock _groupText = new() { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = TextTrimming.CharacterEllipsis };
+    private string _group = AllGroups;
     private readonly TextBox _filter;
     private readonly Button _hidden;
     private readonly TextBlock _hiddenText = new() { Text = "Messi da parte" };
@@ -78,6 +86,9 @@ public sealed class NetworkPage : UserControl, IDuckPage
     private readonly Border _cardChip;
     private readonly TextBlock _cardStatus = new() { FontSize = 10.5, FontWeight = FontWeight.SemiBold };
     private readonly StackPanel _cardBody = new() { Margin = new Thickness(16, 0, 16, 14) };
+
+    /// <summary>"Aggiungi un promemoria" su un host: una voce nuova del calendario legata a lui.</summary>
+    public event Action<object>? ReminderWanted;
 
     public NetworkPage(Workspace ws)
     {
@@ -100,8 +111,8 @@ public sealed class NetworkPage : UserControl, IDuckPage
 
         _scan = Labelled("Primary", "play", "Analizza", "Analizza l'intervallo scritto a sinistra");
         _scan.Click += async (_, _) => await OnScanRange();
-        _note = Labelled("Soft", "note", "Host della nota", "Solo gli indirizzi scritti nelle pagine della nota");
-        _note.Click += async (_, _) => await _ws.ScanNote();
+        _note = Labelled("Soft", _noteIcon, _noteText, "Solo gli indirizzi scritti nelle pagine della nota");
+        _note.Click += async (_, _) => await _ws.ScanGroup(_ws.Groups.Find(_group)?.Id ?? ScanGroups.Note);
         _stop = new Button { Theme = Themes.Of("Quiet"), Height = 34, Width = 38, Content = Icon("stop", 11), IsEnabled = false };
         ToolTip.SetTip(_stop, "Ferma la scansione in corso");
         _stop.Click += (_, _) => _ws.Session.Stop();
@@ -139,9 +150,21 @@ public sealed class NetworkPage : UserControl, IDuckPage
         _up = Segment("state", Counted("Attivi ", _countUp));
         _down = Segment("state", Counted("Spenti ", _countDown));
         _wait = Segment("state", Counted("Da controllare ", _countWait));
-        _fromAll = Segment("source", "Tutti", true, "Gli host della nota e quelli trovati dalla ricerca");
-        _onlyNote = Segment("source", "Nota", tip: "Solo gli host scritti nei fogli");
-        _onlySearch = Segment("source", "Ricerca", tip: "Solo gli host trovati dalla ricerca per intervallo");
+        // il gruppo: un menu, non un altro segmentato, perche' i gruppi li fa chi usa la nota
+        _groupButton = new Button
+        {
+            Theme = Themes.Of("Quiet"),
+            Height = 26,
+            Padding = new Thickness(10, 0),
+            Background = Brushes.Transparent,
+            BorderBrush = Brushes.Transparent,
+            FontSize = 12,
+            Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { Icon("group", 11), _groupText, Icon("down", 9) } }
+        };
+        ToolTip.SetTip(_groupButton, "Quali host mostrare: tutti, quelli della nota o di un gruppo. Da qui si creano e si modificano i gruppi");
+        _groupButton.Click += (_, _) => OnGroupMenu();
+        Border groupWell = new() { Padding = new Thickness(3), VerticalAlignment = VerticalAlignment.Center, Child = _groupButton };
+        groupWell.Classes.Add("well");
 
         _filter = new TextBox
         {
@@ -166,7 +189,7 @@ public sealed class NetworkPage : UserControl, IDuckPage
 
         Grid filters = new() { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"), Margin = new Thickness(0, 0, 0, 12) };
         filters.Children.Add(Well(_all, _up, _down, _wait));
-        filters.Children.Add(Cell(Well(_fromAll, _onlyNote, _onlySearch), 1, new Thickness(10, 0, 0, 0)));
+        filters.Children.Add(Cell(groupWell, 1, new Thickness(10, 0, 0, 0)));
         filters.Children.Add(Cell(_filter, 3));
         filters.Children.Add(Cell(_hidden, 4));
 
@@ -273,7 +296,21 @@ public sealed class NetworkPage : UserControl, IDuckPage
 
         ws.Session.PropertyChanged += (_, _) => Later();
         ws.HostsChanged += Later;
+        ws.GroupsChanged += OnGroupsChanged;
+        ShowGroup();
         ShowSession(force: true);
+    }
+
+    private void OnGroupsChanged()
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(OnGroupsChanged);
+            return;
+        }
+
+        ShowGroup();
+        Later();
     }
 
     private void Later()
@@ -312,7 +349,8 @@ public sealed class NetworkPage : UserControl, IDuckPage
         if (!_visible.Contains(row))
         {
             _filter.Text = string.Empty;
-            _fromAll.IsChecked = true;
+            _group = AllGroups;
+            ShowGroup();
             _all.IsChecked = true;
             _query = HostQuery.Parse(null);
             Fill();
@@ -329,10 +367,20 @@ public sealed class NetworkPage : UserControl, IDuckPage
             : _down.IsChecked == true ? row.IsDown
             : _wait.IsChecked != true || row.NeedsCheck;
 
-        bool source = _onlyNote.IsChecked == true ? row.FromNote
-            : _onlySearch.IsChecked != true || !row.FromNote;
+        return state && InGroup(row) && _query.Matches(row.Facts());
+    }
 
-        return state && source && _query.Matches(row.Facts());
+    private bool InGroup(HostRow row)
+    {
+        GroupHosts groups = _ws.Groups;
+
+        return _group switch
+        {
+            AllGroups => true,
+            ScanGroups.Note => row.FromNote,
+            NoGroup => !row.FromNote && !groups.InAny(row),
+            _ => groups.Find(_group) is { } group && groups.Contains(group, row)
+        };
     }
 
     /// <summary>
@@ -614,6 +662,15 @@ public sealed class NetworkPage : UserControl, IDuckPage
                     _ws.Say($"{chosen.Shown} copiato.");
                 }
             }));
+            menu.Items.Add(MenuEntry("Aggiungi un promemoria…", "bell", "Orange", any && !_ws.IsLocked, () =>
+            {
+                if (Chosen is { } chosen)
+                {
+                    ReminderWanted?.Invoke(Reminder(chosen));
+                }
+
+                return Task.CompletedTask;
+            }));
             menu.Items.Add(new Separator());
             menu.Items.Add(MenuEntry(row is null ? "Metti da parte" : $"Metti da parte {row.Shown}", "hide", "Red", any, () =>
             {
@@ -668,6 +725,178 @@ public sealed class NetworkPage : UserControl, IDuckPage
 
         menu.Open(_hidden);
     }
+
+    /// <summary>
+    /// La voce del calendario per un host: legata a lui; se ha un certificato che scade, gia'
+    /// pronta come scadenza una settimana prima.
+    /// </summary>
+    private static Dictionary<string, object?> Reminder(HostRow row)
+    {
+        Dictionary<string, object?> seed = new()
+        {
+            ["kind"] = "event",
+            ["link"] = new Dictionary<string, string> { ["kind"] = "host", ["host"] = row.Shown, ["name"] = row.Label == row.Shown ? string.Empty : row.Label }
+        };
+
+        if (DuckNote.Notes.Calendar.Agenda.Day(row.TlsExpiry) is { } expires && expires >= DateOnly.FromDateTime(DateTime.Now))
+        {
+            seed["kind"] = "deadline";
+            seed["title"] = $"Rinnovare il certificato di {row.Shown}";
+            DateOnly before = expires.AddDays(-7);
+            seed["date"] = DuckNote.Notes.Calendar.Agenda.Iso(before >= DateOnly.FromDateTime(DateTime.Now) ? before : expires);
+        }
+
+        return seed;
+    }
+
+    // ------------------------------------------------------------------ gruppi
+
+    /// <summary>Il nome del gruppo scelto sul pulsante, e il secondo comando che analizza lui (o la nota).</summary>
+    private void ShowGroup()
+    {
+        ScanGroup? group = _ws.Groups.Find(_group);
+
+        if (group is null && _group is not (AllGroups or NoGroup or ScanGroups.Note))
+        {
+            _group = AllGroups;
+        }
+
+        _groupText.Text = _group switch
+        {
+            AllGroups => "Tutti i gruppi",
+            ScanGroups.Note => "Nota",
+            NoGroup => "Ricerca",
+            _ => group!.Name
+        };
+
+        _noteIcon.Kind = group is null ? "note" : "group";
+        _noteText.Text = group is null ? "Host della nota" : $"Analizza «{Short(group.Name, 22)}»";
+        ToolTip.SetTip(_note, group is null
+            ? "Solo gli indirizzi scritti nelle pagine della nota"
+            : group.Targets.Count == 0 ? "Il gruppo e' vuoto: aggiungi reti o indirizzi con Modifica" : $"Analizza {Short(string.Join(", ", group.Targets), 120)}");
+    }
+
+    private void OnGroupMenu()
+    {
+        GroupHosts groups = _ws.Groups;
+        IReadOnlyList<HostRow> rows = _ws.Session.Rows;
+
+        ContextMenu menu = new() { Placement = PlacementMode.BottomEdgeAlignedLeft, PlacementTarget = _groupButton };
+        menu.Items.Add(GroupEntry(AllGroups, "Tutti i gruppi", rows.Count, "Gli host della nota, dei gruppi e della ricerca"));
+        menu.Items.Add(GroupEntry(ScanGroups.Note, "Nota", rows.Count(row => row.FromNote), "Gli indirizzi scritti nei fogli e sulla mappa"));
+
+        if (groups.All.Count > 0)
+        {
+            menu.Items.Add(new Separator());
+        }
+
+        foreach (ScanGroup group in groups.All)
+        {
+            menu.Items.Add(GroupEntry(group.Id, group.Name, groups.Count(group, rows),
+                group.Targets.Count == 0 ? "Vuoto" : Short(string.Join(", ", group.Targets), 120), group.Monitor));
+        }
+
+        menu.Items.Add(new Separator());
+        menu.Items.Add(GroupEntry(NoGroup, "Ricerca", rows.Count(row => !row.FromNote && !groups.InAny(row)), "Trovati per intervallo, fuori dalla nota e dai gruppi"));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(MenuEntry("Nuovo gruppo…", "add", "Accent", !_ws.IsLocked, () => EditGroup(null)));
+
+        if (groups.Find(_group) is { } chosen)
+        {
+            menu.Items.Add(MenuEntry($"Modifica «{Short(chosen.Name, 30)}»…", "edit", null, !_ws.IsLocked, () => EditGroup(chosen)));
+            menu.Items.Add(MenuEntry($"Elimina «{Short(chosen.Name, 30)}»", "trash", "Red", !_ws.IsLocked, () => RemoveGroup(chosen)));
+        }
+
+        menu.Open(_groupButton);
+    }
+
+    private MenuItem GroupEntry(string id, string name, int count, string tip, bool monitored = false)
+    {
+        StackPanel title = new()
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 6,
+            Children = { new TextBlock { Text = name, MaxWidth = 220, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center } }
+        };
+
+        if (monitored)
+        {
+            Glyph pulse = MenuIcon("pulse", "Green");
+            ToolTip.SetTip(pulse, "Monitorato: i suoi host si controllano da soli");
+            title.Children.Add(pulse);
+        }
+
+        TextBlock number = new() { Text = count.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        number.Classes.Add("caption");
+
+        Grid header = new() { ColumnDefinitions = new ColumnDefinitions("*,Auto"), MinWidth = 210, Children = { title, Cell(number, 1) } };
+        MenuItem item = new() { Header = header, Icon = id == _group ? MenuIcon("check", "Accent") : null };
+        ToolTip.SetTip(item, tip);
+        item.Click += (_, _) =>
+        {
+            _group = id;
+            ShowGroup();
+            ShowSession();
+        };
+        return item;
+    }
+
+    /// <summary>Crea (con <paramref name="group"/> null) o modifica un gruppo; il nuovo diventa quello scelto.</summary>
+    private async Task EditGroup(ScanGroup? group)
+    {
+        if (TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        List<ScanGroup> all = [.. _ws.Groups.All];
+        string suggested = group is null ? _range.Text?.Trim() ?? string.Empty : string.Empty;
+        GroupChoice? choice = await GroupDialog.Ask(owner, group, all, suggested);
+
+        if (choice is null)
+        {
+            return;
+        }
+
+        if (choice.Removed)
+        {
+            all.RemoveAll(other => other.Id == choice.Group.Id);
+            _group = AllGroups;
+            _ws.SaveGroups(all);
+            _ws.Say($"Gruppo «{choice.Group.Name}» eliminato: gli host trovati restano in tabella.");
+            return;
+        }
+
+        int at = all.FindIndex(other => other.Id == choice.Group.Id);
+
+        if (at >= 0)
+        {
+            all[at] = choice.Group;
+        }
+        else
+        {
+            all.Add(choice.Group);
+        }
+
+        _group = choice.Group.Id;
+        _ws.SaveGroups(all);
+        _ws.Say(at >= 0 ? $"Gruppo «{choice.Group.Name}» aggiornato." : $"Gruppo «{choice.Group.Name}» creato: Analizza lo controlla tutto.");
+    }
+
+    private async Task RemoveGroup(ScanGroup group)
+    {
+        if (!await Message.Ask(TopLevel.GetTopLevel(this) as Window, $"Eliminare «{group.Name}»?",
+                "Il gruppo sparisce dalla nota e dalla mappa; gli host gia' trovati restano in tabella.", "Elimina", danger: true))
+        {
+            return;
+        }
+
+        _group = AllGroups;
+        _ws.SaveGroups([.. _ws.Groups.All.Where(other => other.Id != group.Id)]);
+        _ws.Say($"Gruppo «{group.Name}» eliminato.");
+    }
+
+    private static string Short(string text, int most) => text.Length <= most ? text : text[..(most - 1)] + "…";
 
     private List<IReadOnlyList<string>> ShownRows() =>
     [
@@ -825,13 +1054,16 @@ public sealed class NetworkPage : UserControl, IDuckPage
 
     private static Glyph Icon(string kind, double size) => new() { Kind = kind, Width = size, Height = size, VerticalAlignment = VerticalAlignment.Center };
 
-    private static Button Labelled(string theme, string icon, string text, string tip)
+    private static Button Labelled(string theme, string icon, string text, string tip) =>
+        Labelled(theme, Icon(icon, 11), new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }, tip);
+
+    private static Button Labelled(string theme, Glyph icon, TextBlock text, string tip)
     {
         Button button = new()
         {
             Theme = Themes.Of(theme),
             Height = 34,
-            Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, Children = { Icon(icon, 11), new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center } } }
+            Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, Children = { icon, text } }
         };
         ToolTip.SetTip(button, tip);
         return button;

@@ -2,9 +2,10 @@
 
 <img src="assets/logo.png" alt="DuckNote" width="420">
 
-**Technical notes, a network scanner and a network map in the same window.**
+**Technical notes, a network scanner, a network map and a calendar in the same window.**
 Write an address in a sheet and DuckNote checks it; scan a subnet and the results
-come back into the note; draw the network and every device shows its state.
+come back into the note; draw the network and every device shows its state;
+keep the deadlines — certificate expiry dates arrive by themselves.
 For Windows and macOS. One file, nothing to install.
 
 [![Latest release](https://img.shields.io/github/v/release/Zaick99/DuckNote?style=flat-square&label=release&color=f5a524)](https://github.com/Zaick99/DuckNote/releases/latest)
@@ -12,7 +13,7 @@ For Windows and macOS. One file, nothing to install.
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![macOS](https://img.shields.io/badge/macOS-14%2B-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-232-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-271-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
@@ -20,6 +21,7 @@ For Windows and macOS. One file, nothing to install.
 [Writing](#writing) ·
 [Network](#network--rete) ·
 [Map](#map--mappa) ·
+[Calendar](#calendar--calendario) ·
 [Encryption](#encryption) ·
 [Building](#building) ·
 [Changelog](CHANGELOG.md)
@@ -105,10 +107,10 @@ system, illustrations in the style of the duck.
 | top, middle | while a sheet is open, the **formatting bar**: it lives in the title strip, so the sheet gets the whole height |
 | top right | a dot that tells whether the note is saved (orange: changes waiting, green: on disk), the version, the **padlock** (lock now, or set up encryption), the **Impostazioni** gear (pressed again, it goes back to where you were), day/night |
 | sidebar, top | **DuckNote**, then the user: the account's full name, `user su computer`, a picture chosen among 26 dressed-up ducks by the first letter of the name, and the state of the vault. A click opens a menu: lock the note or quit — without encryption, it offers to set it up |
-| sidebar | **Rete** (Network), with the number of hosts down (red) and up (green); **Mappa** (Map), with the number of devices drawn |
+| sidebar | **Rete** (Network), with the number of hosts down (red) and up (green); **Mappa** (Map), with the number of devices drawn; **Calendario** (Calendar), with the items of today and those late (red) |
 | sidebar, middle | **Fogli** (Sheets): the sheets, each on a tile of its own colour, with their H1/H2 titles always at hand; 🔍 searches them, + adds one |
 | sidebar, bottom | the monitoring card, with the button that checks the hosts of the note |
-| the rest | the open sheet, or the **Rete**, **Mappa** or **Impostazioni** page |
+| the rest | the open sheet, or the **Rete**, **Mappa**, **Calendario** or **Impostazioni** page |
 
 **All the room to the sheet.** `F9` (or `Ctrl+\`, or the button next to the
 traffic lights) slides the sidebar away and the page takes the whole window;
@@ -198,7 +200,8 @@ later), copy it.
 | `192.168.1.0/24` + **Analizza** | scan a range (CIDR, `from-to`, `.1-254`, comma-separated lists) |
 | **Host della nota** | keep in the list only the hosts of the note (sheets and map), and check them |
 | **Tutti · Attivi · Spenti · Da controllare** | all, up, down, to check |
-| **Tutti · Nota · Ricerca** | every host, only those of the note, or only those found by the range search |
+| **Tutti i gruppi** ▾ | which hosts to show: all, those of the note (**Nota**), those of a scan group, or those found by a range scan outside every group (**Ricerca**); groups are created and edited from the same menu |
+| **Analizza «gruppo»** | with a group chosen, the second button scans all of it: its networks, ranges and addresses |
 | search box | free text, or by field: `ip:` `nome:` `mac:` `porta:` `os:` `tipo:` `produttore:` `gruppo:` `web:` `nota:` `stato:` |
 | export / to the note | what is shown, to CSV (opens in Excel as is) or into the sheet as a table |
 | **Messi da parte** | hosts set aside, one click (or a right-click on the table) to take them back |
@@ -214,6 +217,37 @@ inventory.
 new check only **ping**: names, MAC, ports and the rest stay as they were found.
 A host that comes back on is analysed in full again. Automatic checks never
 pop up a notification; the ones you start do.
+
+### Scan groups
+
+**Name the parts of the network you scan, and scan them by name.** The note
+has a group of its own, **Nota** — the addresses written in the sheets and on
+the map. Next to it, any number of groups: **Server**, **Telecamere**,
+**Laboratorio**, each with its networks (`192.168.40.0/24`), ranges
+(`192.168.50.10-50`), single addresses and names, one per line. The editor
+says how many addresses a group covers and points at the first line written
+wrong.
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/groups-dark.png">
+  <img src="assets/readme/groups-light.png" alt="The Rete page with the group menu open: all groups, Nota, the groups Server, Telecamere and Laboratorio with their host counts and the pulse of the monitored ones, Ricerca, and Nuovo gruppo" width="900">
+</picture>
+
+*The group menu: every group with its hosts; the pulse marks the monitored ones.*
+
+</div>
+
+- **Monitora**, group by group: on, the hosts of the group are checked by the
+  monitor like those of the note — single addresses at once, the hosts of its
+  networks after their first scan; off, the group is scanned only when you
+  press **Analizza**.
+- a scan of a range no longer drops the hosts of the groups, and a host found
+  by a range scan shows up in its group by itself;
+- the hosts of a monitored group do not get the pencil of the note: the pencil
+  stays for what is written in the sheets;
+- groups are saved inside the note, encrypted with it when the vault is on.
 
 ---
 
@@ -242,7 +276,7 @@ and deletes them.
 |---|---|
 | top bar | the map menu; **Sposta · Collega** (move, connect); **Zona**; undo and redo; the **VLAN** filter; the search; **Disponi** (lay out); **Esporta** (export) |
 | left, **Apparati** | 14 kinds of device — Internet, firewall, router, switch, access point, server, NAS, PC, laptop, phone, printer, camera, IoT, other. Drag one onto the map, or click it to drop it in the middle |
-| left, **Dalla rete** | the hosts DuckNote knows — written in the sheets or found by a scan — with their state. Dragged onto the map, a host arrives with its name, address, MAC, vendor and the kind of device the scan recognised. **Aggiungi tutti** brings in all those still missing, each into the zone of its subnet |
+| left, **Dalla rete** | the hosts DuckNote knows — written in the sheets or found by a scan — with their state, group by group: **Tutti i gruppi**, **Nota**, a scan group, **Ricerca**. Dragged onto the map, a host arrives with its name, address, MAC, vendor and the kind of device the scan recognised. **Aggiungi tutti** brings in those of the chosen group still missing, each into the zone of its subnet |
 | right | the card of what is selected: a device, a cable, a zone, or several of them |
 | bottom | how many devices, cables and zones, how many devices are down; the zoom |
 
@@ -250,7 +284,8 @@ and deletes them.
 up, red down, grey never checked; a cable to a device that is down turns red
 and dashed. The monitor pings the devices of the map together with the hosts of
 the sheets, and they count in the badges of **Rete**. From a device's card,
-one click checks it now, another opens it in **Rete**.
+one click checks it now, another opens it in **Rete**, and **Promemoria** starts
+an item of the calendar tied to the device.
 
 **Cables carry what it takes to rebuild the network.** The type — copper,
 fibre, Wi-Fi, VPN, WAN, each drawn its own way — the speed, from 10M to 100G
@@ -309,6 +344,68 @@ the cable list, that Excel opens as they are.
 
 **Not done**: the map is drawn, not discovered. DuckNote does not read LLDP,
 CDP or the MAC tables of switches; what is connected to what is up to you.
+
+---
+
+## Calendar — Calendario
+
+**The day of the network: appointments, things to do, deadlines.** The
+certificate of the website expires on 14 April, the UPS needs a technician on
+Thursday, the backup of the NAS is checked every Monday. **Calendario** keeps
+them in the note, next to the sheets and the map, and reminds you while
+DuckNote is open.
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/calendar-dark.png">
+  <img src="assets/readme/calendar-light.png" alt="The Calendario page: the month with its items, today selected; on the right the items of the day, what is late and the next fourteen days, with their links to hosts and devices" width="900">
+</picture>
+
+*The month, and on the right the day, what is late and what is coming.*
+
+</div>
+
+| Where | What is there |
+|---|---|
+| top bar | previous and next month, **Oggi** (today), the search, **Certificati** (certificates), **Nuovo** (new) |
+| the month | six weeks from Monday; each day with its items, timed ones with their hour, and `+N` for the rest. A click chooses the day, a double click adds an item to it, an item that does not repeat is dragged to another day |
+| right | the chosen day; **In ritardo** (late: things to do and deadlines not done, up to 30 days back); the next 14 days. A tick marks a thing to do as done |
+
+**Four kinds of item**: **Appuntamento** (an appointment, with its hour),
+**Da fare** (a thing to do), **Scadenza** (a deadline) and **Appunto** (a note
+for the day). Each can:
+
+- **repeat** every day, week, two weeks, month, three or six months, year —
+  until a date if you want; the 31st falls on the last day of shorter months
+  and comes back to the 31st after them. Deleting asks whether to remove only
+  that time or all of them;
+- **remind** at the moment, minutes, hours, days or weeks before; items of the
+  whole day remind at 9:00;
+- **link to a host or to a device of the map**: the item shows its state (green
+  up, red down), and a click opens it in **Rete** or on the map. **Aggiungi un
+  promemoria** in the right-click menu of **Rete**, and **Promemoria** in the
+  card of a device, start an item already linked.
+
+**Reminders while DuckNote is open.** When one comes due, a card stays in the
+corner until you answer it: **Fatto** (done), **Rimanda** (in 10 minutes, in an
+hour, tomorrow at 9) or **Apri** (open it in the calendar). If DuckNote is
+behind other windows, its icon bounces in the Dock on the Mac, and its button
+flashes in the taskbar on Windows. No permission to grant and no system
+notification: when DuckNote is closed, nothing rings — when the note opens, a
+summary says what is on today, what is late and which certificates are about
+to expire, and the badge of **Calendario** counts today and late items.
+
+**Certificate deadlines arrive by themselves.** Every scan that reads a TLS
+certificate puts its expiry date in the calendar, one per host, with reminders
+30 days, a week and a day before (**Certificati** changes them, or turns them
+off). The card of a certificate shows subject and issuer; **Rinnovato** marks
+it renewed, and the next scan moves the date anyway; **Ignora questo host**
+leaves out a host you do not care about — the self-signed printer, say.
+Certificates expired more than a month ago, or expiring more than three years
+from now, are left out.
+
+The calendar is saved inside the note, encrypted with it when the vault is on.
 
 ---
 
@@ -376,6 +473,18 @@ On the map:
 | `Space`+drag, middle button | pan |
 | `Esc` | back to **Sposta**, clear the search, deselect |
 
+In the calendar:
+
+| Keys | Action |
+|---|---|
+| arrows | the day before or after, the week before or after |
+| `Page Up`, `Page Down` | previous month, next month |
+| `T` | today |
+| `N` | a new item on the chosen day |
+| `Ctrl+Enter` | save the item being edited |
+| `Ctrl+F` | search the calendar |
+| `Esc` | close the item, clear the search |
+
 ---
 
 ## Where the data lives
@@ -387,13 +496,13 @@ executable.
 
 | File | Contents |
 |---|---|
-| `note.xaml` | the note, when encryption is off: a zip with one entry per sheet, their order and names, the framed drawings, images and charts, and the maps (`mappa.json`) |
+| `note.xaml` | the note, when encryption is off: a zip with one entry per sheet, their order and names, the framed drawings, images and charts, the maps (`mappa.json`), the scan groups (`gruppi.json`) and the calendar (`calendario.json`) |
 | `note.xaml.bak` | the previous version, refreshed at most every 15 minutes |
 | `settings.json` | the settings |
 | `lastscan.json` | the last scan, so states are found again on reopening |
 | `store.bin`, `store.bin.bak` | with encryption on: everything above except the settings |
 
-On Windows the web engine of the map keeps its working files in
+On Windows the web engine of the map and of the calendar keeps its working files in
 `%LOCALAPPDATA%\duck\DuckNote\WebView2`. It runs in private mode: nothing of the
 note is written there. **Impostazioni › Sistema › Cancella tutto...** (delete
 everything) removes it together with the data.
@@ -401,9 +510,11 @@ everything) removes it together with the data.
 Nothing leaves the computer. The only connections are towards the hosts you
 scan and, a few seconds after startup, one anonymous request to GitHub to see
 whether a newer version exists — **Impostazioni › Sistema › Aggiornamenti**
-turns it off. The map page loads nothing from the network. Notes, containers
-and settings written by earlier versions open as they were; versions before
-0.0.19 do not know the map and would leave it out when they save.
+turns it off. The map and the calendar load nothing from the network. Notes,
+containers and settings written by earlier versions open as they were; versions
+from 0.0.19 to 0.0.21 keep the groups and the calendar of a note without
+showing them, versions before 0.0.19 do not know the map either and would leave
+these parts out when they save.
 
 ---
 
@@ -445,11 +556,11 @@ repository, so building them needs no Node.js:
 | Bundle | Source | Built into | What it is |
 |---|---|---|---|
 | the sheet editor (Mac) | `src/DuckNote.Desktop/Editor` | `Assets/editor` | ProseMirror, in the Mac's web view |
-| the map (Mac and Windows) | `src/DuckNote.Notes/Maps/Web` | `Maps/Assets` | SVG and plain JavaScript, no framework |
+| the map and the calendar (Mac and Windows) | `src/DuckNote.Notes/Web` | `Web/dist` | SVG and plain JavaScript, no framework |
 
-After changing one, `npm ci && node build.mjs` rebuilds it and
-`node test/run.mjs` tests it in Chromium with Playwright (mouse and keyboard
-as a person uses them: 29 scenarios for the map, 19 for the editor).
+After changing one, `npm ci && node build.mjs` rebuilds it and `npm test`
+tests it in Chromium with Playwright (mouse and keyboard as a person uses
+them: 32 scenarios for the map, 18 for the calendar, 19 for the editor).
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one
@@ -486,8 +597,12 @@ src/DuckNote.Scan    the scan engine and the wire protocols
 src/DuckNote.Notes   what the note knows without a window: addresses in text,
                      code colouring, charts, the note file, the sheet tree,
                      the host filter and CSV, settings, updates
-  Maps/                the network map: the page shown by both applications
-                       (Web/, built into Assets/) and the map file
+  Maps/                the network map file
+  Groups/              the scan groups and who belongs to them
+  Calendar/            the calendar: items, repetitions, reminders,
+                       certificate deadlines, the words of the alerts
+  Web/                 the web pages shown by both applications: the map and
+                       the calendar (src/, built into dist/)
 src/DuckNote.Desktop the macOS application (Avalonia): the same pages, and the
                      sheet editor in a web view (Editor/, ProseMirror)
 src/DuckNote.App     the Windows application (WPF), on the Duck design kit
@@ -497,7 +612,7 @@ src/DuckNote.App     the Windows application (WPF), on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table and the map
   Views/               lock screen, dialogs
-tests/               232 tests, including the fixtures written by the
+tests/               271 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README pictures, and the scripts that
                      draw the avatars and the sheet icon

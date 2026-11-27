@@ -1,0 +1,13 @@
+{
+  "name": "ducknote-web",
+  "private": true,
+  "description": "Le pagine web di DuckNote (la mappa della rete, il calendario), impacchettate in un file ciascuna per il WebView di Mac e Windows.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/run.mjs && node test/calendar.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

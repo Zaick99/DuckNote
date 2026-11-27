@@ -2,6 +2,59 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.22] - 2026-11-27
+
+**A calendar with reminders, and scans organised in groups.**
+
+### Added
+
+- **Calendario**, a new page. Appointments, things to do, deadlines and notes
+  for the day, in a month that starts on Monday, with the chosen day, what is
+  late and the next 14 days on the right. Items repeat every day, week, two
+  weeks, month, three or six months or year (until a date, if wanted; the 31st
+  falls on the last day of shorter months), are dragged to another day, are
+  searched, and a deletion can be undone. The calendar is saved inside the
+  note, encrypted with it when the vault is on.
+- **Reminders while DuckNote is open.** A reminder stays in the corner of the
+  window until it is answered — **Fatto** (done), **Rimanda** (in 10 minutes,
+  in an hour, tomorrow at 9) or **Apri** (open it) — and if DuckNote is behind
+  other windows its Dock icon bounces on the Mac and its taskbar button flashes
+  on Windows. No permission and no system notification are needed. When the
+  note opens, a summary tells what is on today, what is late and which
+  certificates are about to expire; the badge of **Calendario** counts today's
+  and late items.
+- **Certificate deadlines from the scans.** Every TLS certificate a scan reads
+  becomes a deadline of its host, with reminders 30 days, a week and a day
+  before (changed, or turned off, under **Certificati**). A renewed
+  certificate moves its date at the next scan; **Ignora questo host** leaves
+  out hosts that do not matter.
+- **Items linked to hosts and devices.** An item can point at a host of
+  **Rete** or at a device of the map: it shows its state, and a click opens it.
+  **Aggiungi un promemoria** in the right-click menu of **Rete** and
+  **Promemoria** in the card of a device start an item already linked — for a
+  host with a certificate, a renewal deadline a week before it expires.
+- **Scan groups.** Next to **Nota** (the addresses of the sheets and of the
+  map), groups of networks, ranges, addresses and names, created and edited
+  from the new group menu of **Rete**, with how many addresses they cover and
+  the first line written wrong. The menu filters the table by group and the
+  second button becomes **Analizza «gruppo»**; **Ricerca** keeps the hosts
+  found by a range scan outside every group. Groups are saved inside the note.
+- **Monitora**, group by group: the hosts of a monitored group are checked by
+  the monitor like those of the note (single addresses at once, the hosts of
+  its networks after their first scan); the monitoring card counts them.
+- **Groups on the map too.** **Dalla rete**, in the map's library, shows the
+  hosts group by group, and **Aggiungi tutti** brings in those of the chosen
+  group.
+
+### Changed
+
+- A scan of a range no longer drops the hosts of the groups, and the hosts of
+  a monitored group do not get the pencil of the note.
+- A device chosen from the calendar opens on its own map, even when another
+  map is on screen.
+- The web pages of DuckNote (the map and the calendar) are built from one
+  folder, `src/DuckNote.Notes/Web`, sharing their buttons, menus and colours.
+
 ## [0.0.21] - 2026-11-27
 
 **The map opens on Windows.**

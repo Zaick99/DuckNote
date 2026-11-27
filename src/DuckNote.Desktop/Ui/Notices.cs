@@ -9,6 +9,12 @@ using Avalonia.Threading;
 namespace DuckNote.Desktop.Ui;
 
 /// <summary>
+/// Un pulsante di un avviso: fa una cosa (e l'avviso se ne va), oppure apre un menu di scelte
+/// (Rimanda: fra 10 minuti, fra un'ora, domani).
+/// </summary>
+public sealed record NoticeAction(string Label, Action? Run, bool Primary = false, IReadOnlyList<(string Label, Action Run)>? Choices = null);
+
+/// <summary>
 /// Gli avvisi della finestra: l'ultimo evento in basso a sinistra (compare, resta il tempo di
 /// leggerlo, se ne va) e le notifiche in basso a destra (esiti, errori, con un'azione se serve).
 /// Sono finestrelle a parte (Popup), non pezzi della finestra: sopra al foglio della nota, che
@@ -120,7 +126,14 @@ public sealed class Notices
 
     public void Error(string title, string text) => Toast("error", "Red", title, text);
 
-    public void Toast(string icon, string tone, string title, string text, string? action = null, Action? onAction = null)
+    public void Toast(string icon, string tone, string title, string text, string? action = null, Action? onAction = null) =>
+        Toast(icon, tone, title, text, action is null ? [] : [new NoticeAction(action, onAction)], sticky: false);
+
+    /// <summary>
+    /// Un avviso con piu' pulsanti; <paramref name="sticky"/>: resta finche' non si sceglie o non
+    /// lo si chiude (i promemoria del calendario).
+    /// </summary>
+    public void Toast(string icon, string tone, string title, string text, IReadOnlyList<NoticeAction> actions, bool sticky)
     {
         Glyph glyph = new() { Kind = icon, Width = 15, Height = 15, Thickness = 1.7 };
         glyph.Bind(Glyph.ForegroundProperty, glyph.GetResourceObservable(tone));
@@ -135,7 +148,7 @@ public sealed class Notices
         chip.Bind(Border.BackgroundProperty, chip.GetResourceObservable(tone + "Soft"));
 
         StackPanel body = new() { Margin = new Thickness(12, 0, 8, 0) };
-        TextBlock head = new() { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 13 };
+        TextBlock head = new() { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 13, TextWrapping = TextWrapping.Wrap, MaxHeight = 40 };
         head.Bind(TextBlock.ForegroundProperty, head.GetResourceObservable("Label"));
         TextBlock words = new() { Text = text, TextWrapping = TextWrapping.Wrap, FontSize = 11.5, Margin = new Thickness(0, 2, 0, 0), MaxHeight = 90 };
         words.Bind(TextBlock.ForegroundProperty, words.GetResourceObservable("LabelSecondary"));
@@ -156,16 +169,48 @@ public sealed class Notices
         Button close = new() { Content = new Glyph { Kind = "close", Width = 9, Height = 9 }, Width = 22, Height = 22, MinWidth = 22, VerticalAlignment = VerticalAlignment.Top };
         close.Theme = Themes.Of("Tool");
 
-        if (action is not null)
+        if (actions.Count > 0)
         {
-            Button act = new() { Content = action, Height = 26, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
-            act.Theme = Themes.Of("Soft");
-            act.Click += (_, _) =>
+            StackPanel row = new() { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(0, 8, 0, 0) };
+
+            foreach (NoticeAction action in actions)
             {
-                onAction?.Invoke();
-                Dismiss(card);
-            };
-            body.Children.Add(act);
+                Button act = new() { Content = action.Label, Height = 26, Padding = new Thickness(10, 0) };
+                act.Theme = Themes.Of(action.Primary ? "Primary" : "Soft");
+
+                if (action.Choices is { Count: > 0 } choices)
+                {
+                    act.Click += (_, _) =>
+                    {
+                        ContextMenu menu = new() { Placement = PlacementMode.BottomEdgeAlignedLeft, PlacementTarget = act };
+
+                        foreach ((string label, Action run) in choices)
+                        {
+                            MenuItem item = new() { Header = label };
+                            item.Click += (_, _) =>
+                            {
+                                run();
+                                Dismiss(card);
+                            };
+                            menu.Items.Add(item);
+                        }
+
+                        menu.Open(act);
+                    };
+                }
+                else
+                {
+                    act.Click += (_, _) =>
+                    {
+                        action.Run?.Invoke();
+                        Dismiss(card);
+                    };
+                }
+
+                row.Children.Add(act);
+            }
+
+            body.Children.Add(row);
         }
 
         Grid grid = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
@@ -192,7 +237,7 @@ public sealed class Notices
             shift.X = 40 * (1 - t);
         });
 
-        DispatcherTimer rest = new() { Interval = TimeSpan.FromSeconds(action is null ? 5 : 9) };
+        DispatcherTimer rest = new() { Interval = TimeSpan.FromSeconds(actions.Count == 0 ? 5 : 9) };
         rest.Tick += (_, _) =>
         {
             if (card.IsPointerOver)
@@ -203,7 +248,11 @@ public sealed class Notices
             rest.Stop();
             Dismiss(card);
         };
-        rest.Start();
+
+        if (!sticky)
+        {
+            rest.Start();
+        }
         close.Click += (_, _) =>
         {
             rest.Stop();

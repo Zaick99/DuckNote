@@ -7,8 +7,8 @@
   -->
   <PropertyGroup>
     <RootNamespace>DuckNote.Notes</RootNamespace>
-    <!-- la mappa (Node) non e' codice della libreria: ne entra solo il pacchetto costruito -->
-    <DefaultItemExcludes>$(DefaultItemExcludes);Maps\Web\**</DefaultItemExcludes>
+    <!-- le pagine web (Node) non sono codice della libreria: ne entrano solo i pacchetti costruiti -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);Web\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,9 +17,11 @@
   <ItemGroup>
     <!-- i colori del tema, gli stessi dell'app WPF: servono a riconoscere i colori scritti nelle note -->
     <EmbeddedResource Include="..\DuckNote.App\Theme\tokens.extended.json" Link="Sheets\tokens.extended.json" LogicalName="DuckNote.Notes.tokens.json" />
-    <!-- la pagina della mappa della rete (Maps/Web, "npm run build"), la stessa per Mac e Windows -->
-    <EmbeddedResource Include="Maps\Assets\map.js" LogicalName="DuckNote.Notes.map.js" />
-    <EmbeddedResource Include="Maps\Assets\map.css" LogicalName="DuckNote.Notes.map.css" />
+    <!-- le pagine della mappa e del calendario (Web, "npm run build"), le stesse per Mac e Windows -->
+    <EmbeddedResource Include="Web\dist\map.js" LogicalName="DuckNote.Notes.map.js" />
+    <EmbeddedResource Include="Web\dist\map.css" LogicalName="DuckNote.Notes.map.css" />
+    <EmbeddedResource Include="Web\dist\calendar.js" LogicalName="DuckNote.Notes.calendar.js" />
+    <EmbeddedResource Include="Web\dist\calendar.css" LogicalName="DuckNote.Notes.calendar.css" />
   </ItemGroup>
 
 </Project>

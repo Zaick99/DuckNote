@@ -105,6 +105,52 @@ public static class NetworkMap
         return hosts;
     }
 
+    /// <summary>
+    /// Gli apparati di tutte le mappe per il calendario (legare una voce a un apparato): mappa,
+    /// nome della mappa, apparato, nome, indirizzo e tipo. Al piu' <paramref name="most"/>.
+    /// </summary>
+    public static List<Dictionary<string, string>> DeviceList(byte[]? json, int most = 2000)
+    {
+        List<Dictionary<string, string>> devices = [];
+
+        Visit(json, map =>
+        {
+            string mapId = Text(map, "id");
+            string mapName = Text(map, "name");
+
+            if (!map.TryGetProperty("nodes", out JsonElement nodes) || nodes.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (JsonElement node in nodes.EnumerateArray())
+            {
+                if (devices.Count >= most)
+                {
+                    return;
+                }
+
+                if (node.ValueKind == JsonValueKind.Object && Text(node, "id") is { Length: > 0 } id)
+                {
+                    devices.Add(new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["map"] = mapId,
+                        ["mapName"] = mapName,
+                        ["node"] = id,
+                        ["name"] = Text(node, "name"),
+                        ["host"] = Text(node, "host"),
+                        ["kind"] = Text(node, "kind")
+                    });
+                }
+            }
+        });
+
+        return devices;
+    }
+
+    private static string Text(JsonElement element, string name) =>
+        element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty;
+
     /// <summary>Quanti apparati ci sono in tutte le mappe.</summary>
     public static int Devices(byte[]? json)
     {

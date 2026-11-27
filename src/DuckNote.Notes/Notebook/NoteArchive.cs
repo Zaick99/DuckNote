@@ -19,13 +19,28 @@ public sealed class NoteArchive
 
     public const string MapEntry = "mappa.json";
 
+    public const string GroupsEntry = "gruppi.json";
+
+    public const string CalendarEntry = "calendario.json";
+
+    /// <summary>Le voci di dati (JSON in UTF-8) che la nota porta oltre ai fogli.</summary>
+    private static readonly string[] DataEntries = [MapEntry, GroupsEntry, CalendarEntry];
+
     public List<ArchivedPage> Pages { get; } = [];
 
     /// <summary>Byte dei riquadri, per nome di voce (vedi <see cref="InsetAddress.Entry"/>).</summary>
     public Dictionary<string, byte[]> Insets { get; } = new(StringComparer.Ordinal);
 
-    /// <summary>Le mappe della rete (JSON in UTF-8, vedi <see cref="Maps.NetworkMap"/>); null se la nota non ne ha.</summary>
-    public byte[]? Map { get; set; }
+    private readonly Dictionary<string, byte[]> _data = new(StringComparer.Ordinal);
+
+    /// <summary>Le mappe della rete (vedi <see cref="Maps.NetworkMap"/>); null se la nota non ne ha.</summary>
+    public byte[]? Map { get => Data(MapEntry); set => Data(MapEntry, value); }
+
+    /// <summary>I gruppi di scansione (vedi <see cref="Groups.ScanGroups"/>); null se la nota non ne ha.</summary>
+    public byte[]? Groups { get => Data(GroupsEntry); set => Data(GroupsEntry, value); }
+
+    /// <summary>Il calendario (vedi <see cref="DuckNote.Notes.Calendar.Agenda"/>); null se la nota non ne ha.</summary>
+    public byte[]? Calendar { get => Data(CalendarEntry); set => Data(CalendarEntry, value); }
 
     /// <summary>Le voci sconosciute, per nome: tornano nel file tali e quali.</summary>
     public Dictionary<string, byte[]> Extras { get; } = new(StringComparer.Ordinal);
@@ -54,9 +69,12 @@ public sealed class NoteArchive
                 Write(zip, entry, bytes);
             }
 
-            if (Map is { Length: > 0 } map)
+            foreach ((string entry, byte[] bytes) in _data)
             {
-                Write(zip, MapEntry, map);
+                if (bytes.Length > 0)
+                {
+                    Write(zip, entry, bytes);
+                }
             }
 
             foreach ((string entry, byte[] bytes) in Extras)
@@ -103,7 +121,10 @@ public sealed class NoteArchive
                 }
             }
 
-            archive.Map = Read(zip, MapEntry);
+            foreach (string entry in DataEntries)
+            {
+                archive.Data(entry, Read(zip, entry));
+            }
 
             foreach (ZipArchiveEntry entry in zip.Entries)
             {
@@ -131,9 +152,23 @@ public sealed class NoteArchive
     /// </summary>
     private static bool IsKnown(string entry) =>
         entry == IndexEntry
-        || entry == MapEntry
+        || DataEntries.Contains(entry)
         || entry.StartsWith("riquadri/", StringComparison.Ordinal)
         || (!entry.Contains('/') && entry.EndsWith(".xaml", StringComparison.OrdinalIgnoreCase));
+
+    private byte[]? Data(string entry) => _data.GetValueOrDefault(entry);
+
+    private void Data(string entry, byte[]? bytes)
+    {
+        if (bytes is { Length: > 0 })
+        {
+            _data[entry] = bytes;
+        }
+        else
+        {
+            _data.Remove(entry);
+        }
+    }
 
     private static List<(string Id, string Name)> Index(ZipArchive zip)
     {

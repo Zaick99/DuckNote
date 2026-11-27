@@ -33,9 +33,9 @@ _testversion/
 # Nessun eseguibile nel repository: si rigenerano con dotnet publish.
 # La regola vale ovunque, non solo nella radice.
 *.exe
-# L'editor della versione Mac e la mappa: le dipendenze si rimettono con npm ci, le prove
-# scrivono qui le loro immagini. I pacchetti costruiti (Assets/editor, Maps/Assets) invece si
-# tengono: sono dentro alle app.
+# L'editor della versione Mac e le pagine web (mappa, calendario): le dipendenze si rimettono
+# con npm ci, le prove scrivono qui le loro immagini. I pacchetti costruiti (Assets/editor,
+# Web/dist) invece si tengono: sono dentro alle app.
 node_modules/
 /src/DuckNote.Desktop/Editor/test/out/
-/src/DuckNote.Notes/Maps/Web/test/out/
+/src/DuckNote.Notes/Web/test/out/

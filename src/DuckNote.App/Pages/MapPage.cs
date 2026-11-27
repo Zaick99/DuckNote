@@ -18,7 +18,7 @@ using MapWeb = DuckNote.Notes.Maps.MapPage;
 namespace DuckNote.App.Pages;
 
 /// <summary>
-/// La mappa della rete: la pagina web della mappa (Maps/Web, la stessa del Mac) in un WebView2.
+/// La mappa della rete: la pagina web della mappa (DuckNote.Notes/Web, la stessa del Mac) in un WebView2.
 /// La finestra di DuckNote e' trasparente (angoli tondi, vetro): un WebView2 classico, che e' una
 /// finestra figlia, li' dentro non si vedrebbe. Il controllo "di composizione" invece disegna
 /// dentro WPF, e ci si possono mettere sopra avvisi e menu. La pagina si serve da memoria su un
@@ -85,6 +85,25 @@ public sealed class MapPage : UserControl, IDuckPage
 
     /// <summary>La mappa chiede la pagina Rete (per analizzare, o per vedere un host).</summary>
     public event Action<string?>? NetworkWanted;
+
+    /// <summary>"Promemoria" sulla scheda di un apparato: una voce nuova del calendario legata a lui.</summary>
+    public event Action<object>? ReminderWanted;
+
+    /// <summary>Un apparato chiesto prima che la pagina fosse pronta.</summary>
+    private string? _reveal;
+
+    /// <summary>Un apparato (identificativo o indirizzo) al centro e scelto, anche su un'altra mappa: dal calendario.</summary>
+    public void Reveal(string what)
+    {
+        if (_ready)
+        {
+            Call($"dm.reveal({Js(what)})");
+        }
+        else
+        {
+            _reveal = what;
+        }
+    }
 
     public void OnShown()
     {
@@ -257,7 +276,7 @@ public sealed class MapPage : UserControl, IDuckPage
     {
         if (_ready && !_ws.IsLocked)
         {
-            Call($"dm.hosts({Js(MapFeed.Hosts(_ws.Session))})");
+            Call($"dm.hosts({Js(MapFeed.Hosts(_ws.Session, _ws.Groups))}, {Js(MapFeed.Groups(_ws.Groups))})");
         }
     }
 
@@ -279,7 +298,8 @@ public sealed class MapPage : UserControl, IDuckPage
         {
             ["readonly"] = _ws.IsDamaged,
             ["focus"] = focus && _front,
-            ["hosts"] = MapFeed.Hosts(_ws.Session)
+            ["hosts"] = MapFeed.Hosts(_ws.Session, _ws.Groups),
+            ["groups"] = MapFeed.Groups(_ws.Groups)
         });
 
         Call($"dm.load({_ws.MapJson ?? "null"}, {options})");
@@ -339,6 +359,13 @@ public sealed class MapPage : UserControl, IDuckPage
                 _ready = true;
                 PushTheme();
                 Load(focus: _front);
+
+                if (_reveal is { } what)
+                {
+                    _reveal = null;
+                    Call($"dm.reveal({Js(what)})");
+                }
+
                 break;
 
             case "changed" when message["doc"] is { } doc:
@@ -359,6 +386,23 @@ public sealed class MapPage : UserControl, IDuckPage
 
             case "reveal" when message["host"]?.GetValue<string>() is { Length: > 0 } host:
                 NetworkWanted?.Invoke(host);
+                break;
+
+            case "remind" when message["node"]?.GetValue<string>() is { Length: > 0 } node:
+                string name = message["name"]?.GetValue<string>() ?? string.Empty;
+                ReminderWanted?.Invoke(new Dictionary<string, object?>
+                {
+                    ["kind"] = "event",
+                    ["title"] = name.Length > 0 ? $"Intervento su {name}" : string.Empty,
+                    ["link"] = new Dictionary<string, string>
+                    {
+                        ["kind"] = "node",
+                        ["map"] = message["map"]?.GetValue<string>() ?? string.Empty,
+                        ["node"] = node,
+                        ["name"] = name,
+                        ["host"] = message["host"]?.GetValue<string>() ?? string.Empty
+                    }
+                });
                 break;
 
             case "check" when message["host"]?.GetValue<string>() is { Length: > 0 } host:

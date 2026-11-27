@@ -12,6 +12,7 @@ using DuckNote.App.Vault;
 using DuckNote.Desktop.Pages;
 using DuckNote.Desktop.Theme;
 using DuckNote.Desktop.Ui;
+using DuckNote.Notes.Calendar;
 
 namespace DuckNote.Desktop;
 
@@ -35,6 +36,7 @@ public sealed partial class MainWindow : Window
     private readonly NotesPage _notes;
     private readonly NetworkPage _network;
     private readonly MapPage _map;
+    private readonly Pages.CalendarPage _calendar;
     private readonly SettingsPage _settings;
     private readonly Notices _notices;
     private readonly Dictionary<string, Control> _pages;
@@ -55,12 +57,14 @@ public sealed partial class MainWindow : Window
         _notes = new NotesPage(ws);
         _network = new NetworkPage(ws);
         _map = new MapPage(ws);
+        _calendar = new Pages.CalendarPage(ws);
         _settings = new SettingsPage(ws, FlushAll, LockNow, () => Navigate("notes"));
         _pages = new Dictionary<string, Control>(StringComparer.Ordinal)
         {
             ["notes"] = _notes,
             ["network"] = _network,
             ["map"] = _map,
+            ["calendar"] = _calendar,
             ["settings"] = _settings
         };
 
@@ -247,7 +251,15 @@ public sealed partial class MainWindow : Window
             ShowMapCount();
         };
         _ws.Unsaved += () => Dispatcher.UIThread.Post(ShowMapCount);
-        _ws.NoteReplaced += () => Dispatcher.UIThread.Post(ShowMapCount);
+        _ws.NoteReplaced += () => Dispatcher.UIThread.Post(() =>
+        {
+            ShowMapCount();
+            ShowCalendarCount();
+        });
+        _ws.CalendarChanged += () => Dispatcher.UIThread.Post(ShowCalendarCount);
+        _ws.CalendarTick += ShowCalendarCount;
+        _ws.RemindersDue += alerts => Dispatcher.UIThread.Post(() => Remind(alerts));
+        _ws.CalendarOpened += summary => Dispatcher.UIThread.Post(() => Summarize(summary));
         _ws.Session.Finished += message =>
         {
             if (!_ws.ScanIsAutomatic)
@@ -286,6 +298,19 @@ public sealed partial class MainWindow : Window
             {
                 _network.Reveal(host);
             }
+        };
+        _map.ReminderWanted += Compose;
+        _network.ReminderWanted += Compose;
+        _calendar.WindowKey += OnWindowKey;
+        _calendar.HostWanted += host =>
+        {
+            Navigate("network");
+            _network.Reveal(host);
+        };
+        _calendar.DeviceWanted += device =>
+        {
+            Navigate("map");
+            _map.Reveal(device);
         };
 
         Lock.Opened += () =>
@@ -427,12 +452,13 @@ public sealed partial class MainWindow : Window
         {
             "network" => "DuckNote - Rete",
             "map" => "DuckNote - Mappa",
+            "calendar" => "DuckNote - Calendario",
             "settings" => "DuckNote - Impostazioni",
             _ => "DuckNote"
         };
 
-        // la nota e la mappa sono WebView: si mostrano e basta (un controllo nativo non sfuma)
-        if (key is "notes" or "map")
+        // la nota, la mappa e il calendario sono WebView: si mostrano e basta (un controllo nativo non sfuma)
+        if (key is "notes" or "map" or "calendar")
         {
             page.IsVisible = true;
         }
@@ -443,6 +469,7 @@ public sealed partial class MainWindow : Window
 
         NavNetwork.Classes.Set("active", key == "network");
         NavMap.Classes.Set("active", key == "map");
+        NavCalendar.Classes.Set("active", key == "calendar");
         ShowToolbar(key == "notes");
         (page as IDuckPage)?.OnShown();
     }
@@ -462,6 +489,8 @@ public sealed partial class MainWindow : Window
     private void OnNetwork(object? sender, RoutedEventArgs e) => Navigate("network");
 
     private void OnMap(object? sender, RoutedEventArgs e) => Navigate("map");
+
+    private void OnCalendar(object? sender, RoutedEventArgs e) => Navigate("calendar");
 
     private void OnSettings(object? sender, RoutedEventArgs e) =>
         Navigate(_current == "settings" ? _beforeSettings : "settings");
@@ -650,6 +679,10 @@ public sealed partial class MainWindow : Window
         {
             _map.Edit(action);
         }
+        else if (_current == "calendar" && !_ws.IsLocked)
+        {
+            _calendar.Edit(action);
+        }
     }
 
     // ------------------------------------------------------------------ blocco
@@ -658,6 +691,8 @@ public sealed partial class MainWindow : Window
     {
         _notes.Forget();
         _map.Forget();
+        _calendar.Forget();
+        BadgeCalendar.IsVisible = false;
 
         foreach (Control page in _pages.Values)
         {
@@ -837,6 +872,129 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>Accanto a Mappa: quanti apparati ci sono disegnati, e quanti sono spenti.</summary>
+    // ------------------------------------------------------------------ calendario
+
+    /// <summary>Il numero accanto a Calendario: le voci di oggi e quelle rimaste indietro (rosso se ce n'e').</summary>
+    private void ShowCalendarCount()
+    {
+        if (_ws.IsLocked || _ws.IsDamaged)
+        {
+            BadgeCalendar.IsVisible = false;
+            return;
+        }
+
+        AgendaSummary summary = _ws.Calendar.Summary(DateTime.Now);
+        int count = summary.Today.Count + summary.Overdue.Count;
+        BadgeCalendar.IsVisible = count > 0;
+        BadgeCalendarText.Text = count > 99 ? "99+" : count.ToString(CultureInfo.CurrentCulture);
+        string tone = summary.Overdue.Count > 0 ? "Red" : "Orange";
+        BadgeCalendar.Bind(Border.BackgroundProperty, BadgeCalendar.GetResourceObservable(tone + "Soft"));
+        BadgeCalendarText.Bind(TextBlock.ForegroundProperty, BadgeCalendarText.GetResourceObservable(tone));
+        ToolTip.SetTip(BadgeCalendar, summary.Overdue.Count > 0
+            ? $"Oggi {summary.Today.Count}, in ritardo {summary.Overdue.Count}"
+            : summary.Today.Count == 1 ? "1 voce oggi" : $"{summary.Today.Count} voci oggi");
+    }
+
+    /// <summary>Una voce nuova chiesta da Rete o dalla mappa, gia' legata all'host o all'apparato.</summary>
+    private void Compose(object seed)
+    {
+        if (_ws.IsLocked)
+        {
+            return;
+        }
+
+        Navigate("calendar");
+        _calendar.Compose(seed);
+    }
+
+    private void ShowOccurrence(Occurrence occurrence)
+    {
+        Navigate("calendar");
+        _calendar.Show(occurrence.Date, occurrence.Key);
+    }
+
+    /// <summary>
+    /// I promemoria scattati: un avviso ciascuno, che resta finche' non si sceglie (Fatto,
+    /// Rimanda, Apri). Se DuckNote e' dietro, l'icona nel Dock salta finche' non si torna.
+    /// </summary>
+    private void Remind(IReadOnlyList<AgendaAlert> alerts)
+    {
+        if (_ws.IsLocked || alerts.Count == 0)
+        {
+            return;
+        }
+
+        DateTime now = DateTime.Now;
+
+        if (alerts.Count > 3)
+        {
+            // dopo una pausa lunga (il Mac addormentato) ne arrivano tanti: uno che li racconta
+            _notices.Toast("bell", "Orange", $"{alerts.Count} promemoria",
+                string.Join(", ", alerts.Take(3).Select(alert => AgendaText.Alert(alert, now).Title)) + " e altri.",
+                [new NoticeAction("Apri il calendario", () => Navigate("calendar"), Primary: true)], sticky: true);
+        }
+        else
+        {
+            foreach (AgendaAlert alert in alerts)
+            {
+                Occurrence occurrence = alert.Occurrence;
+                (string title, string text) = AgendaText.Alert(alert, now);
+                string tone = occurrence.Item.Certificate ? "Orange" : occurrence.Item.Kind switch
+                {
+                    AgendaKinds.Todo => "Green",
+                    AgendaKinds.Deadline => "Red",
+                    AgendaKinds.Note => "Purple",
+                    _ => "Blue"
+                };
+
+                _notices.Toast("bell", tone, title, text,
+                [
+                    new NoticeAction("Fatto", () => _ws.MarkDone(occurrence), Primary: true),
+                    new NoticeAction("Rimanda", null, Choices:
+                    [
+                        ("Fra 10 minuti", () => _ws.Snooze(occurrence, DateTime.Now.AddMinutes(10))),
+                        ("Fra un'ora", () => _ws.Snooze(occurrence, DateTime.Now.AddHours(1))),
+                        ("Domani alle 9", () => _ws.Snooze(occurrence, DateTime.Today.AddDays(1).AddHours(9)))
+                    ]),
+                    new NoticeAction("Apri", () => ShowOccurrence(occurrence))
+                ], sticky: true);
+            }
+        }
+
+        Attention.Request(this, insist: true);
+    }
+
+    /// <summary>All'apertura della nota: cosa c'e' oggi, cosa e' rimasto indietro, cosa arriva.</summary>
+    private void Summarize(AgendaSummary summary)
+    {
+        ShowCalendarCount();
+
+        if (summary.IsEmpty || (summary.Today.Count == 0 && summary.Overdue.Count == 0 && summary.Certificates.Count == 0))
+        {
+            return;
+        }
+
+        DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+        string tone = summary.Overdue.Count > 0 ? "Red" : "Orange";
+
+        // un attimo dopo l'apertura: la finestra (o lo sblocco) prima, poi il riepilogo
+        DispatcherTimer later = new() { Interval = TimeSpan.FromSeconds(1.2) };
+        later.Tick += (_, _) =>
+        {
+            later.Stop();
+
+            if (_ws.IsLocked)
+            {
+                return;
+            }
+
+            _notices.Toast("calendar", tone, AgendaText.SummaryTitle(summary), AgendaText.SummaryText(summary, today),
+                [new NoticeAction("Apri il calendario", () => Navigate("calendar"), Primary: true)], sticky: false);
+            Attention.Request(this, insist: false);
+        };
+        later.Start();
+    }
+
     private void ShowMapCount()
     {
         if (_ws.IsLocked)
@@ -868,11 +1026,13 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        int hosts = _ws.NoteHostCount;
+        // con un gruppo monitorato si contano anche i suoi host; senza, quelli scritti nella nota
+        bool groups = _ws.Groups.All.Any(group => group.Monitor);
+        int hosts = groups ? _ws.MonitoredCount : _ws.NoteHostCount;
         Card(
             "Monitoraggio",
             _ws.Settings.MonitorEnabled
-                ? string.Create(CultureInfo.CurrentCulture, $"{hosts} host della nota, ogni {_ws.Settings.MonitorIntervalSec} s. {session.UpCount} attivi, {session.DownCount} spenti.")
+                ? string.Create(CultureInfo.CurrentCulture, $"{hosts} host {(groups ? "fra nota e gruppi" : "della nota")}, ogni {_ws.Settings.MonitorIntervalSec} s. {session.UpCount} attivi, {session.DownCount} spenti.")
                 : "Spento: gli host si controllano solo a mano.",
             null,
             _ws.Settings.MonitorEnabled ? (session.DownCount > 0 ? "Orange" : "Green") : "Gray",

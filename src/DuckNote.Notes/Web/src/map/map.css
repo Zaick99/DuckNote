@@ -1,0 +1,282 @@
+/* La mappa della rete: la libreria, la tela, le zone, i cavi, gli apparati, la scheda. Il resto
+   (token, pulsanti, campi, popup) e' in common/base.css. */
+@import '../common/base.css';
+
+/* ------------------------------------------------------------------ la libreria */
+
+.dm-library {
+  flex: none;
+  width: 222px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 10px 10px;
+  background: var(--c-BgSidebar);
+  border-right: 1px solid var(--c-Separator);
+  overflow: hidden;
+}
+.no-library .dm-library { display: none; }
+.dm-section { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.dm-section.grow { flex: 1; margin-top: 10px; }
+.dm-section-title { display: flex; align-items: center; min-height: 22px; padding: 0 4px; color: var(--c-LabelSecondary); font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+
+.dm-kinds { display: grid; grid-template-columns: repeat(2, 1fr); gap: 5px; }
+.dm-kind-tile {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 7px 0 4px;
+  border: 1px solid var(--c-Separator);
+  border-radius: 8px;
+  background: var(--c-BgContent);
+  cursor: grab;
+  text-align: left;
+}
+.dm-kind-tile:hover { border-color: var(--c-BorderControl); background: var(--c-BgField); }
+.dm-kind-tile-icon { display: grid; place-items: center; flex: none; width: 26px; height: 26px; border-radius: 6px; background: var(--tone-soft); color: var(--tone); }
+.dm-kind-tile-icon .dm-icon { stroke-width: 1.6; }
+.dm-kind-tile-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
+
+/* il gruppo di scansione da mostrare: sembra un campo, apre un menu */
+.dm-group-pick {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--c-Separator);
+  border-radius: 7px;
+  background: var(--c-BgContent);
+  color: var(--c-LabelTertiary);
+  font-size: 12px;
+  text-align: left;
+}
+.dm-group-pick:hover { border-color: var(--c-BorderControl); background: var(--c-BgField); }
+.dm-group-pick.open { border-color: var(--c-Accent); }
+.dm-group-pick.chosen > .dm-icon:first-child { color: var(--c-Accent); }
+.dm-group-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-Label); font-weight: 500; }
+
+.dm-hosts { flex: 1; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px 4px; }
+.dm-host { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 4px 7px; border-radius: 7px; cursor: grab; }
+.dm-host:hover { background: var(--c-BgHover); }
+.dm-host.placed { cursor: pointer; opacity: 0.62; }
+.dm-host-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dm-host-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.dm-host-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-LabelTertiary); font-size: 11px; }
+.dm-host-check { color: var(--c-Green); }
+.dm-hosts-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 6px 4px; color: var(--c-LabelTertiary); font-size: 12px; }
+
+/* quello che si trascina dalla libreria */
+.dm-ghost {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 176px;
+  height: 52px;
+  padding: 0 10px 0 8px;
+  border: 1px solid var(--c-AccentBorder);
+  border-radius: 12px;
+  background: var(--c-BgContent);
+  box-shadow: 0 6px 18px var(--c-Shadow);
+  pointer-events: none;
+  opacity: 0.92;
+}
+.dm-ghost-tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: var(--tone-soft); color: var(--tone); }
+.dm-ghost-tile .dm-icon { stroke-width: 1.6; }
+.dm-ghost-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
+
+/* ------------------------------------------------------------------ la tela */
+
+.dm-canvas {
+  position: absolute;
+  inset: 0;
+  outline: none;
+  background-color: var(--canvas);
+  background-image: radial-gradient(circle, var(--dots) 1px, transparent 1.3px);
+  touch-action: none;
+}
+.dm-canvas.drop { box-shadow: inset 0 0 0 2px var(--c-AccentBorder); }
+.dm-canvas.grab, .dm-canvas.grab * { cursor: grab !important; }
+.dm-canvas.panning, .dm-canvas.panning * { cursor: grabbing !important; }
+.connecting .dm-canvas .dm-node { cursor: crosshair; }
+.dm-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+/* le zone */
+.dm-zone-box { fill: var(--tone-zone); stroke: var(--tone-border); stroke-width: 1; pointer-events: none; }
+.dm-zone-edge { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: move; }
+.dm-zone-head { cursor: move; }
+.dm-zone-chip { fill: var(--c-BgContent); stroke: var(--c-Separator); }
+.dm-zone-dot { fill: var(--tone); }
+.dm-zone-name { font: 600 12px var(--font-text); fill: var(--c-Label); }
+.dm-zone-sub { font: 11px var(--font-mono); fill: var(--c-LabelSecondary); }
+.dm-zone.selected .dm-zone-box { stroke: var(--c-Accent); stroke-width: 1.5; }
+.dm-zone.selected .dm-zone-chip { stroke: var(--c-AccentBorder); }
+.dm-grips { display: none; }
+.dm-zone.selected .dm-grips { display: inline; }
+.dm-grip { fill: var(--c-BgContent); stroke: var(--c-Accent); stroke-width: 1.4; }
+.dm-grip[data-corner="nw"], .dm-grip[data-corner="se"] { cursor: nwse-resize; }
+.dm-grip[data-corner="ne"], .dm-grip[data-corner="sw"] { cursor: nesw-resize; }
+
+/* i cavi */
+.dm-link { cursor: pointer; }
+.dm-link-hit { fill: none; stroke: transparent; stroke-width: 14; stroke-linecap: round; pointer-events: stroke; }
+.dm-link-line { fill: none; stroke: var(--c-LabelTertiary); stroke-linecap: round; pointer-events: none; }
+.dm-link.k-fiber .dm-link-line { stroke: var(--c-Teal); }
+.dm-link.k-wifi .dm-link-line { stroke: var(--c-Purple); stroke-dasharray: 5 5; }
+.dm-link.k-vpn .dm-link-line { stroke: var(--c-Blue); stroke-dasharray: 0.1 5.5; }
+.dm-link.k-wan .dm-link-line { stroke: var(--c-Blue); }
+.dm-link.down .dm-link-line { stroke: var(--c-Red); stroke-dasharray: 6 4; opacity: 0.75; }
+.dm-link:hover .dm-link-line { stroke: var(--c-LabelSecondary); }
+.dm-link.selected .dm-link-line { stroke: var(--c-Accent); opacity: 1; }
+.dm-link-labels { cursor: pointer; }
+/* le etichette dei cavi (SVG): "dm-tag", da non confondere coi chip di stato della scheda (HTML) */
+.dm-tag rect { fill: var(--c-BgContent); stroke: var(--c-Separator); }
+.dm-tag text { font: 10.5px var(--font-mono); fill: var(--c-LabelSecondary); pointer-events: none; }
+.dm-port text { fill: var(--c-LabelTertiary); }
+.dm-leader { stroke: var(--c-LabelQuaternary); stroke-width: 0.8; stroke-dasharray: 2 2; pointer-events: none; }
+.dm-link-labels.selected .dm-leader { stroke: var(--c-Accent); }
+.dm-link-labels:hover .dm-tag rect { stroke: var(--c-BorderControl); }
+.dm-link-labels.selected .dm-tag rect { stroke: var(--c-AccentBorder); }
+.dm-link-labels.selected .dm-tag text { fill: var(--c-Label); }
+.lod-far .dm-labels { display: none; }
+
+/* gli apparati */
+.dm-node { cursor: default; }
+.dm-node-ring { fill: none; stroke: transparent; stroke-width: 3; }
+.dm-node-card { fill: var(--c-BgContent); stroke: var(--c-Separator); stroke-width: 1; }
+.dm-node:hover .dm-node-card { stroke: var(--c-BorderControl); }
+.dm-node-tile { fill: var(--tone-soft); }
+.dm-node-icon { fill: none; stroke: var(--tone); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.dm-node-tile, .dm-node-icon, .dm-node-name, .dm-node-sub, .dm-node-dot, .dm-node-ring, .dm-zone-name, .dm-zone-sub, .dm-zone-dot { pointer-events: none; }
+.dm-node-name { font: 600 12.5px var(--font-text); fill: var(--c-Label); }
+.dm-node-sub { font: 11px var(--font-text); fill: var(--c-LabelSecondary); }
+.dm-node-sub.mono { font-family: var(--font-mono); }
+.dm-node-dot { fill: var(--c-LabelQuaternary); stroke: var(--c-BgContent); stroke-width: 2; }
+.dm-node.st-none .dm-node-dot { display: none; }
+.dm-node.st-up .dm-node-dot { fill: var(--c-Green); }
+.dm-node.st-down .dm-node-dot { fill: var(--c-Red); }
+.dm-node.st-wait .dm-node-dot { fill: var(--c-Orange); }
+.dm-node.st-down .dm-node-card { stroke: var(--c-RedBorder); }
+.dm-node.st-down .dm-node-sub { fill: var(--c-Red); }
+.dm-node.selected .dm-node-card { stroke: var(--c-Accent); stroke-width: 1.5; }
+.dm-node.selected .dm-node-ring { stroke: var(--c-AccentSoft); }
+.dm-node.target .dm-node-card { stroke: var(--c-Accent); stroke-width: 2; }
+.dm-node.target .dm-node-ring { stroke: var(--c-AccentBorder); }
+.lod-tiny .dm-node-sub { display: none; }
+
+.dm-handles { opacity: 0; }
+.dm-handle { fill: var(--c-BgContent); stroke: var(--c-Accent); stroke-width: 1.5; cursor: crosshair; }
+.dm-handle:hover { fill: var(--c-Accent); }
+.dm-node:hover .dm-handles, .connecting .dm-node .dm-handles { opacity: 1; }
+.dragging .dm-handles, .panning .dm-handles, .lod-far .dm-handles { opacity: 0 !important; pointer-events: none; }
+
+.dim { opacity: 0.22; }
+
+.dm-over > * { pointer-events: none; }
+.dm-marquee { fill: var(--c-AccentSoft); stroke: var(--c-Accent); }
+.dm-wire { fill: none; stroke: var(--c-Accent); stroke-width: 2; stroke-dasharray: 6 4; stroke-linecap: round; }
+.dm-guide { stroke: var(--c-Pink); }
+
+/* ------------------------------------------------------------------ sopra la tela */
+
+.dm-zoom {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--c-Separator);
+  border-radius: 10px;
+  background: var(--c-BgContent);
+}
+.dm-zoom .dm-sep { margin: 0 3px; height: 18px; }
+.dm-zoom-value { min-width: 48px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--c-LabelSecondary); font: 600 11.5px var(--font-mono); cursor: default; }
+.dm-zoom-value:hover { background: var(--c-BgHover); color: var(--c-Label); }
+
+.dm-statusline { position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 12px; color: var(--c-LabelTertiary); font-size: 11.5px; pointer-events: none; max-width: calc(100% - 260px); white-space: nowrap; overflow: hidden; }
+.dm-statusline > * { display: inline-flex; align-items: center; gap: 6px; }
+.dm-status-down { color: var(--c-Red); font-weight: 600; }
+.dm-status-hint { color: var(--c-Accent); }
+
+.dm-empty { position: absolute; left: 50%; top: 46%; width: 380px; max-width: calc(100% - 40px); transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; pointer-events: none; }
+.dm-empty > * { pointer-events: auto; }
+.dm-empty-art { width: 120px; height: 120px; margin-bottom: 6px; background: var(--empty-art, none) center / contain no-repeat; opacity: 0.95; }
+.dm-empty-title { font-size: 17px; font-weight: 700; }
+.dm-empty-text { color: var(--c-LabelSecondary); line-height: 1.5; }
+.dm-empty-buttons { display: flex; gap: 8px; margin-top: 8px; }
+
+/* ------------------------------------------------------------------ la scheda */
+
+.dm-inspector {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 288px;
+  max-height: calc(100% - 68px);
+  overflow-y: auto;
+  border: 1px solid var(--c-Separator);
+  border-radius: 12px;
+  background: var(--c-BgContent);
+  box-shadow: 0 6px 18px var(--c-Shadow);
+}
+.dm-insp-body { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px 14px; }
+.dm-insp-head { display: flex; align-items: flex-start; gap: 10px; }
+.dm-insp-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.dm-insp-title { font-size: 14px; font-weight: 600; }
+.dm-insp-title-row { display: flex; align-items: center; gap: 6px; }
+.dm-insp-sub { color: var(--c-LabelTertiary); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-insp-tile { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 10px; background: var(--tone-soft, var(--c-BgFieldAlt)); color: var(--tone, var(--c-LabelSecondary)); }
+.dm-insp-tile .dm-icon { stroke-width: 1.6; }
+.dm-insp-tile.line { background: var(--c-BgFieldAlt); color: var(--c-LabelSecondary); }
+.dm-insp-tile.zone { background: var(--c-BgFieldAlt); color: var(--tone); }
+.dm-status { display: flex; align-items: center; gap: 4px; min-height: 26px; }
+
+.dm-kind-pick { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.dm-kind-dot { display: grid; place-items: center; height: 30px; border: 1px solid transparent; border-radius: 7px; background: var(--c-BgFieldAlt); color: var(--c-LabelTertiary); cursor: default; padding: 0; }
+.dm-kind-dot:hover:not(:disabled) { color: var(--tone); background: var(--tone-soft); }
+.dm-kind-dot.on { color: var(--tone); background: var(--tone-soft); border-color: var(--tone); }
+.dm-kind-dot .dm-icon { stroke-width: 1.7; }
+
+
+
+.dm-members { display: flex; align-items: center; gap: 4px; color: var(--c-LabelSecondary); font-size: 12px; }
+
+
+.dm-ports-grid { display: grid; gap: 3px; }
+.dm-port-cell { height: 20px; padding: 0; border: 1px solid var(--c-Separator); border-radius: 4px; background: var(--c-BgFieldAlt); color: var(--c-LabelTertiary); font: 9.5px var(--font-mono); cursor: default; }
+.dm-port-cell.on { border-color: var(--c-AccentBorder); background: var(--c-AccentSoft); color: var(--c-Label); font-weight: 600; }
+.dm-port-cell.on.k-fiber { border-color: var(--t-Teal-border); background: var(--t-Teal-soft); }
+.dm-port-cell.on.k-wifi, .dm-port-cell.on.k-vpn { border-color: var(--t-Purple-border); background: var(--t-Purple-soft); }
+.dm-port-cell.on:hover { border-color: var(--c-Accent); }
+.dm-ports { display: flex; flex-direction: column; gap: 6px; }
+
+.dm-cables { display: flex; flex-direction: column; gap: 2px; }
+.dm-cables:empty { display: none; }
+.dm-cables .dm-label { margin-bottom: 3px; }
+.dm-cable { display: flex; align-items: center; gap: 9px; min-height: 34px; padding: 4px 6px; border: 0; border-radius: 7px; background: transparent; text-align: left; cursor: default; }
+.dm-cable:hover { background: var(--c-BgHover); }
+.dm-cable-line { flex: none; width: 18px; height: 0; border-top: 2px solid var(--c-LabelTertiary); }
+.dm-cable.k-fiber .dm-cable-line { border-color: var(--c-Teal); }
+.dm-cable.k-wifi .dm-cable-line { border-top-style: dashed; border-color: var(--c-Purple); }
+.dm-cable.k-vpn .dm-cable-line { border-top-style: dotted; border-color: var(--c-Blue); }
+.dm-cable.k-wan .dm-cable-line { border-color: var(--c-Blue); }
+.dm-cable-text { display: flex; flex-direction: column; min-width: 0; }
+.dm-cable-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dm-cable-sub { color: var(--c-LabelTertiary); font: 11px var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.dm-picker { width: 312px; padding: 8px; }
+.dm-picker .dm-pop-title { padding: 2px 4px 8px; }
+.dm-kind-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.dm-kind-grid .dm-kind-tile { cursor: default; }
+.dm-kind-grid .dm-kind-tile:focus { outline: none; border-color: var(--c-Accent); }

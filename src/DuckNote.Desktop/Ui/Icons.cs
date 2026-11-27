@@ -68,6 +68,10 @@ public static class Icons
         ["web"] = "M8,1.5 A6.5,6.5 0 1 1 7.99,1.5 Z M1.5,8 H14.5",
         ["swap"] = "M2,5 H13 M10.5,2.5 L13,5 L10.5,7.5 M14,11 H3 M5.5,8.5 L3,11 L5.5,13.5",
         ["highlight"] = "M3,13.5 H13 M4.5,11 L5.5,8 L10.5,3 L13,5.5 L8,10.5 Z",
+        ["group"] = "M8,1.8 L14.5,5 L8,8.2 L1.5,5 Z M1.5,8 L8,11.2 L14.5,8 M1.5,11 L8,14.2 L14.5,11",
+        ["calendar"] = "M2,3.5 H14 V14 H2 Z M2,6.5 H14 M5,1.8 V4.8 M11,1.8 V4.8 M5,9.2 h0.1 M8,9.2 h0.1 M11,9.2 h0.1 M5,11.8 h0.1 M8,11.8 h0.1",
+        ["bell"] = "M4,11.2 V7 A4,4 0 0 1 12,7 V11.2 L13.5,12.5 H2.5 Z M6.6,14.3 A1.6,1.6 0 0 0 9.4,14.3",
+        ["edit"] = "M2,14 L3,10.5 L11,2.5 L13.5,5 L5.5,13 Z M9.5,4 L12,6.5",
     };
 
     private static readonly Dictionary<string, Geometry> Parsed = new(StringComparer.Ordinal);

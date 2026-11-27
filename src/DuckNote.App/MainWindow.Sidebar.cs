@@ -282,6 +282,12 @@ public partial class MainWindow
             return;
         }
 
+        if (CalendarHost.Visibility == Visibility.Visible && CalendarHost.Content is CalendarPage calendar)
+        {
+            calendar.OnShown();
+            return;
+        }
+
         if (PageHost.Content is FrameworkElement page && page.MoveFocus(new TraversalRequest(FocusNavigationDirection.First)))
         {
             return;

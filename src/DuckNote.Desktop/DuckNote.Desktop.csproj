@@ -37,7 +37,7 @@
   <ItemGroup>
     <Compile Include="..\DuckNote.App\Vault\Passwords.cs;..\DuckNote.App\Vault\VaultSession.cs" Link="Shared\Vault\%(Filename)%(Extension)" />
     <Compile Include="..\DuckNote.App\Storage\AppWipe.cs;..\DuckNote.App\Storage\CurrentUser.cs;..\DuckNote.App\Storage\IoQueue.cs;..\DuckNote.App\Storage\OnlyOne.cs" Link="Shared\Storage\%(Filename)%(Extension)" />
-    <Compile Include="..\DuckNote.App\Scanning\HostRow.cs;..\DuckNote.App\Scanning\ScanSession.cs;..\DuckNote.App\Scanning\UiThread.cs;..\DuckNote.App\Scanning\MapFeed.cs" Link="Shared\Scanning\%(Filename)%(Extension)" />
+    <Compile Include="..\DuckNote.App\Scanning\HostRow.cs;..\DuckNote.App\Scanning\ScanSession.cs;..\DuckNote.App\Scanning\UiThread.cs;..\DuckNote.App\Scanning\MapFeed.cs;..\DuckNote.App\Scanning\GroupHosts.cs" Link="Shared\Scanning\%(Filename)%(Extension)" />
     <Compile Include="..\DuckNote.App\Ui\Observable.cs" Link="Shared\Ui\Observable.cs" />
   </ItemGroup>
 

@@ -97,6 +97,12 @@ public sealed class Book
     /// <summary>Le mappe della rete (mappa.json), se la nota ne ha: si sostituiscono intere, mai sul posto.</summary>
     public byte[]? Map { get; set; }
 
+    /// <summary>I gruppi di scansione (gruppi.json), se la nota ne ha: si sostituiscono interi.</summary>
+    public byte[]? Groups { get; set; }
+
+    /// <summary>Il calendario (calendario.json), se la nota ne ha: si sostituisce intero.</summary>
+    public byte[]? Calendar { get; set; }
+
     /// <summary>Le voci del file scritte da una versione piu' nuova: si riscrivono tali e quali.</summary>
     public Dictionary<string, byte[]> Extras { get; } = new(StringComparer.Ordinal);
 
@@ -145,6 +151,8 @@ public sealed class Book
         }
 
         book.Map = archive.Map;
+        book.Groups = archive.Groups;
+        book.Calendar = archive.Calendar;
 
         foreach ((string entry, byte[] value) in archive.Extras)
         {
@@ -179,6 +187,8 @@ public sealed class Book
         }
 
         archive.Map = Map;
+        archive.Groups = Groups;
+        archive.Calendar = Calendar;
 
         foreach ((string entry, byte[] bytes) in Extras)
         {
@@ -206,13 +216,18 @@ public sealed class Book
             CryptographicOperations.ZeroMemory(bytes);
         }
 
-        if (Map is { } map)
+        foreach (byte[]? data in (byte[]?[])[Map, Groups, Calendar])
         {
-            CryptographicOperations.ZeroMemory(map);
+            if (data is not null)
+            {
+                CryptographicOperations.ZeroMemory(data);
+            }
         }
 
         Extras.Clear();
         Map = null;
+        Groups = null;
+        Calendar = null;
         _sheets.Clear();
     }
 

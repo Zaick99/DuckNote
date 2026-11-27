@@ -62,6 +62,12 @@ public sealed class Notebook
     /// <summary>Le mappe della rete (mappa.json), se la nota ne ha.</summary>
     public byte[]? Map { get; set; }
 
+    /// <summary>I gruppi di scansione (gruppi.json), se la nota ne ha.</summary>
+    public byte[]? Groups { get; set; }
+
+    /// <summary>Il calendario (calendario.json), se la nota ne ha.</summary>
+    public byte[]? Calendar { get; set; }
+
     /// <summary>Le voci del file scritte da una versione piu' nuova: si riscrivono tali e quali.</summary>
     public Dictionary<string, byte[]> Extras { get; } = new(StringComparer.Ordinal);
 
@@ -121,6 +127,8 @@ public sealed class Notebook
         }
 
         book.Map = archive.Map;
+        book.Groups = archive.Groups;
+        book.Calendar = archive.Calendar;
 
         return book._sheets.Count > 0 ? book : null;
     }
@@ -148,6 +156,8 @@ public sealed class Notebook
 
         // la mappa si sostituisce intera (mai riscritta sul posto): la foto puo' tenerne i byte
         archive.Map = Map;
+        archive.Groups = Groups;
+        archive.Calendar = Calendar;
 
         foreach ((string entry, byte[] bytes) in Extras)
         {
@@ -167,14 +177,19 @@ public sealed class Notebook
             CryptographicOperations.ZeroMemory(bytes);
         }
 
-        if (Map is { } map)
+        foreach (byte[]? data in (byte[]?[])[Map, Groups, Calendar])
         {
-            CryptographicOperations.ZeroMemory(map);
+            if (data is not null)
+            {
+                CryptographicOperations.ZeroMemory(data);
+            }
         }
 
         Insets.Clear();
         Extras.Clear();
         Map = null;
+        Groups = null;
+        Calendar = null;
         _sheets.Clear();
     }
 

@@ -16,7 +16,7 @@ using MapWeb = DuckNote.Notes.Maps.MapPage;
 namespace DuckNote.Desktop.Pages;
 
 /// <summary>
-/// La mappa della rete: la pagina web della mappa (Maps/Web, la stessa di Windows) in un
+/// La mappa della rete: la pagina web della mappa (DuckNote.Notes/Web, la stessa di Windows) in un
 /// WebView a tutta pagina. Questa classe fa da ponte, come per la nota: manda alla pagina le
 /// mappe salvate, il tema e gli host della tabella col loro stato (dm.*), e ascolta quello che
 /// la pagina dice (le mappe cambiate, i tasti della finestra, un host da vedere nella pagina
@@ -85,6 +85,9 @@ public sealed class MapPage : UserControl, IDuckPage
 
     /// <summary>La mappa chiede la pagina Rete (per analizzare, o per vedere un host).</summary>
     public event Action<string?>? NetworkWanted;
+
+    /// <summary>"Promemoria" sulla scheda di un apparato: una voce nuova del calendario legata a lui.</summary>
+    public event Action<object>? ReminderWanted;
 
     public void OnShown()
     {
@@ -157,7 +160,7 @@ public sealed class MapPage : UserControl, IDuckPage
     {
         if (_ready && !_ws.IsLocked)
         {
-            Call($"dm.hosts({Js(MapFeed.Hosts(_ws.Session))})");
+            Call($"dm.hosts({Js(MapFeed.Hosts(_ws.Session, _ws.Groups))}, {Js(MapFeed.Groups(_ws.Groups))})");
         }
     }
 
@@ -179,7 +182,8 @@ public sealed class MapPage : UserControl, IDuckPage
         {
             ["readonly"] = _ws.IsDamaged,
             ["focus"] = focus && _front,
-            ["hosts"] = MapFeed.Hosts(_ws.Session)
+            ["hosts"] = MapFeed.Hosts(_ws.Session, _ws.Groups),
+            ["groups"] = MapFeed.Groups(_ws.Groups)
         });
 
         Call($"dm.load({_ws.MapJson ?? "null"}, {options})");
@@ -298,6 +302,23 @@ public sealed class MapPage : UserControl, IDuckPage
 
             case "reveal" when message["host"]?.GetValue<string>() is { Length: > 0 } host:
                 NetworkWanted?.Invoke(host);
+                break;
+
+            case "remind" when message["node"]?.GetValue<string>() is { Length: > 0 } node:
+                string name = message["name"]?.GetValue<string>() ?? string.Empty;
+                ReminderWanted?.Invoke(new Dictionary<string, object?>
+                {
+                    ["kind"] = "event",
+                    ["title"] = name.Length > 0 ? $"Intervento su {name}" : string.Empty,
+                    ["link"] = new Dictionary<string, string>
+                    {
+                        ["kind"] = "node",
+                        ["map"] = message["map"]?.GetValue<string>() ?? string.Empty,
+                        ["node"] = node,
+                        ["name"] = name,
+                        ["host"] = message["host"]?.GetValue<string>() ?? string.Empty
+                    }
+                });
                 break;
 
             case "check" when message["host"]?.GetValue<string>() is { Length: > 0 } host:

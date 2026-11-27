@@ -1,9 +1,12 @@
 using System.IO;
+using System.Text.Json.Nodes;
 using System.Windows.Documents;
 using System.Windows.Threading;
 using DuckNote.App.Editor;
 using DuckNote.App.Scanning;
 using DuckNote.App.Vault;
+using DuckNote.Notes.Calendar;
+using DuckNote.Notes.Groups;
 using DuckNote.Notes.Hosts;
 using DuckNote.Notes.Maps;
 using DuckNote.Notes.Notebook;
@@ -25,6 +28,10 @@ public sealed class Workspace
     private readonly DispatcherTimer _fresh = new() { Interval = TimeSpan.FromMilliseconds(1600) };
     private readonly DispatcherTimer _monitor = new();
     private readonly DispatcherTimer _idle = new() { Interval = TimeSpan.FromSeconds(20) };
+
+    /// <summary>L'orologio dei promemoria del calendario: batte ogni 20 secondi.</summary>
+    private readonly DispatcherTimer _calendarTick = new() { Interval = TimeSpan.FromSeconds(20) };
+    private readonly ReminderClock _reminders = new();
 
     /// <summary>Raggruppa gli avvisi "gli host sono cambiati": durante un'analisi ne arrivano a decine al secondo.</summary>
     private readonly DispatcherTimer _hosts = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(150) };
@@ -67,7 +74,7 @@ public sealed class Workspace
                 return;
             }
 
-            IReadOnlyList<string> waiting = Session.NeverChecked(NoteHosts(settled: true));
+            IReadOnlyList<string> waiting = Session.NeverChecked(Watched(settled: true));
 
             if (waiting.Count > 0)
             {
@@ -80,8 +87,7 @@ public sealed class Workspace
             // tutti gli indirizzi gia' in tabella, anche l'ultimo scritto se il cursore e'
             // rimasto subito dopo: e' entrato in tabella quando la parola si e' fermata. Fuori
             // resta solo una parola ancora a meta', che in tabella non c'e'.
-            if (Session.IsRunning || IsLocked
-                || NoteHosts(settled: true).Where(host => Session.Find(host) is not null).ToList() is not { Count: > 0 } hosts)
+            if (Session.IsRunning || IsLocked || Monitored() is not { Count: > 0 } hosts)
             {
                 return;
             }
@@ -101,7 +107,24 @@ public sealed class Workspace
         Session.Finished += _ =>
         {
             KeepLastScan();
+            LearnCertificates();
             RaiseHosts();
+        };
+
+        _calendarTick.Tick += (_, _) =>
+        {
+            if (IsLocked || IsDamaged)
+            {
+                return;
+            }
+
+            IReadOnlyList<AgendaAlert> due = _reminders.Tick(Calendar, DateTime.Now);
+            CalendarTick?.Invoke();
+
+            if (due.Count > 0)
+            {
+                RemindersDue?.Invoke(due);
+            }
         };
 
         Session.Rows.CollectionChanged += (_, _) => RaiseHosts();
@@ -261,13 +284,29 @@ public sealed class Workspace
         _dirty = fresh || Book.NeedsRewrite;
         _noteHosts = null;
         _mapHosts = null;
+        _groupHosts = null;
+        _agenda = null;
         CurrentSheet = null;
         NoteReplaced?.Invoke();
+        GroupsChanged?.Invoke();
         SyncHosts();
+        LearnCertificates();
 
         if (_dirty)
         {
             SaveNote();
+        }
+
+        // i promemoria scattati mentre la nota era chiusa non suonano: li dice il riepilogo
+        if (!IsDamaged)
+        {
+            _reminders.Start(DateTime.Now);
+            CalendarChanged?.Invoke();
+            CalendarOpened?.Invoke(Calendar.Summary(DateTime.Now));
+        }
+        else
+        {
+            _reminders.Stop();
         }
     }
 
@@ -509,17 +548,168 @@ public sealed class Workspace
     /// </summary>
     public void SyncHosts(bool settled = false)
     {
-        IReadOnlyList<string> written = NoteHosts(settled: true);
-        Session.Prune(written);
+        IReadOnlyList<string> written = Watched(settled: true);
+        Session.Prune(written, Groups.InAny);
 
-        if (Session.EnsurePending(settled ? written : NoteHosts()).Count > 0)
+        if (Session.EnsurePending(settled ? written : Watched()).Count > 0)
         {
             // un indirizzo appena scritto si controlla da solo, appena si smette di scrivere
             _fresh.Stop();
             _fresh.Start();
         }
 
+        Session.MarkWritten(NoteHosts());
         RaiseHosts();
+    }
+
+    // ------------------------------------------------------------------ gruppi di scansione
+
+    private GroupHosts? _groupHosts;
+
+    /// <summary>I gruppi di scansione della nota (oltre a "Nota", che c'e' sempre).</summary>
+    public GroupHosts Groups => _groupHosts ??= new GroupHosts(ScanGroups.Read(Book.Groups));
+
+    /// <summary>I gruppi sono cambiati (creati, modificati, tolti, o un'altra nota).</summary>
+    public event Action? GroupsChanged;
+
+    /// <summary>I gruppi nuovi, nella nota (e quindi nella cassaforte): si salvano fra poco.</summary>
+    public void SaveGroups(IReadOnlyList<ScanGroup> groups)
+    {
+        if (IsLocked || IsDamaged)
+        {
+            return;
+        }
+
+        Book.Groups = ScanGroups.Write(groups);
+        _groupHosts = null;
+        Touch();
+        SyncHosts(settled: true);
+        GroupsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Gli indirizzi che stanno in tabella anche senza un'analisi e si controllano da soli: quelli
+    /// della nota (fogli e mappa) e quelli singoli dei gruppi col monitoraggio acceso.
+    /// </summary>
+    public IReadOnlyList<string> Watched(bool settled = false)
+    {
+        IReadOnlyList<string> note = NoteHosts(settled);
+        HashSet<string> seen = new(note, StringComparer.OrdinalIgnoreCase);
+        return [.. note, .. Groups.WatchedSingles().Where(host => !Session.IsHidden(host) && seen.Add(host))];
+    }
+
+    /// <summary>Quello che il monitoraggio controlla: gli indirizzi tenuti in tabella e gli host gia' trovati nelle reti dei gruppi monitorati.</summary>
+    public IReadOnlyList<string> Monitored()
+    {
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        return [.. Watched(settled: true).Where(host => Session.Find(host) is not null)
+            .Concat(Groups.MonitoredRows(Session.Rows).Where(host => !Session.IsHidden(host)))
+            .Where(seen.Add)];
+    }
+
+    /// <summary>Quanti host controlla il monitoraggio (per la scheda in fondo alla sidebar).</summary>
+    public int MonitoredCount => Monitored().Count;
+
+    // ------------------------------------------------------------------ calendario
+
+    private Agenda? _agenda;
+
+    /// <summary>Il calendario della nota: le voci e i certificati visti dalle analisi.</summary>
+    public Agenda Calendar => _agenda ??= Agenda.Read(Book.Calendar);
+
+    /// <summary>Il calendario e' cambiato (una voce, un certificato, un'altra nota).</summary>
+    public event Action? CalendarChanged;
+
+    /// <summary>La nota si e' aperta: il riepilogo del calendario (anche vuoto).</summary>
+    public event Action<AgendaSummary>? CalendarOpened;
+
+    /// <summary>Sono scattati dei promemoria.</summary>
+    public event Action<IReadOnlyList<AgendaAlert>>? RemindersDue;
+
+    /// <summary>Un battito dell'orologio del calendario: il numero nella barra laterale cambia anche a mezzanotte.</summary>
+    public event Action? CalendarTick;
+
+    /// <summary>Un cambiamento dalla pagina del calendario: si applica e si salva fra poco.</summary>
+    public bool ChangeCalendar(JsonObject change)
+    {
+        if (IsLocked || IsDamaged || !Calendar.Apply(change))
+        {
+            return false;
+        }
+
+        SaveCalendar();
+        return true;
+    }
+
+    /// <summary>"Fatto" da un avviso: quella volta non suona piu'.</summary>
+    public bool MarkDone(Occurrence occurrence)
+    {
+        if (IsLocked || IsDamaged || !Calendar.SetDone(occurrence.Item.Id, occurrence.Date, true))
+        {
+            return false;
+        }
+
+        SaveCalendar();
+        return true;
+    }
+
+    /// <summary>"Rimanda" da un avviso: il promemoria torna a <paramref name="until"/>.</summary>
+    public void Snooze(Occurrence occurrence, DateTime until) => _reminders.Snooze(occurrence, until);
+
+    private void SaveCalendar()
+    {
+        Book.Calendar = Calendar.Write();
+        Touch();
+        CalendarChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// I certificati che le analisi hanno visto entrano nel calendario come scadenze: quelli che
+    /// scadono da qui a tre anni (o sono scaduti da meno di un mese), uno per host.
+    /// </summary>
+    private void LearnCertificates()
+    {
+        if (IsLocked || IsDamaged)
+        {
+            return;
+        }
+
+        DateOnly today = DateOnly.FromDateTime(DateTime.Now);
+        List<CertificateSeen> seen = [];
+
+        foreach (HostRow row in Session.Rows)
+        {
+            if (row.Shown.Length == 0 || Agenda.Day(row.TlsExpiry) is not { } expires || expires < today.AddDays(-30) || expires > today.AddYears(3))
+            {
+                continue;
+            }
+
+            string name = row.Hostname.Equals(row.Shown, StringComparison.OrdinalIgnoreCase) ? string.Empty : row.Hostname;
+            seen.Add(new CertificateSeen(row.Shown, expires, row.TlsSubject, row.TlsIssuer, name));
+        }
+
+        if (seen.Count > 0 && Calendar.Learn(seen))
+        {
+            SaveCalendar();
+        }
+    }
+
+    /// <summary>"Analizza" su un gruppo: tutte le sue reti, i suoi intervalli e i suoi indirizzi; quello che c'era resta.</summary>
+    public async Task ScanGroup(string id)
+    {
+        if (id == ScanGroups.Note)
+        {
+            await ScanNote();
+            return;
+        }
+
+        if (Groups.Find(id) is not { } group || group.Targets.Count == 0)
+        {
+            Say("Il gruppo non ha bersagli: aggiungili con Modifica.");
+            return;
+        }
+
+        await Scan(group.Expression, keep: true);
     }
 
     /// <summary>Lo stato di un indirizzo: true raggiungibile, false spento, null mai provato.</summary>
@@ -534,7 +724,7 @@ public sealed class Workspace
     public async Task Scan(string targets, bool keep, bool automatic = false, bool force = false)
     {
         ScanIsAutomatic = automatic;
-        await Session.RunAsync(targets, Settings.ToScanOptions(), keep, force);
+        await Session.RunAsync(targets, Settings.ToScanOptions(), keep, force, Groups.InAny);
         SyncHosts();
     }
 
@@ -550,7 +740,7 @@ public sealed class Workspace
         IReadOnlyList<string> hosts = NoteHosts();
 
         // "Host della nota": nell'elenco restano solo loro, gli altri trovati per intervallo escono
-        if (!Session.IsRunning && Session.KeepOnlyNote() > 0)
+        if (!Session.IsRunning && Session.KeepOnlyNote(Groups.InAny) > 0)
         {
             RaiseHosts();
         }
@@ -704,6 +894,9 @@ public sealed class Workspace
         IsLocked = true;
         _noteHosts = null;
         _mapHosts = null;
+        _groupHosts = null;
+        _agenda = null;
+        _reminders.Stop();
         CurrentSheet = null;
 
         NoteReplaced?.Invoke();
@@ -753,6 +946,8 @@ public sealed class Workspace
         {
             _idle.Start();
         }
+
+        _calendarTick.Start();
     }
 
     public void StopTimers()
@@ -761,6 +956,7 @@ public sealed class Workspace
         _fresh.Stop();
         _monitor.Stop();
         _idle.Stop();
+        _calendarTick.Stop();
     }
 
     /// <summary>Cancella ogni dato: da qui in poi niente si salva piu', nemmeno alla chiusura.</summary>

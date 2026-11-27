@@ -70,7 +70,26 @@ public sealed partial class HostRow : Observable
     /// <summary>Come la tabella lo chiama: com'e' scritto nella nota, se viene da li', altrimenti l'indirizzo.</summary>
     public string Shown => NoteKey.Length > 0 ? NoteKey : IP;
 
-    public bool FromNote => NoteKey.Length > 0;
+    private bool _written = true;
+
+    /// <summary>
+    /// Scritto nella nota (nei fogli o sulla mappa). Falso per gli indirizzi che stanno in
+    /// tabella solo perche' un gruppo col monitoraggio acceso li tiene d'occhio.
+    /// </summary>
+    public bool Written
+    {
+        get => _written;
+        set
+        {
+            if (_written != value)
+            {
+                _written = value;
+                RaiseAll();
+            }
+        }
+    }
+
+    public bool FromNote => NoteKey.Length > 0 && _written;
 
     /// <summary>La risposta in tabella: solo la media ("0.5 ms"); minimo e massimo stanno nella scheda.</summary>
     public string RoundTripShort => RoundTrip.Split('(')[0].Trim();
@@ -129,6 +148,14 @@ public sealed partial class HostRow : Observable
     public void Bind(string written)
     {
         NoteKey = written;
+        RaiseAll();
+    }
+
+    /// <summary>Scioglie il legame: la riga resta come se l'avesse trovata un'analisi per intervallo.</summary>
+    public void Unbind()
+    {
+        NoteKey = string.Empty;
+        _written = true;
         RaiseAll();
     }
 

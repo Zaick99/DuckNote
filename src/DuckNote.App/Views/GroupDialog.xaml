@@ -1,0 +1,65 @@
+<Window x:Class="DuckNote.App.Views.GroupDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent" ResizeMode="NoResize"
+        SizeToContent="Height" Width="540" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        FontFamily="{StaticResource FText}" FontSize="12.5" Title="Gruppo">
+  <!-- un gruppo di scansione: nome, reti e indirizzi (uno per riga), e se il monitoraggio lo controlla -->
+  <Border x:Name="Root" Margin="18" Background="{DynamicResource BgElevated}" BorderBrush="{DynamicResource Separator}"
+          BorderThickness="1" CornerRadius="{StaticResource RPanel}" Opacity="0" RenderTransformOrigin="0.5,0.5">
+    <Border.RenderTransform>
+      <TransformGroup><ScaleTransform/><TranslateTransform/></TransformGroup>
+    </Border.RenderTransform>
+    <Border.Effect>
+      <DropShadowEffect BlurRadius="28" ShadowDepth="8" Direction="270" Opacity="0.35" Color="Black"/>
+    </Border.Effect>
+    <Grid Margin="22,18,22,16">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+        <RowDefinition Height="Auto"/>
+      </Grid.RowDefinitions>
+      <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+        <Border Style="{StaticResource ChipBlue}" Width="30" Height="30" CornerRadius="15" Padding="0">
+          <TextBlock Text="&#xE81E;" Style="{StaticResource Icon}" HorizontalAlignment="Center" Foreground="{DynamicResource Blue}"/>
+        </Border>
+        <TextBlock x:Name="Head" Style="{StaticResource TxtSub}" Margin="10,0,0,0" VerticalAlignment="Center"/>
+      </StackPanel>
+
+      <StackPanel Grid.Row="1">
+        <TextBlock Style="{StaticResource GroupFooter}" Margin="2,0,0,12" TextWrapping="Wrap"
+                   Text="Reti, intervalli e indirizzi da analizzare insieme. Il gruppo si salva nella nota (e nella cassaforte, se la nota e' cifrata)."/>
+        <TextBlock Text="NOME" Style="{StaticResource GroupHeader}" Margin="2,0,0,6"/>
+        <TextBox x:Name="NameBox" Style="{StaticResource HintField}" Height="34" MaxLength="60" Tag="Ufficio, Server, Laboratorio..."/>
+        <TextBlock Text="RETI E INDIRIZZI, UNO PER RIGA" Style="{StaticResource GroupHeader}" Margin="2,14,0,6"/>
+        <TextBox x:Name="TargetsBox" Style="{StaticResource HintArea}" Height="150" TextChanged="OnTargets"
+                 Tag="192.168.10.0/24&#x0a;192.168.20.1-50&#x0a;10.0.0.5&#x0a;nas01.example.local"/>
+        <TextBlock x:Name="SummaryText" Style="{StaticResource GroupFooter}" Margin="2,8,0,0" TextWrapping="Wrap"/>
+        <Border x:Name="Problem" Style="{StaticResource ErrorBox}" Margin="0,10,0,0" Visibility="Collapsed">
+          <TextBlock x:Name="ProblemText" TextWrapping="Wrap" Foreground="{DynamicResource Red}"/>
+        </Border>
+        <Grid Margin="0,16,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+          </Grid.ColumnDefinitions>
+          <StackPanel>
+            <TextBlock Text="Monitora" FontWeight="SemiBold" Foreground="{DynamicResource Label}"/>
+            <TextBlock Style="{StaticResource GroupFooter}" Margin="0,3,0,0" TextWrapping="Wrap"
+                       Text="Gli host del gruppo si controllano da soli, come quelli della nota: gli indirizzi singoli subito, quelli delle reti dopo la prima analisi."/>
+          </StackPanel>
+          <CheckBox x:Name="MonitorBox" Grid.Column="1" Style="{StaticResource Switch}" Margin="16,0,0,0" VerticalAlignment="Center"/>
+        </Grid>
+      </StackPanel>
+
+      <Grid Grid.Row="2" Margin="0,18,0,0">
+        <Button x:Name="BtnRemove" Style="{StaticResource DangerBtn}" Content="Elimina il gruppo" HorizontalAlignment="Left"
+                Visibility="Collapsed" Click="OnRemove"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Style="{StaticResource QuietBtn}" Content="Annulla" Margin="0,0,8,0" IsCancel="True" Click="OnCancel"/>
+          <Button x:Name="BtnSave" Style="{StaticResource PrimaryBtn}" Content="Salva" Click="OnSave"/>
+        </StackPanel>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>

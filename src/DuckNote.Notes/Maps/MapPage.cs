@@ -4,8 +4,8 @@ using DuckNote.Notes.Sheets;
 namespace DuckNote.Notes.Maps;
 
 /// <summary>
-/// La pagina della mappa per il WebView: HTML, stile e script in un file solo (Assets/map.js e
-/// map.css, costruiti da Maps/Web con "npm run build"), con l'illustrazione della mappa vuota.
+/// La pagina della mappa per il WebView: HTML, stile e script in un file solo (Web/dist/map.js e
+/// map.css, costruiti da Web con "npm run build"), con l'illustrazione della mappa vuota.
 /// La stessa pagina va nel WKWebView del Mac e nel WebView2 di Windows.
 /// </summary>
 public static class MapPage
