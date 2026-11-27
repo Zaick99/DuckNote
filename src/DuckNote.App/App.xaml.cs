@@ -119,17 +119,17 @@ public partial class App : Application
                 {
                     MainWindow?.Close();
                 }
-            });
+            }, tab: "Aggiornamento");
             return;
         }
 
         if (updates.CanOpenDownloaded)
         {
-            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded());
+            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded(), tab: "Aggiornamento");
             return;
         }
 
-        Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => OpenPage(release.Page));
+        Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => OpenPage(release.Page), tab: "Aggiornamento");
     }
 
     internal static void OpenPage(Uri page)

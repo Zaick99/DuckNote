@@ -7,6 +7,30 @@ namespace DuckNote.Notes.Tests;
 public class ScanGroupsTests
 {
     [Fact]
+    public void A_host_is_added_to_a_group_once_at_the_end()
+    {
+        ScanGroup lab = new("glab", "Laboratorio", ["192.168.50.0/24"], Monitor: false);
+
+        ScanGroup more = ScanGroups.WithTarget(lab, " 192.168.60.7 ");
+        Assert.Equal(["192.168.50.0/24", "192.168.60.7"], more.Targets);
+        Assert.Same(more, ScanGroups.WithTarget(more, "192.168.60.7"));
+        Assert.Same(lab, ScanGroups.WithTarget(lab, "  "));
+    }
+
+    [Fact]
+    public void Only_the_lines_that_name_the_host_can_be_taken_away()
+    {
+        ScanGroup office = new("gufficio", "Ufficio", ["192.168.10.0/24", "192.168.40.10", "NAS01.example.local"], Monitor: true);
+        string[] nas = ["192.168.40.10", "nas01.example.local", ""];
+
+        Assert.Equal(["192.168.40.10", "NAS01.example.local"], ScanGroups.Listed(office, nas));
+        Assert.Equal(["192.168.10.0/24"], ScanGroups.WithoutHost(office, nas).Targets);
+        // un host che sta nel gruppo per la sua rete non ha righe sue
+        Assert.Empty(ScanGroups.Listed(office, ["192.168.10.20"]));
+        Assert.Same(office, ScanGroups.WithoutHost(office, ["192.168.10.20"]));
+    }
+
+    [Fact]
     public void Groups_travel_inside_the_note_file()
     {
         ScanGroup office = new("gufficio", "Ufficio", ["192.168.10.0/24", "192.168.40.10", "nas01.example.local"], Monitor: true);

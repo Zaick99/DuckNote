@@ -301,6 +301,11 @@ public sealed partial class MainWindow : Window
         };
         _map.ReminderWanted += Compose;
         _network.ReminderWanted += Compose;
+        _network.MapWanted += host =>
+        {
+            Navigate("map");
+            _map.Reveal(host);
+        };
         _calendar.WindowKey += OnWindowKey;
         _calendar.HostWanted += host =>
         {
@@ -408,17 +413,17 @@ public sealed partial class MainWindow : Window
                 {
                     Close();
                 }
-            });
+            }, tab: "Aggiornamento");
             return;
         }
 
         if (updates.CanOpenDownloaded)
         {
-            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded());
+            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded(), tab: "Aggiornamento");
             return;
         }
 
-        _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => _ = Launcher.LaunchUriAsync(release.Page));
+        _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => _ = Launcher.LaunchUriAsync(release.Page), tab: "Aggiornamento");
     }
 
     // ------------------------------------------------------------------ navigazione
@@ -1053,15 +1058,15 @@ public sealed partial class MainWindow : Window
     {
         if (message.StartsWith("Analisi interrotta", StringComparison.Ordinal))
         {
-            _notices.Error("Analisi non riuscita", message);
+            _notices.Toast("error", "Red", "Analisi non riuscita", message, tab: "Rete");
         }
         else if (message.StartsWith("Fermata", StringComparison.Ordinal))
         {
-            _notices.Info("Analisi fermata", message);
+            _notices.Toast("info", "Blue", "Analisi fermata", message, tab: "Rete");
         }
         else if (!message.StartsWith("Indica", StringComparison.Ordinal) && !message.StartsWith("Niente", StringComparison.Ordinal))
         {
-            _notices.Success("Analisi finita", message);
+            _notices.Toast("check", "Green", "Analisi finita", message, tab: "Rete");
         }
     }
 }

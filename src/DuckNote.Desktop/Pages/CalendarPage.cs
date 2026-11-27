@@ -93,6 +93,8 @@ public sealed class CalendarPage : UserControl, IDuckPage
 
         if (_ready)
         {
+            // la vista nativa compare di colpo: la pagina entra da se' (dissolvenza breve)
+            Call("dc.shown(true)");
             PushHosts();
             PushDevices();
             GiveKeyboard();
@@ -100,7 +102,15 @@ public sealed class CalendarPage : UserControl, IDuckPage
         }
     }
 
-    public void OnHidden() => _front = false;
+    public void OnHidden()
+    {
+        _front = false;
+
+        if (_ready)
+        {
+            Call("dc.hidden()");
+        }
+    }
 
     /// <summary>Una voce nuova gia' avviata, da Rete o dalla mappa: { kind, title, date, link }.</summary>
     public void Compose(object seed) => Later($"dc.compose({Js(seed)})");
@@ -246,6 +256,8 @@ public sealed class CalendarPage : UserControl, IDuckPage
             case "ready":
                 _ready = true;
                 PushTheme();
+                // la pagina sa se si vede: la cascata dell'apertura aspetta che si veda
+                Call(_front ? "dc.shown(false)" : "dc.hidden()");
                 Load();
 
                 foreach (string script in _waiting)

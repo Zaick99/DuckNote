@@ -126,26 +126,45 @@ public sealed class Notices
 
     public void Error(string title, string text) => Toast("error", "Red", title, text);
 
-    public void Toast(string icon, string tone, string title, string text, string? action = null, Action? onAction = null) =>
-        Toast(icon, tone, title, text, action is null ? [] : [new NoticeAction(action, onAction)], sticky: false);
+    public void Toast(string icon, string tone, string title, string text, string? action = null, Action? onAction = null, string? tab = null) =>
+        Toast(icon, tone, title, text, action is null ? [] : [new NoticeAction(action, onAction)], sticky: false, tab);
+
+    /// <summary>Il tipo di avviso scritto sulla linguetta, dall'icona (o dal tono).</summary>
+    public static string Kind(string icon, string tone) => icon switch
+    {
+        "bell" => "Promemoria",
+        "calendar" => "Calendario",
+        "check" => "Fatto",
+        "warning" => "Attenzione",
+        "error" => "Errore",
+        _ => tone switch
+        {
+            "Green" => "Fatto",
+            "Orange" => "Attenzione",
+            "Red" => "Errore",
+            _ => "Avviso"
+        }
+    };
 
     /// <summary>
     /// Un avviso con piu' pulsanti; <paramref name="sticky"/>: resta finche' non si sceglie o non
-    /// lo si chiude (i promemoria del calendario).
+    /// lo si chiude (i promemoria del calendario). Ha la forma delle schede della mappa: una
+    /// linguetta col tipo (<paramref name="tab"/>, o quello dell'icona) e l'ora, e sotto il corpo
+    /// con la riga d'accento nel tono, la tessera dell'icona, il titolo e il testo.
     /// </summary>
-    public void Toast(string icon, string tone, string title, string text, IReadOnlyList<NoticeAction> actions, bool sticky)
+    public void Toast(string icon, string tone, string title, string text, IReadOnlyList<NoticeAction> actions, bool sticky, string? tab = null)
     {
         Glyph glyph = new() { Kind = icon, Width = 15, Height = 15, Thickness = 1.7 };
         glyph.Bind(Glyph.ForegroundProperty, glyph.GetResourceObservable(tone));
-        Border chip = new()
+        Border tile = new()
         {
-            Width = 30,
-            Height = 30,
-            CornerRadius = new CornerRadius(15),
+            Width = 32,
+            Height = 32,
+            CornerRadius = new CornerRadius(8),
             VerticalAlignment = VerticalAlignment.Top,
             Child = glyph
         };
-        chip.Bind(Border.BackgroundProperty, chip.GetResourceObservable(tone + "Soft"));
+        tile.Bind(Border.BackgroundProperty, tile.GetResourceObservable(tone + "Soft"));
 
         StackPanel body = new() { Margin = new Thickness(12, 0, 8, 0) };
         TextBlock head = new() { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 13, TextWrapping = TextWrapping.Wrap, MaxHeight = 40 };
@@ -155,16 +174,41 @@ public sealed class Notices
         body.Children.Add(head);
         body.Children.Add(words);
 
-        Border card = new()
+        // la linguetta: il tipo e l'ora (come il nome e UP/DOWN sulle schede della mappa)
+        TextBlock kind = new() { Text = tab ?? Kind(icon, tone), FontSize = 11.5, FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        kind.Bind(TextBlock.ForegroundProperty, kind.GetResourceObservable("Label"));
+        TextBlock time = new() { Text = DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), FontSize = 9.5, FontWeight = FontWeight.Bold, VerticalAlignment = VerticalAlignment.Center };
+        time.Bind(TextBlock.ForegroundProperty, time.GetResourceObservable(tone));
+        Border tabBox = new()
         {
-            Padding = new Thickness(14, 12, 10, 12),
-            CornerRadius = new CornerRadius(14),
-            BorderThickness = new Thickness(1),
-            BoxShadow = BoxShadows.Parse("0 6 24 0 #33000000"),
-            Opacity = 0
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(10, 0, 0, -1),
+            Padding = new Thickness(10, 3, 10, 4),
+            CornerRadius = new CornerRadius(6, 6, 0, 0),
+            BorderThickness = new Thickness(1, 1, 1, 0),
+            Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 7, Children = { kind, time } }
         };
-        card.Bind(Border.BackgroundProperty, card.GetResourceObservable("BgElevated"));
-        card.Bind(Border.BorderBrushProperty, card.GetResourceObservable("Separator"));
+        tabBox.Bind(Border.BackgroundProperty, tabBox.GetResourceObservable("BgElevated"));
+        tabBox.Bind(Border.BorderBrushProperty, tabBox.GetResourceObservable("Separator"));
+
+        // la riga d'accento lungo il bordo di sopra del corpo, nel tono
+        Border accent = new() { Height = 2, Margin = new Thickness(10, 0, 10, 0), CornerRadius = new CornerRadius(1), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Top };
+        accent.Bind(Border.BackgroundProperty, accent.GetResourceObservable(tone));
+
+        Border face = new()
+        {
+            CornerRadius = new CornerRadius(10),
+            BorderThickness = new Thickness(1)
+        };
+        face.Bind(Border.BackgroundProperty, face.GetResourceObservable("BgElevated"));
+        face.Bind(Border.BorderBrushProperty, face.GetResourceObservable("Separator"));
+
+        StackPanel card = new()
+        {
+            Opacity = 0,
+            Children = { tabBox, face },
+            Effect = new DropShadowEffect { OffsetX = 0, OffsetY = 6, BlurRadius = 22, Opacity = 0.2, Color = Colors.Black }
+        };
 
         Button close = new() { Content = new Glyph { Kind = "close", Width = 9, Height = 9 }, Width = 22, Height = 22, MinWidth = 22, VerticalAlignment = VerticalAlignment.Top };
         close.Theme = Themes.Of("Tool");
@@ -213,13 +257,13 @@ public sealed class Notices
             body.Children.Add(row);
         }
 
-        Grid grid = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
+        Grid grid = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Margin = new Thickness(12, 12, 8, 12) };
         Grid.SetColumn(body, 1);
         Grid.SetColumn(close, 2);
-        grid.Children.Add(chip);
+        grid.Children.Add(tile);
         grid.Children.Add(body);
         grid.Children.Add(close);
-        card.Child = grid;
+        face.Child = new Grid { Children = { grid, accent } };
 
         _toasts.Children.Insert(0, card);
 
@@ -260,7 +304,7 @@ public sealed class Notices
         };
     }
 
-    private void Dismiss(Border card)
+    private void Dismiss(Control card)
     {
         TranslateTransform shift = card.RenderTransform as TranslateTransform ?? new TranslateTransform();
         card.RenderTransform = shift;

@@ -105,6 +105,8 @@ public sealed partial class NotesPage : UserControl, IDuckPage
 
         if (_ready)
         {
+            // la vista nativa compare di colpo: la pagina entra da se' (dissolvenza breve)
+            Call("dn.shown(true)");
             // l'attesa si cambia nelle Impostazioni: torna aggiornata a ogni ritorno sulla nota
             Call(string.Create(CultureInfo.InvariantCulture, $"dn.settle({_ws.Settings.HostDebounceMs})"));
         }
@@ -120,6 +122,12 @@ public sealed partial class NotesPage : UserControl, IDuckPage
     public void OnHidden()
     {
         _front = false;
+
+        if (_ready)
+        {
+            Call("dn.hidden()");
+        }
+
         RefreshOutline();
     }
 

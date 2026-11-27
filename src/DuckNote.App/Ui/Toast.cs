@@ -23,25 +23,41 @@ public static class Toast
 
     public static void Attach(Panel host) => _host = host;
 
-    public static void Success(string title, string text, string? action = null, Action? onAction = null) => Show("ChipGreen", "Green", "\uE73E", title, text, action, onAction);
-    public static void Info(string title, string text, string? action = null, Action? onAction = null) => Show("ChipBlue", "Blue", "\uE946", title, text, action, onAction);
-    public static void Warning(string title, string text, string? action = null, Action? onAction = null) => Show("ChipOrange", "Orange", "\uE7BA", title, text, action, onAction);
+    public static void Success(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipGreen", "Green", "\uE73E", title, text, action, onAction, tab);
+    public static void Info(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipBlue", "Blue", "\uE946", title, text, action, onAction, tab);
+    public static void Warning(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipOrange", "Orange", "\uE7BA", title, text, action, onAction, tab);
 
-    public static void Error(string title, string text, string? action = null, Action? onAction = null) => Show("ChipRed", "Red", "\uEA39", title, text, action, onAction);
+    public static void Error(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipRed", "Red", "\uEA39", title, text, action, onAction, tab);
 
-    private static void Show(string chip, string fg, string glyph, string title, string text, string? action, Action? onAction) =>
-        Show(chip, fg, glyph, title, text, action is null ? [] : [new ToastAction(action, onAction)], sticky: false);
+    private static void Show(string chip, string fg, string glyph, string title, string text, string? action, Action? onAction, string? tab) =>
+        Show(chip, fg, glyph, title, text, action is null ? [] : [new ToastAction(action, onAction)], sticky: false, tab);
+
+    /// <summary>Il tipo di avviso scritto sulla linguetta, dall'icona (o dal tono).</summary>
+    public static string Kind(string glyph, string fg) => glyph switch
+    {
+        "\uEA8F" => "Promemoria",
+        "\uE787" => "Calendario",
+        _ => fg switch
+        {
+            "Green" => "Fatto",
+            "Orange" => "Attenzione",
+            "Red" => "Errore",
+            _ => "Avviso"
+        }
+    };
 
     /// <summary>
     /// Un avviso con piu' pulsanti; <paramref name="sticky"/>: resta finche' non si sceglie o non
-    /// lo si chiude (i promemoria del calendario).
+    /// lo si chiude (i promemoria del calendario). Ha la forma delle schede della mappa: una
+    /// linguetta col tipo (<paramref name="tab"/>, o quello dell'icona) e l'ora, e sotto il corpo
+    /// con la riga d'accento nel tono, la tessera dell'icona, il titolo e il testo.
     /// </summary>
-    public static void Show(string chip, string fg, string glyph, string title, string text, IReadOnlyList<ToastAction> actions, bool sticky)
+    public static void Show(string chip, string fg, string glyph, string title, string text, IReadOnlyList<ToastAction> actions, bool sticky, string? tab = null)
     {
         if (_host is null) return;
         var app = Application.Current;
 
-        var icon = new Border { Style = (Style)app.FindResource(chip), Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Top };
+        var icon = new Border { Style = (Style)app.FindResource(chip), Width = 32, Height = 32, CornerRadius = new CornerRadius(8), Padding = new Thickness(0), VerticalAlignment = VerticalAlignment.Top };
         var ig = new TextBlock { Text = glyph, Style = (Style)app.FindResource("Icon"), HorizontalAlignment = HorizontalAlignment.Center };
         ig.SetResourceReference(TextBlock.ForegroundProperty, fg);
         icon.Child = ig;
@@ -51,7 +67,7 @@ public static class Toast
         body.Children.Add(new TextBlock { Text = text, Style = (Style)app.FindResource("TxtCaption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0), MaxHeight = 90, TextTrimming = TextTrimming.CharacterEllipsis });
 
         var close = new Button { Content = new TextBlock { Text = "\uE711", Style = (Style)app.FindResource("Icon"), FontSize = 9 }, Style = (Style)app.FindResource("Toolbtn"), Width = 22, Height = 22, MinWidth = 0, VerticalAlignment = VerticalAlignment.Top };
-        var grid = new Grid();
+        var grid = new Grid { Margin = new Thickness(12, 12, 8, 12) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -90,20 +106,45 @@ public static class Toast
             body.Children.Add(row);
         }
 
-        var card = new Border
+        // la linguetta: il tipo e l'ora (come il nome e UP/DOWN sulle schede della mappa)
+        var kind = new TextBlock { Text = tab ?? Kind(glyph, fg), FontSize = 11.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+        kind.SetResourceReference(TextBlock.ForegroundProperty, "Label");
+        var time = new TextBlock { Text = DateTime.Now.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture), FontSize = 9.5, FontWeight = FontWeights.Bold, Margin = new Thickness(7, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        time.SetResourceReference(TextBlock.ForegroundProperty, fg);
+        var tabBox = new Border
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(10, 0, 0, -1),
+            Padding = new Thickness(10, 3, 10, 4),
+            CornerRadius = new CornerRadius(6, 6, 0, 0),
+            BorderThickness = new Thickness(1, 1, 1, 0),
+            Child = new StackPanel { Orientation = Orientation.Horizontal, Children = { kind, time } }
+        };
+        tabBox.SetResourceReference(Border.BackgroundProperty, "BgElevated");
+        tabBox.SetResourceReference(Border.BorderBrushProperty, "Separator");
+
+        // la riga d'accento lungo il bordo di sopra del corpo, nel tono
+        var accent = new Border { Height = 2, Margin = new Thickness(10, 0, 10, 0), CornerRadius = new CornerRadius(1), Opacity = 0.6, VerticalAlignment = VerticalAlignment.Top };
+        accent.SetResourceReference(Border.BackgroundProperty, fg);
+
+        var face = new Border
+        {
+            CornerRadius = new CornerRadius(10),
+            BorderThickness = new Thickness(1),
+            Child = new Grid { Children = { grid, accent } }
+        };
+        face.SetResourceReference(Border.BackgroundProperty, "BgElevated");
+        face.SetResourceReference(Border.BorderBrushProperty, "Separator");
+
+        var card = new StackPanel
         {
             Width = 340,
             Margin = new Thickness(0, 0, 0, 10),
-            Padding = new Thickness(14, 12, 10, 12),
-            CornerRadius = new CornerRadius(14),
-            BorderThickness = new Thickness(1),
-            Child = grid,
+            Children = { tabBox, face },
             RenderTransform = new TranslateTransform(40, 0),
             Opacity = 0,
-            Effect = new DropShadowEffect { BlurRadius = 24, ShadowDepth = 6, Direction = 270, Opacity = 0.28, Color = Colors.Black },
+            Effect = new DropShadowEffect { BlurRadius = 22, ShadowDepth = 6, Direction = 270, Opacity = 0.24, Color = Colors.Black },
         };
-        card.SetResourceReference(Border.BackgroundProperty, "BgElevated");
-        card.SetResourceReference(Border.BorderBrushProperty, "Separator");
         _host.Children.Insert(0, card);
         while (_host.Children.Count > 4) _host.Children.RemoveAt(_host.Children.Count - 1);
 

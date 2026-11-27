@@ -247,7 +247,9 @@ public sealed partial class HostRow : Observable
         }
         else
         {
+            // spento: la latenza di quando rispondeva non vale piu' (nella colonna sembrerebbe acceso)
             AverageMs = double.MaxValue;
+            RoundTrip = string.Empty;
         }
 
         RaiseAll();

@@ -4,6 +4,12 @@ public sealed record PingOutcome(bool Online, IReadOnlyList<long> RoundTrips, in
 {
     public static readonly PingOutcome Silent = new(false, [], 0, 0, 0);
 
+    /// <summary>
+    /// Nessun tentativo e' arrivato all'host: e' fallito questo computer (troppi ping insieme,
+    /// risorse finite). Non vuol dire che l'host sia spento.
+    /// </summary>
+    public bool Inconclusive { get; init; }
+
     public double AverageMs => RoundTrips.Count == 0 ? 0 : Math.Round(RoundTrips.Average(), 1);
 
     public int LossPercent => Sent == 0 ? 0 : (int)((Sent - Received) / (double)Sent * 100);

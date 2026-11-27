@@ -21,7 +21,63 @@ export const Curves = {
 };
 
 // chi ha chiesto meno movimento nel sistema lo vede arrivare subito
-const still = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+export const still = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/**
+ * Una pagina web che la finestra nasconde: il contenuto si spegne, cosi' quando torna puo'
+ * entrare (pageArrive) invece di comparire com'era.
+ */
+export function pageAway(root) {
+  root.classList.remove('dm-arrive');
+  root.classList.add('dm-away');
+  // se la pagina si usa senza che la finestra l'abbia detto (un clic, un tasto), si riaccende
+  const wake = () => {
+    root.classList.remove('dm-away');
+    for (const name of WAKE) window.removeEventListener(name, wake, true);
+  };
+  for (const name of WAKE) window.addEventListener(name, wake, true);
+}
+
+const WAKE = ['pointerdown', 'keydown', 'focusin'];
+
+/**
+ * La pagina torna in primo piano: con fade entra in fretta (dissolvenza e 6 pixel di salita, 220
+ * ms), senza si riaccende e basta. Sul Mac la vista nativa non sfuma da sola: lo fa la pagina;
+ * su Windows sfuma gia' la finestra.
+ */
+export function pageArrive(root, fade = true) {
+  root.classList.remove('dm-away');
+  if (!fade || still()) return;
+  root.classList.remove('dm-arrive');
+  void root.offsetWidth;
+  root.classList.add('dm-arrive');
+  const done = () => root.classList.remove('dm-arrive');
+  root.addEventListener('animationend', done, { once: true });
+  setTimeout(done, 500);
+}
+
+/**
+ * Una cascata: ogni elemento sale al suo posto in dissolvenza, col ritardo che delay(elemento,
+ * indice) gli da' (in millisecondi). Alla fine le classi se ne vanno: niente resta animato.
+ */
+export function cascade(elements, delay, { ms = 340 } = {}) {
+  if (still()) return;
+  let longest = 0;
+  elements.forEach((el, index) => {
+    const wait = Math.max(0, Math.round(delay(el, index)));
+    longest = Math.max(longest, wait);
+    el.style.setProperty('--delay', `${wait}ms`);
+    el.classList.remove('dm-rise');
+    void el.offsetWidth;
+    el.classList.add('dm-rise');
+  });
+  setTimeout(() => {
+    for (const el of elements) {
+      el.classList.remove('dm-rise');
+      el.style.removeProperty('--delay');
+    }
+  }, longest + ms + 80);
+}
 
 const running = new WeakMap();
 

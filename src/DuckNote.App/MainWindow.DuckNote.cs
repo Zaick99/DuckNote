@@ -241,6 +241,11 @@ public partial class MainWindow
     {
         NetworkPage network = new(_ws);
         network.ReminderWanted += Compose;
+        network.MapWanted += host =>
+        {
+            Navigate("map");
+            (Page("map") as MapPage)?.Reveal(host);
+        };
         return network;
     }
 
@@ -553,15 +558,15 @@ public partial class MainWindow
     {
         if (message.StartsWith("Analisi interrotta", StringComparison.Ordinal))
         {
-            Toast.Error("Analisi non riuscita", message);
+            Toast.Error("Analisi non riuscita", message, tab: "Rete");
         }
         else if (message.StartsWith("Fermata", StringComparison.Ordinal))
         {
-            Toast.Info("Analisi fermata", message);
+            Toast.Info("Analisi fermata", message, tab: "Rete");
         }
         else if (!message.StartsWith("Indica", StringComparison.Ordinal) && !message.StartsWith("Niente", StringComparison.Ordinal))
         {
-            Toast.Success("Analisi finita", message);
+            Toast.Success("Analisi finita", message, tab: "Rete");
         }
     }
 

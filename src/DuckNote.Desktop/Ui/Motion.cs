@@ -78,9 +78,10 @@ public static class Motion
     /// <summary>
     /// Porta un valore da <paramref name="from"/> a <paramref name="to"/> in <paramref name="ms"/>
     /// millisecondi lungo <paramref name="curve"/> (di serie l'uscita cubica), chiamando
-    /// <paramref name="step"/> a ogni fotogramma.
+    /// <paramref name="step"/> a ogni fotogramma; con <paramref name="delay"/> resta fermo su
+    /// <paramref name="from"/> per quei millisecondi prima di partire.
     /// </summary>
-    public static void Tween(object key, double from, double to, int ms, Action<double> step, Action? done = null, Func<double, double>? curve = null)
+    public static void Tween(object key, double from, double to, int ms, Action<double> step, Action? done = null, Func<double, double>? curve = null, int delay = 0)
     {
         Stop(key);
 
@@ -105,7 +106,7 @@ public static class Motion
                 return;
             }
 
-            double t = Math.Min(1, clock.Elapsed.TotalMilliseconds / ms);
+            double t = Math.Clamp((clock.Elapsed.TotalMilliseconds - delay) / ms, 0, 1);
             step(from + ((to - from) * curve(t)));
 
             if (t >= 1)
@@ -136,6 +137,39 @@ public static class Motion
             control.Opacity = t;
             shift.Y = rise * (1 - t);
         });
+    }
+
+    /// <summary>
+    /// Le righe di un elenco che entrano una dopo l'altra: dissolvenza e uno scivolo da destra di
+    /// <paramref name="slide"/> pixel, ognuna <paramref name="step"/> ms dopo la precedente, al
+    /// massimo le prime <paramref name="max"/> (le altre ci sono gia').
+    /// </summary>
+    public static void Cascade(IEnumerable<Control> items, int step = 22, int max = 14, int ms = 320, double slide = 16, int start = 0)
+    {
+        int index = 0;
+
+        foreach (Control item in items.Take(max))
+        {
+            Arrive(item, ms, slide, start + (step * index++));
+        }
+    }
+
+    /// <summary>Una riga che arriva: dissolvenza e uno scivolo da destra, dopo <paramref name="delay"/> ms.</summary>
+    public static void Arrive(Control item, int ms = 300, double slide = 16, int delay = 0)
+    {
+        TranslateTransform shift = item.RenderTransform as TranslateTransform ?? new TranslateTransform();
+        item.RenderTransform = shift;
+        item.Opacity = 0;
+        shift.X = slide;
+        Tween((item, "arrive"), 0, 1, ms, t =>
+        {
+            item.Opacity = t;
+            shift.X = slide * (1 - t);
+        }, () =>
+        {
+            item.Opacity = 1;
+            shift.X = 0;
+        }, delay: delay);
     }
 
     /// <summary>Sparisce scendendo un poco, in dissolvenza; alla fine non occupa piu' spazio.</summary>

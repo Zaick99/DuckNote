@@ -13,6 +13,8 @@ mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1240, height: 800 } });
+// le prove cliccano subito dopo aver aperto: la cascata dei giorni diventa istantanea
+await page.emulateMedia({ reducedMotion: 'reduce' });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.setContent(calendarHtml());
@@ -132,7 +134,8 @@ await check('eliminare una volta sola e poi annullare', async () => {
   await page.click(`${cell('2027-04-19')} .dc-pill`);
   await page.click('.dc-detail .dc-edit');
   await page.click('.dc-editor .dm-button.danger');
-  await page.click('.dm-menu .dm-menu-row:has-text("Solo la volta")');
+  assert((await page.textContent('.dm-ask .dm-pop-title')) === 'Eliminare «Stand-up»?', 'conferma');
+  await page.click('.dm-ask .dm-button:has-text("Solo il 19 apr")');
   let [op] = await ops();
   assert(op.op === 'skip' && op.id === weekly.id && op.date === '2027-04-19', JSON.stringify(op));
   assert(!(await pills('2027-04-19')).includes('Stand-up') && (await pills('2027-04-26')).includes('Stand-up'), 'solo quella volta');
@@ -172,6 +175,26 @@ await check('un clic su una voce mostra la scheda, la matita la modifica', async
   assert((await page.textContent('.dc-detail-title')) === 'Manutenzione UPS sala server', 'scheda aggiornata');
   await page.keyboard.press('Escape');
   assert(await page.isVisible('.dc-day-head'), 'Esc torna al giorno');
+});
+
+await check('Elimina nella scheda chiede sempre conferma', async () => {
+  const call = item({ title: 'Chiamata fornitore', time: '11:00' });
+  await load({ items: [call] });
+  await page.click(`${cell(TODAY)} .dc-pill`);
+  await page.click('.dc-detail .dc-delete');
+  assert(await page.isVisible('.dm-ask') && (await ops()).length === 0, 'prima la domanda');
+  // Annulla: resta tutto com'era
+  await page.click('.dm-ask .dm-button:has-text("Annulla")');
+  assert((await ops()).length === 0 && (await pills(TODAY)).includes('Chiamata fornitore'), 'annullato');
+  // Elimina: sparisce, e l'avviso permette di tornare indietro
+  await page.click('.dc-detail .dc-delete');
+  await page.click('.dm-ask .dm-button.danger:has-text("Elimina")');
+  let [op] = await ops();
+  assert(op?.op === 'remove' && op.id === call.id, JSON.stringify(op));
+  assert((await pills(TODAY)).length === 0 && await page.isVisible('.dc-day-head'), 'eliminata');
+  await page.click('.dc-toast .dm-link-button');
+  [op] = await ops();
+  assert(op?.op === 'put' && op.item.id === call.id, JSON.stringify(op));
 });
 
 await check('trascinare una voce la sposta a un altro giorno', async () => {
@@ -300,7 +323,7 @@ await check('sola lettura: niente si modifica', async () => {
   await load({ items: [item({ title: 'Ferma' })] }, { readonly: true });
   assert(await page.isVisible('.dm-chip:has-text("Sola lettura")') && await page.isDisabled('.dc-new'), 'Nuovo spento');
   await page.click(`${cell(TODAY)} .dc-pill`);
-  assert(await page.isVisible('.dc-detail') && !(await page.isVisible('.dc-detail .dc-edit')), 'la scheda senza matita');
+  assert(await page.isVisible('.dc-detail') && !(await page.isVisible('.dc-detail .dc-edit')) && !(await page.isVisible('.dc-detail .dc-delete')), 'la scheda senza matita e senza Elimina');
   await page.keyboard.press('e');
   assert(!(await page.isVisible('.dc-editor')), 'niente modifica');
   await page.dblclick(cell('2027-04-21'));
@@ -320,6 +343,29 @@ await check('dc.clear dimentica tutto', async () => {
   await page.evaluate(() => dc.clear());
   assert((await page.$$('.dc-pill')).length === 0 && (await doc()).items.length === 0, 'resta qualcosa');
   assert((await page.evaluate(() => dc.state.hosts.length)) === 0, 'host');
+});
+
+await check('il calendario arriva in cascata, anche quando era nascosto', async () => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  try {
+    await page.evaluate(() => dc.shown(false));
+    await load();
+    const rising = await page.$$eval('.dc-cell.dm-rise', (cells) => cells.map((cell) => cell.style.getPropertyValue('--delay')));
+    assert(rising.length === 42 && rising[0] === '0ms' && rising[41] === `${5 * 34 + 6 * 14}ms`, JSON.stringify(rising.slice(0, 3)));
+    assert(await page.evaluate(() => document.querySelector('.dc-panel').classList.contains('dm-rise')), 'la colonna del giorno non entra');
+    await page.waitForTimeout(800);
+    assert((await page.$$('.dm-rise')).length === 0, 'la cascata resta');
+    // nascosto dalla finestra: la cascata aspetta che torni
+    await page.evaluate(() => dc.hidden());
+    await load();
+    assert((await page.$$('.dm-rise')).length === 0, 'la cascata e\' partita a pagina nascosta');
+    await page.evaluate(() => dc.shown(true));
+    assert((await page.$$('.dc-cell.dm-rise')).length === 42 && await page.evaluate(() => document.querySelector('.dc-app').classList.contains('dm-arrive')), 'al ritorno niente entrata');
+    await page.waitForTimeout(800);
+  } finally {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => dc.shown(false));
+  }
 });
 
 assert(errors.length === 0, `errori nella pagina: ${errors.join(' | ')}`);

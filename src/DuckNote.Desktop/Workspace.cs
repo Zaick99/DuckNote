@@ -319,6 +319,28 @@ public sealed class Workspace
     /// <summary>Le mappe della nota per la pagina della mappa (null: la nota non ne ha).</summary>
     public string? MapJson => Book.Map is { Length: > 0 } map ? System.Text.Encoding.UTF8.GetString(map) : null;
 
+    // gli indirizzi degli apparati delle mappe, letti di nuovo solo quando le mappe cambiano
+    private byte[]? _mapHostsOf;
+    private IReadOnlyList<string> _mapHosts = [];
+
+    /// <summary>Come compare l'host su una mappa della nota (l'indirizzo dell'apparato), o null se non c'e'.</summary>
+    public string? MapHostOf(HostRow row)
+    {
+        if (IsLocked || Book.Map is null)
+        {
+            return null;
+        }
+
+        if (!ReferenceEquals(_mapHostsOf, Book.Map))
+        {
+            _mapHosts = NetworkMap.Hosts(Book.Map);
+            _mapHostsOf = Book.Map;
+        }
+
+        HashSet<string> names = new(row.Names(), StringComparer.OrdinalIgnoreCase);
+        return _mapHosts.FirstOrDefault(names.Contains);
+    }
+
     /// <summary>Il foglio e' cambiato nell'editor: si tiene il documento nuovo e si salva fra poco.</summary>
     public void Update(Sheet sheet, SheetDoc doc)
     {

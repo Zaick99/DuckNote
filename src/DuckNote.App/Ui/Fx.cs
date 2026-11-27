@@ -174,22 +174,31 @@ public static class Fx
         ScaleTo(ns, 0.985, 1, 560, Expo(), 90);
     }
 
-    /// <summary>Le voci di una lista entrano scivolando una dopo l'altra.</summary>
-    public static void Cascade(ItemsControl list)
+    /// <summary>
+    /// Le voci di una lista entrano scivolando una dopo l'altra (le prime 16, dopo
+    /// <paramref name="baseDelay"/> ms: in una pagina che entra, la card si e' gia' quasi posata).
+    /// </summary>
+    public static void Cascade(ItemsControl list, int baseDelay = 0)
     {
         list.Dispatcher.BeginInvoke(() =>
         {
             for (int i = 0; i < Math.Min(list.Items.Count, 16); i++)
             {
                 if (list.ItemContainerGenerator.ContainerFromIndex(i) is not FrameworkElement c) continue;
-                var (_, t) = Xf(c);
-                c.Opacity = 0;
-                var slide = Anim(22, 0, 460, Expo(), 24 * i);
-                Cached(c, slide);
-                c.BeginAnimation(UIElement.OpacityProperty, Anim(0, 1, 260, Expo(), 24 * i));
-                t.BeginAnimation(TranslateTransform.XProperty, slide);
+                Arrive(c, baseDelay + (24 * i));
             }
         }, DispatcherPriority.Loaded);
+    }
+
+    /// <summary>Una voce che arriva in una lista: dissolvenza e uno scivolo da destra.</summary>
+    public static void Arrive(FrameworkElement c, int delay = 0)
+    {
+        var (_, t) = Xf(c);
+        c.Opacity = 0;
+        var slide = Anim(22, 0, 460, Expo(), delay);
+        Cached(c, slide);
+        c.BeginAnimation(UIElement.OpacityProperty, Anim(0, 1, 260, Expo(), delay));
+        t.BeginAnimation(TranslateTransform.XProperty, slide);
     }
 
     // ---------------------------------------------------------------- piccoli gesti

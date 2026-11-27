@@ -6,11 +6,11 @@
 import { h, icon, fill, typingIn, modKey } from '../common/dom.js';
 import { ui as uiIcons } from '../common/icons.js';
 import { Popups } from '../common/popups.js';
-import { show as appear, hide as vanish } from '../common/motion.js';
+import { show as appear, hide as vanish, pageAway, pageArrive, cascade } from '../common/motion.js';
 import { send, takeOutbox, activity, windowKey, applyTheme } from '../common/bridge.js';
 import {
   normalizeDoc, applyOp, writeItem, normalizeItem, localToday, parseDay, addDays, addMonths, partsOf,
-  makeDay, daysIn, MONTHS, newId, allItems, occurrences, shortDay, dates, nextDate,
+  makeDay, daysIn, MONTHS, newId, allItems, occurrences, shortDay, dates, nextDate, longDay, repeatLabel,
 } from './model.js';
 import { Month } from './month.js';
 import { editor, linkPicker, DEFAULT_REMIND } from './editor.js';
@@ -46,6 +46,21 @@ const state = {
 };
 
 // ------------------------------------------------------------------ la pagina
+
+// la finestra dice quando la pagina si vede: la cascata dell'apertura aspetta che si veda
+let front = true;
+let pendingEnter = false;
+
+/** Il calendario che arriva: i giorni salgono a onde, riga per riga, poi la colonna del giorno. */
+function enter() {
+  if (!front) {
+    pendingEnter = true;
+    return;
+  }
+  const cells = [...app.querySelectorAll('.dc-cell')];
+  cascade(cells, (cell, index) => Math.floor(index / 7) * 34 + (index % 7) * 14, { ms: 340 });
+  cascade([panel], () => 160, { ms: 340 });
+}
 
 const app = h('div', { class: 'dm-app dc-app' });
 const popupLayer = h('div', { class: 'dm-popups' });
@@ -84,6 +99,9 @@ const actions = {
   },
   done: (occurrence, on) => change({ op: 'done', id: occurrence.item.id, date: occurrence.date, on }),
   edit: (occurrence) => editOccurrence(occurrence),
+  remove: (occurrence, anchor) => {
+    if (!state.readonly) remove(occurrence.item.id, occurrence.date, anchor);
+  },
   reveal: (link) => reveal(link),
   ignore: (host) => {
     if (change({ op: 'ignore', host, on: true })) {
@@ -306,7 +324,11 @@ function edit(draft, isNew, date) {
   form.focus();
 }
 
-function remove(id, date, anchor) {
+/**
+ * Eliminare chiede sempre: una voce sola con Elimina, una che si ripete con la scelta fra
+ * quella volta e tutte. Dopo, l'avviso in basso permette ancora di tornare indietro.
+ */
+async function remove(id, date, anchor) {
   const item = state.doc.items.find((one) => one.id === id);
   if (!item) {
     back();
@@ -314,25 +336,30 @@ function remove(id, date, anchor) {
   }
   const old = structuredClone(item);
   const name = item.title || 'Senza titolo';
-  const all = () => {
+  const thisYear = partsOf(state.today)[0];
+  const day = shortDay(date, thisYear);
+  const answer = await popups.confirm(anchor, item.repeat
+    ? {
+      title: `Eliminare «${name}»?`,
+      text: `${repeatLabel(item, thisYear)}: si toglie solo la volta del ${day}, o tutte.`,
+      choices: [
+        { label: `Solo il ${day}`, value: 'one', tone: '' },
+        { label: 'Tutte le volte', value: 'all', tone: 'danger' },
+      ],
+    }
+    : { title: `Eliminare «${name}»?`, text: `${longDay(item.date)}: la voce sparisce dal calendario.`, ok: 'Elimina' });
+
+  if (answer === 'one') {
+    if (change({ op: 'skip', id, date })) {
+      back();
+      toast(`Tolta la volta del ${day}`, () => change({ op: 'put', item: writeItem(old) }));
+    }
+  } else if (answer === true || answer === 'all') {
     if (change({ op: 'remove', id })) {
       back();
       toast(`Eliminato «${name}»`, () => change({ op: 'put', item: writeItem(old) }));
     }
-  };
-  if (!item.repeat) {
-    all();
-    return;
   }
-  popups.menu(anchor, [
-    { label: `Solo la volta del ${shortDay(date, partsOf(state.today)[0])}`, action: () => {
-      if (change({ op: 'skip', id, date })) {
-        back();
-        toast(`Tolta la volta del ${shortDay(date, partsOf(state.today)[0])}`, () => change({ op: 'put', item: writeItem(old) }));
-      }
-    } },
-    { label: 'Tutte le volte', danger: true, icon: uiIcons.trash, action: all },
-  ], { width: 240 });
 }
 
 /** Un cambiamento: si applica qui subito e si manda alla finestra, che lo applica al calendario vero. */
@@ -488,6 +515,29 @@ window.dc = {
     state.query = '';
     search.value = '';
     render();
+    enter();
+    return true;
+  },
+
+  /**
+   * La pagina torna in primo piano. fade: entra con una dissolvenza (sul Mac, dove la vista
+   * nativa compare di colpo); il calendario aperto mentre era nascosto arriva adesso.
+   */
+  shown(fade = false) {
+    front = true;
+    pageArrive(app, fade);
+    if (pendingEnter) {
+      pendingEnter = false;
+      enter();
+    }
+    return true;
+  },
+
+  /** La finestra nasconde la pagina (un'altra pagina in primo piano). */
+  hidden() {
+    front = false;
+    pageAway(app);
+    popups.close();
     return true;
   },
 

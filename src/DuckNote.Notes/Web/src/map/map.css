@@ -79,17 +79,30 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 176px;
-  height: 52px;
-  padding: 0 10px 0 8px;
+  width: 200px;
+  height: 65px;
+  padding: 0 10px 0 12px;
   border: 1px solid var(--c-AccentBorder);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--c-BgContent);
   box-shadow: 0 6px 18px var(--c-Shadow);
   pointer-events: none;
   opacity: 0.92;
 }
-.dm-ghost-tile { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: var(--tone-soft); color: var(--tone); }
+/* la linguetta, come sulle schede della mappa */
+.dm-ghost::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: -20px;
+  width: 64px;
+  height: 20px;
+  border: 1px solid var(--c-AccentBorder);
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--c-BgContent);
+}
+.dm-ghost-tile { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 8px; background: var(--tone-soft); color: var(--tone); }
 .dm-ghost-tile .dm-icon { stroke-width: 1.6; }
 .dm-ghost-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
@@ -126,17 +139,20 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .dm-grip[data-corner="nw"], .dm-grip[data-corner="se"] { cursor: nwse-resize; }
 .dm-grip[data-corner="ne"], .dm-grip[data-corner="sw"] { cursor: nesw-resize; }
 
-/* i cavi */
+/* i cavi: ad angolo retto, del colore di quello che portano (wireOf in scene.js). --wire e' il
+   colore scelto per il cavo: verde se risponde, quello della VLAN per una porta access, ... */
 .dm-link { cursor: pointer; }
-.dm-link-hit { fill: none; stroke: transparent; stroke-width: 14; stroke-linecap: round; pointer-events: stroke; }
-.dm-link-line { fill: none; stroke: var(--c-LabelTertiary); stroke-linecap: round; pointer-events: none; }
-.dm-link.k-fiber .dm-link-line { stroke: var(--c-Teal); }
-.dm-link.k-wifi .dm-link-line { stroke: var(--c-Purple); stroke-dasharray: 5 5; }
-.dm-link.k-vpn .dm-link-line { stroke: var(--c-Blue); stroke-dasharray: 0.1 5.5; }
-.dm-link.k-wan .dm-link-line { stroke: var(--c-Blue); }
-.dm-link.down .dm-link-line { stroke: var(--c-Red); stroke-dasharray: 6 4; opacity: 0.75; }
-.dm-link:hover .dm-link-line { stroke: var(--c-LabelSecondary); }
-.dm-link.selected .dm-link-line { stroke: var(--c-Accent); opacity: 1; }
+.dm-link-hit { fill: none; stroke: transparent; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; }
+.dm-link-line { fill: none; stroke: var(--wire, var(--c-LabelTertiary)); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.dm-link.w-up .dm-link-line { opacity: 0.9; }
+.dm-link.w-trunk .dm-link-line { stroke: var(--c-LabelSecondary); }
+.dm-link.w-wifi .dm-link-line { stroke-dasharray: 5 5; }
+.dm-link.w-net .dm-link-line { stroke-dasharray: 0.1 5.5; }
+.dm-link.w-down .dm-link-line { stroke-dasharray: 6 4; opacity: 0.85; }
+.dm-link:hover .dm-link-hit { stroke: var(--c-BgHover); }
+.dm-link.selected .dm-link-hit { stroke: var(--c-AccentSoft); }
+.dm-link.selected .dm-link-line { opacity: 1; }
+.dm-link.selected.w-plain .dm-link-line, .dm-link.selected.w-trunk .dm-link-line { stroke: var(--c-Accent); }
 .dm-link-labels { cursor: pointer; }
 /* le etichette dei cavi (SVG): "dm-tag", da non confondere coi chip di stato della scheda (HTML) */
 .dm-tag rect { fill: var(--c-BgContent); stroke: var(--c-Separator); }
@@ -149,29 +165,48 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .dm-link-labels.selected .dm-tag text { fill: var(--c-Label); }
 .lod-far .dm-labels { display: none; }
 
-/* gli apparati */
+/* gli apparati: una scheda con la linguetta (nome e stato), l'icona, il modello, l'indirizzo e
+   quello che si sa adesso; switch, router e firewall con le porte hanno sotto il pannello. */
 .dm-node { cursor: default; }
 .dm-node-ring { fill: none; stroke: transparent; stroke-width: 3; }
-.dm-node-card { fill: var(--c-BgContent); stroke: var(--c-Separator); stroke-width: 1; }
-.dm-node:hover .dm-node-card { stroke: var(--c-BorderControl); }
+.dm-node-card, .dm-node-tab, .dm-node-cloud { fill: var(--c-BgContent); stroke: var(--c-Separator); stroke-width: 1; }
+.dm-node-cloud { stroke: var(--tone-border); stroke-width: 1.2; }
+.dm-node:hover .dm-node-card, .dm-node:hover .dm-node-tab { stroke: var(--c-BorderControl); }
+.dm-node:hover .dm-node-cloud { stroke: var(--tone); }
+.dm-node-accent { stroke: var(--tone); stroke-width: 2; stroke-linecap: round; opacity: 0.6; }
 .dm-node-tile { fill: var(--tone-soft); }
 .dm-node-icon { fill: none; stroke: var(--tone); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.dm-node-tile, .dm-node-icon, .dm-node-name, .dm-node-sub, .dm-node-dot, .dm-node-ring, .dm-zone-name, .dm-zone-sub, .dm-zone-dot { pointer-events: none; }
-.dm-node-name { font: 600 12.5px var(--font-text); fill: var(--c-Label); }
-.dm-node-sub { font: 11px var(--font-text); fill: var(--c-LabelSecondary); }
-.dm-node-sub.mono { font-family: var(--font-mono); }
+.dm-node-tile, .dm-node-icon, .dm-node-accent, .dm-node-tabname, .dm-node-badge, .dm-node-title, .dm-node-ip, .dm-node-info,
+.dm-node-dot, .dm-node-ring, .dm-jack-bay, .dm-zone-name, .dm-zone-sub, .dm-zone-dot { pointer-events: none; }
+.dm-node-tabname { font: 600 11.5px var(--font-text); fill: var(--c-Label); }
+.dm-node-badge { font: 700 9px var(--font-text); letter-spacing: 0.04em; fill: var(--c-LabelTertiary); }
+.dm-node.st-up .dm-node-badge { fill: var(--c-Green); }
+.dm-node.st-down .dm-node-badge { fill: var(--c-Red); }
+.dm-node.st-wait .dm-node-badge { fill: var(--c-Orange); }
+.dm-node-title { font: 600 13px var(--font-text); fill: var(--c-Label); }
+.dm-node-ip { font: 11px var(--font-mono); fill: var(--c-Accent); }
+.dm-node-info { font: 10.5px var(--font-text); fill: var(--c-LabelTertiary); }
+.dm-node.st-up .dm-node-info { fill: var(--c-LabelSecondary); }
+.dm-node.st-down .dm-node-info { fill: var(--c-Red); }
 .dm-node-dot { fill: var(--c-LabelQuaternary); stroke: var(--c-BgContent); stroke-width: 2; }
-.dm-node.st-none .dm-node-dot { display: none; }
 .dm-node.st-up .dm-node-dot { fill: var(--c-Green); }
 .dm-node.st-down .dm-node-dot { fill: var(--c-Red); }
 .dm-node.st-wait .dm-node-dot { fill: var(--c-Orange); }
-.dm-node.st-down .dm-node-card { stroke: var(--c-RedBorder); }
-.dm-node.st-down .dm-node-sub { fill: var(--c-Red); }
-.dm-node.selected .dm-node-card { stroke: var(--c-Accent); stroke-width: 1.5; }
+.dm-node.st-down .dm-node-card, .dm-node.st-down .dm-node-tab { stroke: var(--c-RedBorder); }
+.dm-node.st-down .dm-node-cloud { stroke: var(--c-Red); }
+.dm-node.selected .dm-node-card, .dm-node.selected .dm-node-tab, .dm-node.selected .dm-node-cloud { stroke: var(--c-Accent); stroke-width: 1.5; }
 .dm-node.selected .dm-node-ring { stroke: var(--c-AccentSoft); }
-.dm-node.target .dm-node-card { stroke: var(--c-Accent); stroke-width: 2; }
+.dm-node.target .dm-node-card, .dm-node.target .dm-node-tab, .dm-node.target .dm-node-cloud { stroke: var(--c-Accent); stroke-width: 2; }
 .dm-node.target .dm-node-ring { stroke: var(--c-AccentBorder); }
-.lod-tiny .dm-node-sub { display: none; }
+.lod-tiny .dm-node-info, .lod-tiny .dm-node-ip, .lod-tiny .dm-node-badge { display: none; }
+
+/* il pannello delle porte: libere vuote, usate del colore del loro cavo */
+.dm-jack-bay { fill: var(--c-BgFieldAlt); stroke: var(--c-Separator); stroke-width: 0.8; }
+.dm-jack { fill: var(--c-BgContent); stroke: var(--c-BorderControl); stroke-width: 0.8; }
+.dm-jack.used { fill: var(--port); stroke: var(--port); }
+.dm-jack.used.w-down { fill: var(--c-Red); stroke: var(--c-Red); }
+.dm-jack:hover { stroke: var(--c-Accent); stroke-width: 1.4; }
+.lod-far .dm-jack { pointer-events: none; }
 
 .dm-handles { opacity: 0; }
 .dm-handle { fill: var(--c-BgContent); stroke: var(--c-Accent); stroke-width: 1.5; cursor: crosshair; }
@@ -280,3 +315,119 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .dm-kind-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .dm-kind-grid .dm-kind-tile { cursor: default; }
 .dm-kind-grid .dm-kind-tile:focus { outline: none; border-color: var(--c-Accent); }
+
+/* ------------------------------------------------------------------ vista e modifica */
+
+/* la vista: la mappa da guardare, senza libreria, strumenti e maniglie */
+.viewing .dm-library, .viewing .dm-edit-only { display: none !important; }
+.viewing .dm-handles { display: none; }
+.viewing .dm-node, .viewing .dm-zone-head { cursor: pointer; }
+.dm-edit-toggle { margin-left: 4px; }
+
+/* la scheda in vista: i campi diventano testo, quelli vuoti spariscono */
+.viewing .dm-inspector .dm-kind-pick,
+.viewing .dm-inspector .dm-row:has(> .dm-kind-pick),
+.viewing .dm-inspector .dm-button.edit,
+.viewing .dm-inspector .dm-tool.edit,
+.viewing .dm-inspector .dm-choice.edit:not(.on),
+.viewing .dm-inspector .dm-tone.edit:not(.on) { display: none; }
+.viewing .dm-inspector .dm-choice.edit:disabled, .viewing .dm-inspector .dm-tone.edit:disabled { opacity: 1; }
+.viewing .dm-inspector .dm-row:has(> .dm-field:placeholder-shown),
+.viewing .dm-inspector .dm-row:has(> textarea:placeholder-shown) { display: none; }
+.viewing .dm-inspector .dm-field:disabled {
+  opacity: 1;
+  border-color: transparent;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+  color: var(--c-Label);
+  -webkit-text-fill-color: var(--c-Label);
+  resize: none;
+}
+.viewing .dm-inspector select.dm-field:disabled { background-image: none; }
+.viewing .dm-inspector .dm-field.big:disabled { margin-left: 0; width: 100%; }
+
+/* i riquadri della vista: reti e legenda, in alto a sinistra */
+.dm-overview {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 248px;
+  max-height: calc(100% - 64px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+.dm-overview > * { pointer-events: auto; }
+.dm-app:not(.viewing) .dm-overview { display: none; }
+.dm-over-card {
+  border: 1px solid var(--c-Separator);
+  border-radius: 12px;
+  background: var(--c-BgContent);
+  box-shadow: 0 4px 14px var(--c-Shadow);
+  overflow: hidden;
+}
+.dm-over-card[hidden] { display: none; }
+.dm-over-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  background: none;
+  color: var(--c-LabelSecondary);
+  text-align: left;
+  cursor: default;
+}
+.dm-over-head:hover { background: var(--c-BgHover); }
+.dm-over-title { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
+.dm-over-count { color: var(--c-LabelTertiary); font: 600 10.5px var(--font-mono); }
+.dm-net-list, .dm-legend-list { display: flex; flex-direction: column; gap: 1px; padding: 0 6px 6px; }
+
+.dm-net {
+  display: grid;
+  grid-template-columns: 3px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 3px 6px 3px 4px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  text-align: left;
+  cursor: default;
+}
+.dm-net:hover { background: var(--c-BgHover); }
+.dm-net.on { background: var(--tone-soft); }
+.dm-net.off { opacity: 0.5; }
+.dm-net-stripe { align-self: stretch; border-radius: 2px; background: var(--tone); }
+.dm-net-vlan { padding: 1px 6px; border-radius: 5px; background: var(--tone-soft); color: var(--tone); font: 600 10.5px var(--font-mono); white-space: nowrap; }
+.dm-net-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.dm-net-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
+.dm-net-none { color: var(--c-LabelTertiary); font-weight: 400; }
+.dm-net-cidr { overflow: hidden; text-overflow: ellipsis; color: var(--c-LabelTertiary); font: 10.5px var(--font-mono); white-space: nowrap; }
+
+.dm-legend-row { display: flex; align-items: center; gap: 10px; min-height: 26px; padding: 2px 6px; }
+.dm-legend-sample { flex: none; overflow: visible; }
+.dm-legend-sample path { fill: none; stroke: var(--wire, var(--c-LabelTertiary)); stroke-width: 2.2; stroke-linecap: round; }
+.dm-legend-sample.w-up { --wire: var(--c-Green); }
+.dm-legend-sample.w-down { --wire: var(--c-Red); }
+.dm-legend-sample.w-down path { stroke-dasharray: 6 4; }
+.dm-legend-sample.w-trunk { --wire: var(--c-LabelSecondary); }
+.dm-legend-sample.w-trunk path { stroke-width: 2.8; }
+.dm-legend-sample.w-net { --wire: var(--c-Blue); }
+.dm-legend-sample.w-net path { stroke-dasharray: 0.1 5.5; }
+.dm-legend-sample.w-wifi { --wire: var(--c-Purple); }
+.dm-legend-sample.w-wifi path { stroke-dasharray: 5 5; }
+.dm-legend-sample.w-fiber { --wire: var(--c-Teal); }
+.dm-legend-label { display: flex; flex-direction: column; min-width: 0; font-size: 12px; line-height: 1.25; }
+.dm-legend-sub { color: var(--c-LabelTertiary); font-size: 10.5px; }
+
+/* finestre strette: i riquadri lasciano posto alla mappa */
+@media (max-width: 720px) {
+  .dm-overview { display: none; }
+}

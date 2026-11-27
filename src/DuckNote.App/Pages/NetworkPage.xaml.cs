@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -13,6 +14,7 @@ using DuckNote.App.Scanning;
 using DuckNote.App.Ui;
 using DuckNote.App.Views;
 using DuckNote.Notes.Groups;
+using DuckNote.Notes.Hosts;
 using DuckNote.Notes.Scanning;
 using Microsoft.Win32;
 
@@ -39,6 +41,10 @@ public partial class NetworkPage : UserControl, IDuckPage
     /// condivisa sopra la collezione che la scansione sta riempiendo.
     /// </summary>
     private readonly ObservableCollection<HostRow> _visible = [];
+
+    // le righe gia' viste e quelle appena trovate da un'analisi in corso (entrano scivolando)
+    private readonly HashSet<HostRow> _known = [];
+    private readonly HashSet<HostRow> _fresh = [];
     private HostQuery _query = HostQuery.Parse(null);
     private readonly System.Windows.Threading.DispatcherTimer _refresh = new() { Interval = TimeSpan.FromMilliseconds(120) };
     private HostRow? _shown;
@@ -57,6 +63,7 @@ public partial class NetworkPage : UserControl, IDuckPage
         InitializeComponent();
 
         Table.ItemsSource = _visible;
+        Table.LoadingRow += OnLoadingRow;
         Table.SizeChanged += (_, change) =>
         {
             if (change.WidthChanged)
@@ -106,9 +113,23 @@ public partial class NetworkPage : UserControl, IDuckPage
 
     public void OnShown()
     {
+        // le righe che ci sono adesso entrano in cascata; quelle che arriveranno, una per volta
+        _known.Clear();
+        _known.UnionWith(_ws.Session.Rows);
+        _fresh.Clear();
         SpreadColumns();
         ShowSession(force: true);
         RangeBox.Focus();
+        Fx.Cascade(Table, 120);
+    }
+
+    /// <summary>Una riga che il DataGrid prepara: se e' un host appena trovato, entra scivolando.</summary>
+    private void OnLoadingRow(object? sender, DataGridRowEventArgs e)
+    {
+        if (e.Row.DataContext is HostRow row && _fresh.Remove(row))
+        {
+            Fx.Arrive(e.Row);
+        }
     }
 
     /// <summary>Apre la scheda di un host (chiesta dalla nota o dall'elenco host).</summary>
@@ -165,6 +186,17 @@ public partial class NetworkPage : UserControl, IDuckPage
     {
         List<HostRow> wanted = [.. _ws.Session.Rows.Where(Wanted)];
         HashSet<HostRow> keep = [.. wanted];
+
+        // durante un'analisi gli host appena trovati entrano scivolando (OnLoadingRow)
+        bool scanning = _ws.Session.IsRunning && IsVisible;
+
+        foreach (HostRow row in wanted)
+        {
+            if (_known.Add(row) && scanning)
+            {
+                _fresh.Add(row);
+            }
+        }
 
         for (int i = _visible.Count - 1; i >= 0; i--)
         {
@@ -229,10 +261,12 @@ public partial class NetworkPage : UserControl, IDuckPage
             ? "Nessun host ancora"
             : string.Create(CultureInfo.CurrentCulture, $"{session.Rows.Count} host, {fromNote} dalla nota · {session.UpCount} attivi");
 
-        BtnScan.IsEnabled = !session.IsRunning;
-        BtnNote.IsEnabled = !session.IsRunning;
-        BtnStop.IsEnabled = session.IsRunning;
-        RangeBox.IsEnabled = !session.IsRunning;
+        bool running = session.IsRunning;
+        ScanIcon.Text = running ? "\uE71A" : "\uE768";
+        ScanText.Text = running ? "Ferma" : "Analizza";
+        BtnScan.ToolTip = running ? "Ferma l'analisi in corso" : "Analizza l'intervallo scritto a sinistra (Invio)";
+        BtnNote.IsEnabled = !running;
+        RangeBox.IsEnabled = !running;
         Progress.Visibility = session.IsRunning ? Visibility.Visible : Visibility.Collapsed;
         Progress.Value = session.Progress;
 
@@ -261,6 +295,13 @@ public partial class NetworkPage : UserControl, IDuckPage
 
     private async void OnScanRange(object sender, RoutedEventArgs e)
     {
+        // mentre un'analisi e' in corso il pulsante e' "Ferma"
+        if (_ws.Session.IsRunning)
+        {
+            _ws.Session.Stop();
+            return;
+        }
+
         if (RangeBox.Text.Trim().Length == 0)
         {
             Fx.Shake(RangeBox);
@@ -281,8 +322,6 @@ public partial class NetworkPage : UserControl, IDuckPage
     }
 
     private async void OnScanNote(object sender, RoutedEventArgs e) => await _ws.ScanGroup(_ws.Groups.Find(_group)?.Id ?? ScanGroups.Note);
-
-    private void OnStop(object sender, RoutedEventArgs e) => _ws.Session.Stop();
 
     private void OnFilter(object sender, RoutedEventArgs e)
     {
@@ -315,6 +354,10 @@ public partial class NetworkPage : UserControl, IDuckPage
 
     private void Fill(HostRow row)
     {
+        CardCheck.IsEnabled = !_ws.Session.IsRunning && !_ws.IsLocked;
+        CardOpen.Visibility = Doors(row).Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        CardRemind.IsEnabled = !_ws.IsLocked;
+
         CardTitle.Text = row.Name.Length > 0 ? row.Name : row.IP;
         // l'IP sotto al titolo solo se il titolo e' un nome: due volte lo stesso numero non serve
         CardSub.Text = string.Join("  ·  ", ((string[])[row.Name.Length > 0 ? row.IP : string.Empty, row.DeviceType]).Where(part => part.Length > 0));
@@ -405,6 +448,27 @@ public partial class NetworkPage : UserControl, IDuckPage
     private void OnRowMenu(object sender, RoutedEventArgs e)
     {
         bool any = Chosen is not null;
+
+        // aprire: le porte che l'host ha aperte; la mappa: se un apparato ha il suo indirizzo
+        RowOpen.Items.Clear();
+
+        if (Chosen is { } open)
+        {
+            foreach (HostDoor door in Doors(open))
+            {
+                RowOpen.Items.Add(Command(door.Label, DoorIcon(door), "Blue", () => Launch(door)));
+            }
+        }
+
+        RowOpen.Visibility = RowOpen.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (Chosen is { } grouped)
+        {
+            FillGroups(RowGroups, grouped);
+        }
+
+        RowGroups.Visibility = Chosen is null ? Visibility.Collapsed : Visibility.Visible;
+        RowMap.Visibility = Chosen is { } placed && _ws.MapHostOf(placed) is not null ? Visibility.Visible : Visibility.Collapsed;
         RowAnalyse.IsEnabled = any && !_ws.Session.IsRunning;
         RowCopy.IsEnabled = any;
         RowRemind.IsEnabled = any && !_ws.IsLocked;
@@ -462,15 +526,188 @@ public partial class NetworkPage : UserControl, IDuckPage
 
     private void OnRowCopy(object sender, RoutedEventArgs e)
     {
-        if (Chosen is not { } row)
+        if (Chosen is { } row)
+        {
+            CopyAddress(row);
+        }
+    }
+
+    private void OnRowMap(object sender, RoutedEventArgs e)
+    {
+        if (Chosen is { } row && _ws.MapHostOf(row) is { } onMap)
+        {
+            MapWanted?.Invoke(onMap);
+        }
+    }
+
+    /// <summary>"Mostra sulla mappa": l'host com'e' scritto sull'apparato della mappa.</summary>
+    public event Action<string>? MapWanted;
+
+    // ------------------------------------------------------------------ i gruppi di un host
+
+    /// <summary>
+    /// "Gruppi" per un host: aggiungerlo a un gruppo (una riga in fondo), toglierlo da quelli che
+    /// lo nominano, o farne uno nuovo che parte da lui. Chi ci sta per una rete resta li'.
+    /// </summary>
+    private void FillGroups(MenuItem menu, HostRow row)
+    {
+        menu.Items.Clear();
+        menu.IsEnabled = !_ws.IsLocked;
+        GroupHosts groups = _ws.Groups;
+        string[] names = [.. row.Names()];
+
+        foreach (ScanGroup group in groups.All)
+        {
+            ScanGroup chosen = group;
+            string name = Short(group.Name, 34);
+
+            if (!groups.Contains(group, row))
+            {
+                menu.Items.Add(Command($"Aggiungi a «{name}»", "\uE710", "Green",
+                    () => ChangeGroup(ScanGroups.WithTarget(chosen, Target(row)), $"{row.Shown} aggiunto a «{chosen.Name}».")));
+            }
+            else if (ScanGroups.Listed(group, names).Count > 0)
+            {
+                menu.Items.Add(Command($"Togli da «{name}»", "\uE711", "Red",
+                    () => ChangeGroup(ScanGroups.WithoutHost(chosen, names), $"{row.Shown} tolto da «{chosen.Name}».")));
+            }
+            else
+            {
+                menu.Items.Add(new MenuItem { Header = $"In «{name}» per la sua rete", IsEnabled = false, Icon = Glyph("\uE73E", null) });
+            }
+        }
+
+        if (groups.All.Count > 0)
+        {
+            menu.Items.Add(new Separator());
+        }
+
+        menu.Items.Add(Command("Nuovo gruppo con questo host...", "\uE710", "Accent", () => EditGroup(null, Target(row))));
+    }
+
+    /// <summary>Salva un gruppo cambiato al volo (un host aggiunto o tolto).</summary>
+    private void ChangeGroup(ScanGroup next, string message)
+    {
+        List<ScanGroup> all = [.. _ws.Groups.All];
+        int at = all.FindIndex(group => group.Id == next.Id);
+
+        if (at < 0)
         {
             return;
         }
 
+        all[at] = next;
+        _ws.SaveGroups(all);
+        _ws.Say(message);
+        ShowGroup();
+        ShowSession();
+    }
+
+    // ------------------------------------------------------------------ comandi della scheda
+
+    /// <summary>Come si chiama l'host per i comandi: com'e' scritto nella nota, o il suo IP.</summary>
+    private static string Target(HostRow row) => row.NoteKey.Length > 0 ? row.NoteKey : row.IP;
+
+    /// <summary>Quello che si apre su questo host, dalle sue porte aperte (su Windows: browser, Esplora risorse, mstsc).</summary>
+    private static IReadOnlyList<HostDoor> Doors(HostRow row) => HostDoors.For(row.IP.Length > 0 ? row.IP : row.NoteKey, row.OpenPorts, mac: false);
+
+    private static string DoorIcon(HostDoor door) => door.Kind switch
+    {
+        "web" => "\uE774",
+        "share" => "\uE8B7",
+        "rdp" => "\uE7F4",
+        _ => "\uE8A7"
+    };
+
+    private void Launch(HostDoor door)
+    {
         try
         {
-            Clipboard.SetText(row.IP);
-            _ws.Say($"{row.IP} copiato.");
+            ProcessStartInfo start = door.Kind switch
+            {
+                "share" => new ProcessStartInfo("explorer.exe", door.Target) { UseShellExecute = true },
+                "rdp" => new ProcessStartInfo("mstsc.exe", $"/v:{door.Target}") { UseShellExecute = true },
+                _ => new ProcessStartInfo(door.Target) { UseShellExecute = true }
+            };
+            Process.Start(start);
+            _ws.Say($"Aperto {door.Label}.");
+        }
+        catch (Exception problem) when (problem is System.ComponentModel.Win32Exception or InvalidOperationException or FileNotFoundException)
+        {
+            _ws.Say($"Non si e' aperto {door.Label}: {problem.Message}");
+        }
+    }
+
+    private async void OnCardCheck(object sender, RoutedEventArgs e)
+    {
+        if (_shown is { } row)
+        {
+            await _ws.Analyse(Target(row));
+        }
+    }
+
+    /// <summary>"Apri" nella scheda: un menu con le porte che l'host ha aperte.</summary>
+    private void OnCardOpen(object sender, RoutedEventArgs e)
+    {
+        if (_shown is not { } row)
+        {
+            return;
+        }
+
+        OpenMenu.Items.Clear();
+
+        foreach (HostDoor door in Doors(row))
+        {
+            OpenMenu.Items.Add(Command(door.Label, DoorIcon(door), "Blue", () => Launch(door)));
+        }
+
+        OpenMenu.PlacementTarget = CardOpen;
+        OpenMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        OpenMenu.IsOpen = true;
+    }
+
+    /// <summary>"Altro" nella scheda: copiare l'indirizzo, la mappa, mettere da parte.</summary>
+    private void OnCardMore(object sender, RoutedEventArgs e)
+    {
+        if (_shown is not { } row)
+        {
+            return;
+        }
+
+        MoreMenu.Items.Clear();
+        MoreMenu.Items.Add(Command("Copia indirizzo", "\uE8C8", null, () => CopyAddress(row)));
+
+        if (_ws.MapHostOf(row) is { } onMap)
+        {
+            MoreMenu.Items.Add(Command("Mostra sulla mappa", "\uE707", "Teal", () => MapWanted?.Invoke(onMap)));
+        }
+
+        MenuItem groupsItem = new() { Header = "Gruppi", Icon = Glyph("\uE81E", "Accent") };
+        FillGroups(groupsItem, row);
+        MoreMenu.Items.Add(groupsItem);
+        MoreMenu.Items.Add(new Separator());
+        MoreMenu.Items.Add(Command($"Metti da parte {row.Shown}", "\uE711", "Red", () => _ws.Hide(Target(row))));
+        MoreMenu.PlacementTarget = CardMore;
+        MoreMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        MoreMenu.IsOpen = true;
+    }
+
+    /// <summary>"Esporta" nella barra: gli host mostrati nella nota (come tabella) o in un file.</summary>
+    private void OnExportMenu(object sender, RoutedEventArgs e)
+    {
+        ExportMenu.PlacementTarget = BtnExport;
+        ExportMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        ExportMenu.IsOpen = true;
+    }
+
+    private void CopyAddress(HostRow row)
+    {
+        string address = row.IP.Length > 0 ? row.IP : row.NoteKey;
+
+        try
+        {
+            Clipboard.SetText(address);
+            _ws.Say($"{address} copiato.");
         }
         catch (ExternalException)
         {
@@ -532,8 +769,9 @@ public partial class NetworkPage : UserControl, IDuckPage
             _ => group!.Name
         };
 
-        NoteIcon.Text = group is null ? "\uE8A5" : "\uE81E";
-        NoteText.Text = group is null ? "Host della nota" : $"Analizza «{Short(group.Name, 22)}»";
+        BtnGroupEdit.Visibility = group is not null && !_ws.IsLocked ? Visibility.Visible : Visibility.Collapsed;
+        NoteIcon.Text = group is null ? "\uE73E" : "\uE81E";
+        NoteText.Text = group is null ? "Controlla la nota" : $"Controlla «{Short(group.Name, 22)}»";
         BtnNote.ToolTip = group is null
             ? "Solo gli indirizzi scritti nelle pagine della nota"
             : group.Targets.Count == 0 ? "Il gruppo e' vuoto: aggiungi reti o indirizzi con Modifica" : $"Analizza {Short(string.Join(", ", group.Targets), 120)}";
@@ -564,10 +802,18 @@ public partial class NetworkPage : UserControl, IDuckPage
         GroupMenu.Items.Add(new Separator());
         GroupMenu.Items.Add(Command("Nuovo gruppo...", "\uE710", "Accent", () => EditGroup(null)));
 
-        if (groups.Find(_group) is { } chosen)
+        if (groups.All.Count > 0)
         {
-            GroupMenu.Items.Add(Command($"Modifica «{Short(chosen.Name, 30)}»...", "\uE70F", null, () => EditGroup(chosen)));
-            GroupMenu.Items.Add(Command($"Elimina «{Short(chosen.Name, 30)}»", "\uE74D", "Red", () => RemoveGroup(chosen)));
+            // ogni gruppo si apre direttamente: non serve sceglierlo prima nel filtro
+            MenuItem edit = new() { Header = "Modifica un gruppo", Icon = Glyph("\uE70F", null), IsEnabled = !_ws.IsLocked };
+
+            foreach (ScanGroup group in groups.All)
+            {
+                ScanGroup chosen = group;
+                edit.Items.Add(Command(Short(group.Name, 40), group.Monitor ? "\uE9D9" : "\uE81E", group.Monitor ? "Green" : null, () => EditGroup(chosen)));
+            }
+
+            GroupMenu.Items.Add(edit);
         }
 
         GroupMenu.PlacementTarget = BtnGroup;
@@ -629,10 +875,23 @@ public partial class NetworkPage : UserControl, IDuckPage
     }
 
     /// <summary>Crea (con <paramref name="group"/> null) o modifica un gruppo; il nuovo diventa quello scelto.</summary>
-    private void EditGroup(ScanGroup? group)
+    private void OnGroupEdit(object sender, RoutedEventArgs e)
+    {
+        if (_ws.Groups.Find(_group) is { } chosen)
+        {
+            EditGroup(chosen);
+        }
+    }
+
+    /// <summary>
+    /// Crea (con <paramref name="group"/> null) o modifica un gruppo; il nuovo diventa quello
+    /// scelto. <paramref name="start"/>: le righe di un gruppo nuovo (un host della tabella);
+    /// senza, l'intervallo scritto in alto.
+    /// </summary>
+    private void EditGroup(ScanGroup? group, string? start = null)
     {
         List<ScanGroup> all = [.. _ws.Groups.All];
-        string suggested = group is null ? RangeBox.Text.Trim() : string.Empty;
+        string suggested = group is null ? start ?? RangeBox.Text.Trim() : string.Empty;
 
         if (GroupDialog.Ask(Window.GetWindow(this), group, all, suggested) is not { } choice)
         {
@@ -662,19 +921,6 @@ public partial class NetworkPage : UserControl, IDuckPage
         _group = choice.Group.Id;
         _ws.SaveGroups(all);
         _ws.Say(at >= 0 ? $"Gruppo «{choice.Group.Name}» aggiornato." : $"Gruppo «{choice.Group.Name}» creato: Analizza lo controlla tutto.");
-    }
-
-    private void RemoveGroup(ScanGroup group)
-    {
-        if (!DuckDialog.Confirm(Window.GetWindow(this), $"Eliminare «{group.Name}»?",
-                "Il gruppo sparisce dalla nota e dalla mappa; gli host gia' trovati restano in tabella.", "Elimina", danger: true))
-        {
-            return;
-        }
-
-        _group = AllGroups;
-        _ws.SaveGroups([.. _ws.Groups.All.Where(other => other.Id != group.Id)]);
-        _ws.Say($"Gruppo «{group.Name}» eliminato.");
     }
 
     private static string Short(string text, int most) => text.Length <= most ? text : text[..(most - 1)] + "…";

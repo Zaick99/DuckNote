@@ -2,9 +2,32 @@
 // Tutto quello che entra (dal file, da un incolla, da un messaggio della finestra) passa da
 // normalize*: il resto del codice puo' fidarsi della forma e dei limiti.
 
-export const NODE_W = 176;
-export const NODE_H = 52;
 export const GRID = 8;
+
+// ------------------------------------------------------------------ misure delle schede
+// Ogni apparato e' una scheda con una linguetta in alto (il nome e lo stato); switch, router e
+// firewall con le porte hanno sotto il pannello frontale e si allargano quanto serve. Internet e'
+// una nuvola. Le misure comprendono la linguetta: il rettangolo dell'apparato e' tutto quello che
+// occupa sulla mappa.
+
+/** L'altezza della linguetta, sopra al corpo della scheda. */
+export const TAB_H = 20;
+export const CARD_W = 200;
+export const CARD_H = 84;
+export const CLOUD_W = 184;
+export const CLOUD_H = 88;
+/** Una porta del pannello: larghezza, altezza, spazio fra due, spazio in piu' ogni gruppo. */
+export const PORT_W = 12;
+export const PORT_H = 10;
+export const PORT_GAP = 3;
+const PORT_GROUP = 6;
+const PORT_GROUP_GAP = 5;
+const PORT_LEFT = 14;
+const PORT_BOTTOM = 12;
+
+/** Le misure "di prima" per un apparato nuovo, quando non si sa ancora che cosa sara'. */
+export const NODE_W = CARD_W;
+export const NODE_H = CARD_H;
 export const MIN_ZOOM = 0.15;
 export const MAX_ZOOM = 3;
 
@@ -164,9 +187,61 @@ export function normalizeZone(raw, fresh = (id, prefix) => (typeof id === 'strin
 
 // ------------------------------------------------------------------ geometria degli oggetti
 
-export const centerOf = (node) => ({ x: node.x + NODE_W / 2, y: node.y + NODE_H / 2 });
+const snapUp = (value) => Math.ceil(value / GRID) * GRID;
 
-export const rectOf = (node) => ({ x: node.x, y: node.y, w: NODE_W, h: NODE_H });
+/** Il pannello delle porte: una fila fino a 8 porte, due oltre (dispari sopra, pari sotto). Null se non ce l'ha. */
+export function panelOf(node) {
+  if (!PORTED.has(node?.kind) || !(node.ports > 0)) return null;
+  const rows = node.ports > 8 ? 2 : 1;
+  const cols = Math.ceil(node.ports / rows);
+  const groups = Math.floor((cols - 1) / PORT_GROUP);
+  return {
+    rows,
+    cols,
+    w: cols * (PORT_W + PORT_GAP) - PORT_GAP + groups * PORT_GROUP_GAP,
+    h: rows * (PORT_H + PORT_GAP) - PORT_GAP,
+  };
+}
+
+/** Quanto occupa l'apparato sulla mappa, linguetta compresa. */
+export function sizeOf(node) {
+  if (node?.kind === 'internet') return { w: CLOUD_W, h: CLOUD_H };
+  const panel = panelOf(node);
+  if (!panel) return { w: CARD_W, h: CARD_H };
+  return { w: Math.max(CARD_W, snapUp(panel.w + PORT_LEFT * 2)), h: snapUp(CARD_H + panel.h + PORT_BOTTOM) };
+}
+
+/**
+ * La porta n (1..porte) nel pannello, relativa all'angolo dell'apparato: il suo riquadro, il
+ * centro e ax, la x dove ci si attacca il cavo. Con due file la porta di sopra e quella di sotto
+ * stanno nella stessa colonna: i loro cavi si attaccano 3 pixel a sinistra e a destra del
+ * centro, perche' non corrano uno sopra l'altro.
+ */
+export function portCell(node, n) {
+  const panel = panelOf(node);
+  if (!panel || !Number.isInteger(n) || n < 1 || n > node.ports) return null;
+  const size = sizeOf(node);
+  const index = n - 1;
+  const row = panel.rows === 2 ? index % 2 : 0;
+  const col = panel.rows === 2 ? Math.floor(index / 2) : index;
+  const x = PORT_LEFT + col * (PORT_W + PORT_GAP) + Math.floor(col / PORT_GROUP) * PORT_GROUP_GAP;
+  const y = size.h - PORT_BOTTOM - panel.h + row * (PORT_H + PORT_GAP);
+  const ax = x + PORT_W / 2 + (panel.rows === 2 ? (row === 0 ? -3 : 3) : 0);
+  return { x, y, w: PORT_W, h: PORT_H, cx: x + PORT_W / 2, cy: y + PORT_H / 2, ax, row };
+}
+
+export const centerOf = (node) => {
+  const size = sizeOf(node);
+  return { x: node.x + size.w / 2, y: node.y + size.h / 2 };
+};
+
+export const rectOf = (node) => ({ x: node.x, y: node.y, ...sizeOf(node) });
+
+/** Il corpo della scheda, senza la linguetta (per la nuvola di Internet, tutto). */
+export function bodyOf(node) {
+  const rect = rectOf(node);
+  return node.kind === 'internet' ? rect : { x: rect.x, y: rect.y + TAB_H - 1, w: rect.w, h: rect.h - TAB_H + 1 };
+}
 
 export const inside = (point, rect) => point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h;
 
@@ -196,7 +271,12 @@ export function boundsOf(map, ids = null) {
     x1 = Math.max(x1, x + w);
     y1 = Math.max(y1, y + h);
   };
-  for (const node of map.nodes) if (!ids || ids.has(node.id)) grow(node.x, node.y, NODE_W, NODE_H);
+  for (const node of map.nodes) {
+    if (!ids || ids.has(node.id)) {
+      const size = sizeOf(node);
+      grow(node.x, node.y, size.w, size.h);
+    }
+  }
   for (const zone of map.zones) if (!ids || ids.has(zone.id)) grow(zone.x, zone.y, zone.w, zone.h);
   return Number.isFinite(x0) ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
 }

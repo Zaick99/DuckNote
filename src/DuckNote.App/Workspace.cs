@@ -471,6 +471,18 @@ public sealed class Workspace
     /// <summary>Gli indirizzi degli apparati della mappa (letti una volta per modifica della mappa).</summary>
     private IReadOnlyList<string> MapHosts() => _mapHosts ??= NetworkMap.Hosts(Book.Map);
 
+    /// <summary>Come compare l'host su una mappa della nota (l'indirizzo dell'apparato), o null se non c'e'.</summary>
+    public string? MapHostOf(HostRow row)
+    {
+        if (IsLocked || Book.Map is null)
+        {
+            return null;
+        }
+
+        HashSet<string> names = new(row.Names(), StringComparer.OrdinalIgnoreCase);
+        return MapHosts().FirstOrDefault(names.Contains);
+    }
+
     /// <summary>
     /// Le mappe della rete sono cambiate nella loro pagina: si tengono (se sono davvero un
     /// documento di mappe) e si salvano fra poco, come un foglio, dentro la nota e quindi nella

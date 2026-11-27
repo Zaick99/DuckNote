@@ -4,11 +4,11 @@
 // switch) vanno in una griglia sotto al loro apparato invece che in una riga lunghissima. Gli
 // apparati senza cavi finiscono in una griglia in fondo.
 
-import { NODE_W, NODE_H } from './model.js';
+import { sizeOf } from './model.js';
 
 const RANK = { internet: 0, firewall: 1, router: 2, switch: 3, ap: 4, server: 5, nas: 5, pc: 6, laptop: 6, phone: 6, printer: 6, camera: 6, iot: 6, other: 7 };
-const GAP_X = 40;
-const GAP_Y = 84;
+const GAP_X = 48;
+const GAP_Y = 88;
 const LEAF_GAP_Y = 28;
 const COMPONENT_GAP = 96;
 
@@ -64,7 +64,7 @@ export function arrange(map, only = null) {
     bottom = Math.max(bottom, part.h);
   }
   if (loose.length) {
-    const grid = gridBlock(loose.sort(byRank).map((node) => node.id));
+    const grid = gridBlock(loose.sort(byRank).map((node) => node.id), byId);
     const width = Math.max(x - COMPONENT_GAP, grid.w);
     grid.place(trees.length ? (width - grid.w) / 2 : 0, trees.length ? bottom + GAP_Y * 1.5 : 0, positions);
   }
@@ -74,38 +74,42 @@ export function arrange(map, only = null) {
 /** Il blocco di un apparato e di tutto quello che gli sta sotto: misura e posa. */
 function block(id, children, byId) {
   const kids = children.get(id) ?? [];
+  const size = sizeOf(byId.get(id));
   if (kids.length === 0) {
-    return { w: NODE_W, h: NODE_H, place: (x, y, out) => out.set(id, { x, y }) };
+    return { w: size.w, h: size.h, place: (x, y, out) => out.set(id, { x, y }) };
   }
   const branches = kids.filter((kid) => (children.get(kid) ?? []).length > 0).map((kid) => block(kid, children, byId));
   const leaves = kids.filter((kid) => (children.get(kid) ?? []).length === 0);
   const parts = [...branches];
-  if (leaves.length > 4) parts.push(gridBlock(leaves));
+  if (leaves.length > 4) parts.push(gridBlock(leaves, byId));
   else for (const leaf of leaves) parts.push(block(leaf, children, byId));
 
   const inner = parts.reduce((sum, part) => sum + part.w, 0) + GAP_X * (parts.length - 1);
-  const w = Math.max(NODE_W, inner);
-  const h = NODE_H + GAP_Y + Math.max(...parts.map((part) => part.h));
+  const w = Math.max(size.w, inner);
+  const h = size.h + GAP_Y + Math.max(...parts.map((part) => part.h));
   return {
     w,
     h,
     place: (x, y, out) => {
-      out.set(id, { x: x + (w - NODE_W) / 2, y });
+      out.set(id, { x: x + (w - size.w) / 2, y });
       let cx = x + (w - inner) / 2;
       for (const part of parts) {
-        part.place(cx, y + NODE_H + GAP_Y, out);
+        part.place(cx, y + size.h + GAP_Y, out);
         cx += part.w + GAP_X;
       }
     },
   };
 }
 
-/** Una griglia di apparati (le foglie di uno switch, gli apparati senza cavi). */
-function gridBlock(ids) {
+/** Una griglia di apparati (le foglie di uno switch, gli apparati senza cavi): caselle grandi quanto la scheda piu' grande. */
+function gridBlock(ids, byId) {
   const columns = Math.max(1, Math.min(6, Math.ceil(Math.sqrt(ids.length * 1.5))));
   const rows = Math.ceil(ids.length / columns);
-  const w = columns * NODE_W + (columns - 1) * (GAP_X / 2);
-  const h = rows * NODE_H + (rows - 1) * LEAF_GAP_Y;
+  const sizes = ids.map((id) => sizeOf(byId.get(id)));
+  const cellW = Math.max(...sizes.map((size) => size.w));
+  const cellH = Math.max(...sizes.map((size) => size.h));
+  const w = columns * cellW + (columns - 1) * (GAP_X / 2);
+  const h = rows * cellH + (rows - 1) * LEAF_GAP_Y;
   return {
     w,
     h,
@@ -113,7 +117,7 @@ function gridBlock(ids) {
       ids.forEach((id, index) => {
         const column = index % columns;
         const row = Math.floor(index / columns);
-        out.set(id, { x: x + column * (NODE_W + GAP_X / 2), y: y + row * (NODE_H + LEAF_GAP_Y) });
+        out.set(id, { x: x + column * (cellW + GAP_X / 2), y: y + row * (cellH + LEAF_GAP_Y) });
       });
     },
   };

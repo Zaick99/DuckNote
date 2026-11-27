@@ -4,7 +4,7 @@
 
 import { h, icon, fill, typingIn, modKey, isMac, shortcut } from '../common/dom.js';
 import { ui as uiIcons } from '../common/icons.js';
-import { NODE_W, NODE_H, GRID, parseVlans, boundsOf, centerOf, normalizeDoc } from './model.js';
+import { GRID, parseVlans, boundsOf, centerOf, normalizeDoc, sizeOf, kindFromScan } from './model.js';
 import { Store, snap } from './store.js';
 import { Scene } from './scene.js';
 import { Pointer } from './interact.js';
@@ -12,9 +12,10 @@ import { Popups } from '../common/popups.js';
 import { kindPicker } from './picker.js';
 import { Library, segments, toolButton, textButton } from './panels.js';
 import { Inspector } from './inspector.js';
+import { Overview } from './overview.js';
 import { arrange } from './layout.js';
 import { mapPng, mapSvg, devicesTable, linksTable, fileName } from './exporter.js';
-import { pressable, stop } from '../common/motion.js';
+import { pressable, stop, pageAway, pageArrive } from '../common/motion.js';
 import { send, takeOutbox, activity, windowKey, applyTheme } from '../common/bridge.js';
 
 // ------------------------------------------------------------------ la pagina
@@ -35,6 +36,15 @@ const popups = new Popups(popupLayer);
 let mode = 'move';
 let clip = null;
 let pasteCount = 0;
+// La mappa si apre da guardare: pulita, senza libreria ne' strumenti, coi riquadri delle reti e
+// della legenda. «Modifica mappa» (o E) apre tutto il resto, «Fine» torna a guardare; una mappa
+// vuota si apre gia' in modifica. damaged: la nota non si e' letta per intero e non si salva,
+// la mappa si puo' solo guardare.
+let editing = false;
+let damaged = false;
+// la finestra dice quando la pagina si vede: l'onda dell'apertura aspetta che si veda
+let front = true;
+let pendingEnter = false;
 
 /** La tastiera alla mappa (e agli appunti): un campo nascosto, con un carattere selezionato. */
 function focusSink() {
@@ -76,13 +86,19 @@ const layoutButton = textButton(uiIcons.layout, 'Disponi', 'Mette in ordine la m
 const exportButton = textButton(uiIcons.export, 'Esporta', 'Immagine, disegno o inventario', () => (popups.current?.anchor === exportButton ? popups.close() : exportMenu()));
 exportButton.dataset.menuAlign = 'right';
 const readonlyChip = h('span', { class: 'dm-chip tone-Orange', hidden: true }, 'Sola lettura');
+const editButton = h('button', { class: 'dm-button small primary dm-press dm-edit-toggle', type: 'button', onclick: () => setEditing(!editing) });
 
+// in vista restano la mappa, la ricerca, il filtro VLAN e l'esportazione
+const editOnly = (el) => {
+  el.classList.add('dm-edit-only');
+  return el;
+};
 toolbar.append(
-  libraryToggle, mapButton, h('span', { class: 'dm-sep' }),
-  modes.el, zoneButton, h('span', { class: 'dm-sep' }),
-  undoButton, redoButton, readonlyChip,
+  editOnly(libraryToggle), mapButton, editOnly(h('span', { class: 'dm-sep' })),
+  editOnly(modes.el), editOnly(zoneButton), editOnly(h('span', { class: 'dm-sep' })),
+  editOnly(undoButton), editOnly(redoButton), readonlyChip,
   h('span', { class: 'dm-spacer' }),
-  vlanButton, searchBox, layoutButton, exportButton);
+  vlanButton, searchBox, editOnly(layoutButton), exportButton, editButton);
 
 // ------------------------------------------------------------------ libreria, scheda, zoom
 
@@ -129,7 +145,13 @@ const empty = h('div', { class: 'dm-empty', hidden: true },
   h('div', { class: 'dm-empty-text' }, 'Trascina un apparato dalla libreria, oppure parti dagli host che DuckNote ha gia\' trovato. Per collegare due apparati tira un cavo dal bordo dell\'uno all\'altro.'),
   h('div', { class: 'dm-empty-buttons' }, emptyAdd, emptyScan));
 
-stage.append(empty, inspector.el, zoom, statusLine);
+const overview = new Overview(store, {
+  vlan: () => scene.filter.vlan,
+  pickVlan: (id) => setVlan(id),
+  frameZone: (zone) => scene.frameRect(zone, { maxZoom: 1.15 }),
+});
+
+stage.append(empty, overview.el, inspector.el, zoom, statusLine);
 app.append(toolbar, h('div', { class: 'dm-main' }, library.el, stage));
 pressable(document.body);
 
@@ -177,8 +199,10 @@ store.on((what) => {
     showChrome();
   }
   inspector.refresh(what);
-  if (what !== 'select') library.renderHosts();
-  else showStatus();
+  if (what !== 'select') {
+    library.renderHosts();
+    overview.render();
+  } else showStatus();
 });
 
 function showChrome() {
@@ -189,18 +213,41 @@ function showChrome() {
   const vlans = vlanList();
   vlanButton.hidden = vlans.length === 0;
   if (scene.filter.vlan != null && !vlans.includes(scene.filter.vlan)) setVlan(null);
-  readonlyChip.hidden = !store.readonly;
+  readonlyChip.hidden = !damaged;
   for (const el of [zoneButton, layoutButton]) el.disabled = store.readonly;
   modes.el.classList.toggle('disabled', store.readonly);
+  fill(editButton, icon(editing ? uiIcons.check : uiIcons.pen, 13), h('span', {}, editing ? 'Fine' : 'Modifica mappa'));
+  editButton.disabled = damaged;
+  editButton.title = damaged
+    ? 'La nota non si e\' letta per intero: la mappa si puo\' solo guardare'
+    : editing ? 'Torna a guardare la mappa (E)' : 'Sposta, collega, aggiungi apparati e zone (E)';
   showEmpty();
   showStatus();
+}
+
+/** Vista o modifica: in vista niente si sposta e niente si scrive, la scheda mostra e basta. */
+function setEditing(on) {
+  const next = !!on && !damaged;
+  if (next === editing && store.readonly === (damaged || !next)) return;
+  editing = next;
+  store.readonly = damaged || !editing;
+  if (!editing) {
+    pointer.cancel();
+    popups.close();
+    setMode('move');
+  }
+  app.classList.toggle('viewing', !editing);
+  showChrome();
+  inspector.refresh('doc');
+  overview.render();
+  scene.invalidate();
 }
 
 function showEmpty() {
   const blank = store.map.nodes.length === 0 && store.map.zones.length === 0;
   const count = store.hosts.length;
   fill(emptyAdd, icon(uiIcons.add, 14), h('span', {}, count === 1 ? 'Aggiungi l\'host trovato' : `Aggiungi i ${count} host trovati`));
-  emptyAdd.hidden = count === 0 || store.readonly;
+  emptyAdd.hidden = count === 0 || damaged;
   emptyScan.hidden = count > 0;
   empty.hidden = !blank;
 }
@@ -251,7 +298,9 @@ function zoomTo(k) {
 
 function fitAll(animate = true) {
   const box = boundsOf(store.map);
-  if (box) scene.frameRect(box, { animate });
+  // in vista i riquadri delle reti e della legenda stanno a sinistra: la mappa si inquadra accanto
+  const covered = !editing && !overview.el.hidden ? overview.el.getBoundingClientRect().width + 12 : 0;
+  if (box) scene.frameRect(box, { animate, left: covered });
   else {
     const { w, h: height } = scene.size;
     scene.setView(w / 2, height / 3, 1);
@@ -266,6 +315,7 @@ function fitAll(animate = true) {
 let needsFit = false;
 function showMap() {
   stop(scene, 'view');
+  if (!editing && !damaged && store.map.nodes.length === 0 && store.map.zones.length === 0) setEditing(true);
   scene.forget();
   scene.render();
   const view = store.map.view;
@@ -273,6 +323,8 @@ function showMap() {
   if (view) scene.setView(view.x, view.y, view.k);
   else if (scene.size.w < 10 || scene.size.h < 10) needsFit = true;
   else fitAll(false);
+  if (front) scene.enter();
+  else pendingEnter = true;
 }
 
 new ResizeObserver(() => {
@@ -284,15 +336,16 @@ new ResizeObserver(() => {
 
 // ------------------------------------------------------------------ aggiungere
 
-/** Dove posare qualcosa: il punto lasciato, oppure il centro della vista (a scalare se occupato). */
-function spot(clientX, clientY) {
+/** Dove posare un apparato del tipo dato: il punto lasciato, oppure il centro della vista (a scalare se occupato). */
+function spot(clientX, clientY, kind) {
+  const size = sizeOf({ kind });
   if (clientX != null) {
     const at = scene.toWorld(clientX, clientY);
-    return { x: at.x - NODE_W / 2, y: at.y - NODE_H / 2 };
+    return { x: at.x - size.w / 2, y: at.y - size.h / 2 };
   }
   const middle = scene.middle();
-  let x = snap(middle.x - NODE_W / 2);
-  let y = snap(middle.y - NODE_H / 2);
+  let x = snap(middle.x - size.w / 2);
+  let y = snap(middle.y - size.h / 2);
   while (store.map.nodes.some((node) => Math.abs(node.x - x) < 12 && Math.abs(node.y - y) < 12)) {
     x += 24;
     y += 24;
@@ -308,16 +361,17 @@ function added(node) {
 }
 
 function addKind(kind, clientX, clientY) {
-  const at = spot(clientX, clientY);
+  const at = spot(clientX, clientY, kind);
   added(store.addNode(kind, at.x, at.y));
 }
 
 function addHost(host, clientX, clientY) {
-  const at = spot(clientX, clientY);
+  const at = spot(clientX, clientY, kindFromScan(host));
   added(store.nodeFromHost(host, at.x, at.y));
 }
 
 function addHosts(list) {
+  if (!editing) setEditing(true);
   const ids = store.addHosts(list, scene.middle());
   if (ids.length === 0) return;
   for (const id of ids) scene.pulse.add(id);
@@ -587,7 +641,7 @@ document.addEventListener('keydown', (event) => {
   } else if (!event.altKey && !event.repeat) {
     // la lettera non deve finire nel campo che il comando apre (Z apre il nome della zona)
     const lower = key.toLowerCase();
-    const run = { v: () => setMode('move'), c: () => setMode(mode === 'connect' ? 'move' : 'connect'), z: () => addZone(), '+': () => zoomBy(1.25), '=': () => zoomBy(1.25), '-': () => zoomBy(1 / 1.25) }[lower];
+    const run = { v: () => setMode('move'), c: () => setMode(mode === 'connect' ? 'move' : 'connect'), z: () => addZone(), e: () => setEditing(!editing), '+': () => zoomBy(1.25), '=': () => zoomBy(1.25), '-': () => zoomBy(1 / 1.25) }[lower];
     if (run) {
       event.preventDefault();
       run();
@@ -654,6 +708,7 @@ function setVlan(vlan) {
   vlanButton.classList.toggle('on', vlan != null);
   vlanButton.querySelector('span').textContent = vlan == null ? 'VLAN' : `VLAN ${vlan}`;
   scene.invalidate();
+  overview?.render();
 }
 
 function vlanMenu() {
@@ -675,12 +730,18 @@ function mapMenu() {
     { header: 'Le mappe della nota' },
     ...store.doc.maps.map((item) => ({ label: item.name, hint: String(item.nodes.length), checked: item.id === map.id, action: () => switchMap(item.id) })),
     'sep',
-    { label: 'Nuova mappa', icon: uiIcons.add, disabled: store.readonly, action: () => newMap() },
-    { label: 'Rinomina...', icon: uiIcons.pen, disabled: store.readonly, action: () => renameMap() },
-    { label: 'Duplica', icon: uiIcons.duplicate, disabled: store.readonly, action: () => duplicateMap() },
+    { label: 'Nuova mappa', icon: uiIcons.add, disabled: damaged, action: () => editThen(newMap) },
+    { label: 'Rinomina...', icon: uiIcons.pen, disabled: damaged, action: () => editThen(renameMap) },
+    { label: 'Duplica', icon: uiIcons.duplicate, disabled: damaged, action: () => editThen(duplicateMap) },
     'sep',
-    { label: 'Elimina la mappa', icon: uiIcons.trash, danger: true, disabled: store.readonly || (store.doc.maps.length === 1 && map.nodes.length === 0 && map.zones.length === 0), action: () => deleteMap() },
+    { label: 'Elimina la mappa', icon: uiIcons.trash, danger: true, disabled: damaged || (store.doc.maps.length === 1 && map.nodes.length === 0 && map.zones.length === 0), action: () => editThen(deleteMap) },
   ], { width: 240 });
+}
+
+/** Un comando che cambia la mappa, dato dalla vista: prima si passa in modifica. */
+function editThen(command) {
+  if (!editing) setEditing(true);
+  return command();
 }
 
 function switchMap(id) {
@@ -779,7 +840,7 @@ function contextMenu(x, y, hit, world) {
   } else {
     items = [
       { label: 'Aggiungi un apparato...', icon: uiIcons.add, disabled: ro, action: () => kindPicker(popups, x, y, (kind) => {
-        const node = store.addNode(kind, world.x - NODE_W / 2, world.y - NODE_H / 2);
+        const node = store.addNode(kind, world.x - sizeOf({ kind }).w / 2, world.y - sizeOf({ kind }).h / 2);
         added(node);
       }) },
       { label: 'Incolla', icon: uiIcons.copy, disabled: ro || !clip, hint: shortcut('V'), action: () => pasteFragment(clip) },
@@ -795,22 +856,54 @@ function contextMenu(x, y, hit, world) {
 // ------------------------------------------------------------------ cosa chiede la finestra
 
 window.dm = {
-  /** Le mappe della nota (il JSON di mappa.json, o null per una nota senza mappe). */
+  /**
+   * Le mappe della nota (il JSON di mappa.json, o null per una nota senza mappe). options:
+   * readonly (la nota e' rovinata: solo vista), mode ('view' | 'edit'; di solito vista, una
+   * mappa vuota in modifica), hosts e groups (come dm.hosts), focus.
+   */
   load(doc, options = {}) {
     const raw = typeof doc === 'string' ? JSON.parse(doc || 'null') : doc;
     clearTimeout(saveTimer);
     saveTimer = 0;
     popups.close();
     pointer.cancel();
-    store.readonly = !!options.readonly;
+    damaged = !!options.readonly;
+    store.readonly = true;
+    editing = false;
     if (options.hosts) store.setHosts(options.hosts, options.groups);
     store.load(raw);
     clearFilters();
+    const blank = store.map.nodes.length === 0 && store.map.zones.length === 0;
+    editing = null;
+    setEditing(options.mode === 'edit' || (options.mode !== 'view' && blank));
     setMode('move');
     showChrome();
     showMap();
     library.renderHosts();
     if (options.focus) focusSink();
+    return true;
+  },
+
+  /**
+   * La pagina torna in primo piano. fade: entra con una dissolvenza (sul Mac, dove la vista
+   * nativa compare di colpo); la mappa aperta mentre era nascosta arriva adesso con la sua onda.
+   */
+  shown(fade = false) {
+    front = true;
+    pageArrive(app, fade);
+    if (pendingEnter) {
+      pendingEnter = false;
+      scene.enter();
+    }
+    return true;
+  },
+
+  /** La finestra nasconde la pagina (un'altra pagina in primo piano). */
+  hidden() {
+    front = false;
+    pageAway(app);
+    pointer.cancel();
+    popups.close();
     return true;
   },
 
@@ -833,10 +926,15 @@ window.dm = {
   },
 
   readonly(on) {
-    store.readonly = !!on;
-    if (on) setMode('move');
-    showChrome();
-    inspector.refresh('doc');
+    damaged = !!on;
+    editing = null;
+    setEditing(!damaged && store.map.nodes.length === 0 && store.map.zones.length === 0);
+  },
+
+  /** 'view' o 'edit' (se la nota non e' rovinata): come il pulsante Modifica mappa. */
+  mode(value) {
+    setEditing(value === 'edit');
+    return editing ? 'edit' : 'view';
   },
 
   /** Via tutto: la nota si chiude a chiave. */
@@ -846,8 +944,11 @@ window.dm = {
     popups.close();
     pointer.cancel();
     clip = null;
+    damaged = false;
     store.clear();
     clearFilters();
+    editing = null;
+    setEditing(false);
     scene.forget();
     showChrome();
     library.renderHosts();
@@ -925,6 +1026,8 @@ try {
 } catch {
   setLibrary(true);
 }
+editing = null;
+setEditing(false);
 setMode('move');
 showChrome();
 showMap();

@@ -111,6 +111,8 @@ public sealed class MapPage : UserControl, IDuckPage
 
         if (_ready)
         {
+            // la pagina la fa entrare gia' la finestra (Fx.PageIn): qui solo l'onda, se aspettava
+            Call("dm.shown(false)");
             PushHosts();
             _web.Focus();
             Call("dm.focus()");
@@ -122,7 +124,15 @@ public sealed class MapPage : UserControl, IDuckPage
         }
     }
 
-    public void OnHidden() => _front = false;
+    public void OnHidden()
+    {
+        _front = false;
+
+        if (_ready)
+        {
+            Call("dm.hidden()");
+        }
+    }
 
     // ------------------------------------------------------------------ il WebView
 
@@ -358,6 +368,8 @@ public sealed class MapPage : UserControl, IDuckPage
             case "ready":
                 _ready = true;
                 PushTheme();
+                // la pagina sa se si vede: l'onda dell'apertura aspetta che si veda
+                Call(_front ? "dm.shown(false)" : "dm.hidden()");
                 Load(focus: _front);
 
                 if (_reveal is { } what)

@@ -2,6 +2,73 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.24] - 2026-11-27
+
+**A map you read at a glance, a Rete page built around what you do, and no
+more hosts called down by mistake.**
+
+### Added
+
+- **The map opens to look at.** Clean, without the library and the tools, with
+  **Reti** (the zones with their VLAN and subnet, and the VLANs of cables
+  outside every zone; a click lights up only that VLAN) and **Legenda** (only
+  the kinds of cable the map uses) on the left. **Modifica mappa** (or `E`)
+  opens the library, the tools and the editable card; **Fine** goes back. An
+  empty map opens ready to draw; in the view, dragging a device moves the view.
+- **Every device is a card**, with a tab for the name and the state (**UP**,
+  **DOWN**, **?**), the icon of its kind, the model, the address and what is
+  known now (response time and system, *non risponde*, the place). Switches,
+  routers and firewalls carry their front panel on the map, every port a cable
+  names lit in the colour of that cable. Internet is a cloud.
+- **Commands in the card of a host**, in **Rete**: **Ricontrolla**; **Apri** ▾
+  with its web pages, its shares (Finder, Explorer), SSH on the Mac and Remote
+  Desktop on Windows — only what its open ports offer; **Promemoria**; and
+  **⋯** to copy the address, **Mostra sulla mappa**, **Gruppi** ▸ and
+  **Metti da parte**. The right-click menu of the table has them too.
+- **Groups edited in one click**: a pencil next to the chosen group, **Modifica
+  un gruppo** ▸ in the group menu for any of them, and from a host **Gruppi** ▸
+  to add it to a group, take it out of one that lists it, or start **Nuovo
+  gruppo con questo host…**.
+- **Animations**: pages arrive in a quick fade (on the Mac the sheet, the map
+  and the calendar fade by themselves); the map arrives in a wave from the top
+  with its cables behind; the calendar day by day; the hosts of **Rete** in a
+  cascade, and those a running scan finds slide in. *Reduce motion* turns them
+  off.
+
+### Changed
+
+- **Cables run at right angles**, from side to side of the cards, around the
+  other cards and without running over each other; a cable that names a port of
+  a switch leaves from that port. Green when a device answers, red and dashed
+  when one end is down, in the colour of its VLAN for an access port, light and
+  thicker for a trunk, dotted for Internet and VPN, dashed for Wi-Fi, teal for
+  fibre. Zone titles stay above the cables.
+- **The Rete bar**: **Analizza** becomes **Ferma** while a scan runs (the
+  separate stop button is gone); **Host della nota** is now **Controlla la
+  nota** (with a group chosen, **Controlla «gruppo»**); the two unlabelled
+  icons are one **Esporta** ▾ menu, **Tabella nella nota** or **File CSV…**.
+- **Notifications look like the cards of the map**: a tab with what they are
+  about (**Rete**, **Promemoria**, **Calendario**, **Aggiornamento**,
+  **Errore**) and the time, a coloured line, the icon on its tile.
+- **Elimina** in the card of a calendar item, and deleting from the editor,
+  always ask first; an item that repeats asks whether to remove only that time
+  or all of them.
+- The SVG and PNG exports of the map draw the new cards and cables.
+
+### Fixed
+
+- **Hosts that were up no longer turn red during scans.** A host that misses
+  one round of pings keeps its state and its details until the end of the
+  scan, then is asked again calmly — pings with more patience and, if it had
+  open ports, a connection to them — and turns red only if it is silent again.
+  Pings go out in steps (the second 300 ms after the first, so it finds the
+  ARP entry ready), at most 256 at a time in the whole app, instead of
+  hundreds of ICMP sockets at once that lost replies. A ping that fails on this
+  computer leaves the host **to check**, not down.
+- A host that goes down no longer shows its last response time.
+- A full scan no longer wipes names, MAC and ports of a host that missed a
+  ping.
+
 ## [0.0.23] - 2026-11-27
 
 **In the calendar, a click shows an item; the pencil edits it.**

@@ -161,21 +161,27 @@ export class Popups {
   }
 
   /** Una conferma, per quello che non si annulla. */
-  confirm(where, { title, text, ok = 'Elimina', danger = true }) {
+  /**
+   * Una conferma: Annulla e un pulsante (ok), oppure piu' risposte (choices: { label, value,
+   * tone: 'danger' | 'primary' | '' }). Si risolve col valore scelto (true per ok); Annulla, Esc
+   * o un clic fuori non la risolvono.
+   */
+  confirm(where, { title, text, ok = 'Elimina', danger = true, choices = null }) {
     let done = () => {};
+    const answers = choices ?? [{ label: ok, value: true, tone: danger ? 'danger' : 'primary' }];
     const el = h('div', { class: 'dm-pop dm-ask' },
       h('div', { class: 'dm-pop-title' }, title),
       text ? h('div', { class: 'dm-pop-text' }, text) : null,
       h('div', { class: 'dm-pop-buttons' },
         h('button', { class: 'dm-button dm-press', type: 'button', onclick: () => this.close() }, 'Annulla'),
-        h('button', {
-          class: `dm-button dm-press ${danger ? 'danger' : 'primary'}`,
+        answers.map((answer) => h('button', {
+          class: `dm-button dm-press${answer.tone ? ` ${answer.tone}` : ''}`,
           type: 'button',
           onclick: () => {
             this.close();
-            done(true);
+            done(answer.value);
           },
-        }, ok)));
+        }, answer.label))));
     this.open(el, where);
     el.querySelector('.dm-button:last-child')?.focus();
     return new Promise((resolve) => {

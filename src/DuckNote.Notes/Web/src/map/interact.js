@@ -2,7 +2,7 @@
 // un cavo, allargare una zona, selezionare col rettangolo, scorrere la vista. Sul vuoto si
 // trascina la vista; con Maiuscole si seleziona col rettangolo.
 
-import { NODE_W, NODE_H, GRID, centerOf, membersOf, inside } from './model.js';
+import { GRID, centerOf, rectOf, sizeOf, membersOf, inside } from './model.js';
 import { intersects, normalizeRect } from './geometry.js';
 import { isMac, modKey } from '../common/dom.js';
 import { stop } from '../common/motion.js';
@@ -130,6 +130,11 @@ export class Pointer {
     if (additive) this.store.toggle(hit.id);
     else if (!wasSelected) this.store.select([hit.id]);
 
+    // in sola lettura un apparato non si sposta: trascinarlo sposta la vista
+    if (this.store.readonly && !additive) {
+      this.start(event, { type: 'pan', x: event.clientX, y: event.clientY, view: { ...this.scene.view }, moved: false, clear: false });
+      return;
+    }
     if (hit.type === 'link' || this.store.readonly || !this.store.sel.has(hit.id)) {
       this.start(event, { type: 'none' });
       return;
@@ -203,7 +208,7 @@ export class Pointer {
         const rect = normalizeRect(drag.from.x, drag.from.y, world.x, world.y);
         this.scene.marquee(rect);
         const ids = new Set(drag.base);
-        for (const node of this.store.map.nodes) if (intersects(rect, { x: node.x, y: node.y, w: NODE_W, h: NODE_H })) ids.add(node.id);
+        for (const node of this.store.map.nodes) if (intersects(rect, rectOf(node))) ids.add(node.id);
         for (const zone of this.store.map.zones) {
           if (rect.x <= zone.x && rect.y <= zone.y && rect.x + rect.w >= zone.x + zone.w && rect.y + rect.h >= zone.y + zone.h) ids.add(zone.id);
         }
@@ -244,26 +249,28 @@ export class Pointer {
    */
   align(drag, primary, dx, dy, k) {
     const threshold = SNAP_GUIDE / k;
-    const cx = primary.x + dx + NODE_W / 2;
-    const cy = primary.y + dy + NODE_H / 2;
+    const size = sizeOf(primary);
+    const cx = primary.x + dx + size.w / 2;
+    const cy = primary.y + dy + size.h / 2;
     let bestX = null;
     let bestY = null;
     for (const node of this.store.map.nodes) {
       if (drag.items.has(node.id)) continue;
-      const ox = node.x + NODE_W / 2;
-      const oy = node.y + NODE_H / 2;
+      const other = sizeOf(node);
+      const ox = node.x + other.w / 2;
+      const oy = node.y + other.h / 2;
       if (Math.abs(ox - cx) < threshold && (!bestX || Math.abs(ox - cx) < Math.abs(bestX.ox - cx))) bestX = { ox, node };
       if (Math.abs(oy - cy) < threshold && (!bestY || Math.abs(oy - cy) < Math.abs(bestY.oy - cy))) bestY = { oy, node };
     }
     const guides = [];
     if (bestX) {
       dx += bestX.ox - cx;
-      const ys = [bestX.node.y, bestX.node.y + NODE_H, primary.y + dy, primary.y + dy + NODE_H];
+      const ys = [bestX.node.y, bestX.node.y + sizeOf(bestX.node).h, primary.y + dy, primary.y + dy + size.h];
       guides.push({ x1: bestX.ox, x2: bestX.ox, y1: Math.min(...ys) - 12, y2: Math.max(...ys) + 12 });
     }
     if (bestY) {
       dy += bestY.oy - cy;
-      const xs = [bestY.node.x, bestY.node.x + NODE_W, primary.x + dx, primary.x + dx + NODE_W];
+      const xs = [bestY.node.x, bestY.node.x + sizeOf(bestY.node).w, primary.x + dx, primary.x + dx + size.w];
       guides.push({ y1: bestY.oy, y2: bestY.oy, x1: Math.min(...xs) - 12, x2: Math.max(...xs) + 12 });
     }
     return { dx, dy, guides };
@@ -302,7 +309,7 @@ export class Pointer {
           // un cavo lasciato nel vuoto: un apparato nuovo, gia' collegato, proprio li'
           const at = this.scene.toWorld(event.clientX, event.clientY);
           this.ui.kindPicker(event.clientX, event.clientY, (kind) => {
-            const node = this.store.addNode(kind, at.x - NODE_W / 2, at.y - NODE_H / 2);
+            const node = this.store.addNode(kind, at.x - sizeOf({ kind }).w / 2, at.y - sizeOf({ kind }).h / 2);
             if (!node) return;
             this.scene.pulse.add(node.id);
             this.store.cut();
@@ -353,7 +360,7 @@ export class Pointer {
       if (this.store.readonly) return;
       const at = this.scene.toWorld(event.clientX, event.clientY);
       this.ui.kindPicker(event.clientX, event.clientY, (kind) => {
-        const node = this.store.addNode(kind, at.x - NODE_W / 2, at.y - NODE_H / 2);
+        const node = this.store.addNode(kind, at.x - sizeOf({ kind }).w / 2, at.y - sizeOf({ kind }).h / 2);
         if (node) {
           this.scene.pulse.add(node.id);
           this.store.select([node.id]);
@@ -399,11 +406,12 @@ export class Pointer {
 /** Il punto del bordo di un apparato verso un punto dato (dove parte il cavo che si tira). */
 export function edgeToward(node, point) {
   const c = centerOf(node);
+  const rect = rectOf(node);
   const dx = point.x - c.x;
   const dy = point.y - c.y;
   if (Math.abs(dx) < 0.001 && Math.abs(dy) < 0.001) return c;
-  const tx = dx !== 0 ? (NODE_W / 2) / Math.abs(dx) : Infinity;
-  const ty = dy !== 0 ? (NODE_H / 2) / Math.abs(dy) : Infinity;
+  const tx = dx !== 0 ? (rect.w / 2) / Math.abs(dx) : Infinity;
+  const ty = dy !== 0 ? (rect.h / 2) / Math.abs(dy) : Infinity;
   const t = Math.min(tx, ty, 1);
-  return inside(point, { x: node.x, y: node.y, w: NODE_W, h: NODE_H }) ? c : { x: c.x + dx * t, y: c.y + dy * t };
+  return inside(point, rect) ? c : { x: c.x + dx * t, y: c.y + dy * t };
 }

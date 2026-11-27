@@ -3,7 +3,7 @@
 // evita gli apparati, le testate delle zone e le etichette gia' messe. Se proprio non c'e'
 // posto (cavi cortissimi, apparati ammucchiati) va dove copre meno: resta comunque visibile.
 
-import { NODE_W, NODE_H } from './model.js';
+import { rectOf } from './model.js';
 import { measure } from '../common/dom.js';
 
 export const PORT_HEIGHT = 16;
@@ -131,7 +131,8 @@ export function chipSize(text, height, font) {
 }
 
 /**
- * Le etichette di tutti i cavi. entries: [{ link, path, pa, pb, mid }] con i testi gia' pronti
+ * Le etichette di tutti i cavi. entries: [{ link, pathA, pathB, pathMid, pa, pb, mid }]: i tratti
+ * del percorso su cui stanno (quello del capo a, del capo b, il piu' lungo) e i testi gia' pronti
  * (o vuoti); obstacles: i rettangoli da non coprire (le testate delle zone). Torna, per cavo,
  * { a, b, mid }: per ogni etichetta il centro (at), il punto del cavo a cui appartiene (anchor) e
  * se serve il filo che ve la lega (lead); null se l'etichetta non c'e'.
@@ -140,7 +141,10 @@ export function placeLabels(nodes, entries, obstacles, font, { quick = false } =
   // mentre si trascina basta un posto buono fra i primi: quello migliore arriva quando si lascia
   const budget = quick ? 24 : Infinity;
   const room = new Room();
-  for (const node of nodes) room.add({ x: node.x - 2, y: node.y - 2, w: NODE_W + 4, h: NODE_H + 4 }, 6);
+  for (const node of nodes) {
+    const rect = rectOf(node);
+    room.add({ x: rect.x - 2, y: rect.y - 2, w: rect.w + 4, h: rect.h + 4 }, 6);
+  }
   for (const rect of obstacles) room.add(rect, 3);
   const placed = new Map();
   for (const entry of entries) placed.set(entry.link.id, { a: null, b: null, mid: null });
@@ -150,13 +154,13 @@ export function placeLabels(nodes, entries, obstacles, font, { quick = false } =
     room.add(box(spot.at, size), 2);
   };
 
-  // prima le porte: stanno dove i cavi si affollano (attorno agli switch), hanno meno scelta
+  // prima le porte: stanno dove i cavi si affollano (attorno agli switch), hanno meno scelta;
+  // ognuna sul tratto del suo capo (il primo o l'ultimo del percorso a gomito)
   for (const entry of entries) {
-    const { path } = entry;
-    if (!path) continue;
     for (const end of ['a', 'b']) {
+      const path = end === 'a' ? entry.pathA : entry.pathB;
       const text = end === 'a' ? entry.pa : entry.pb;
-      if (!text) continue;
+      if (!path || !text) continue;
       const size = chipSize(text, PORT_HEIGHT, font);
       const along = alongOf(path, size);
       const near = along + 4;
@@ -168,9 +172,9 @@ export function placeLabels(nodes, entries, obstacles, font, { quick = false } =
     }
   }
 
-  // poi velocita' e VLAN, attorno al mezzo del cavo
+  // poi velocita' e VLAN, attorno al mezzo del tratto piu' lungo
   for (const entry of entries) {
-    const { path } = entry;
+    const path = entry.pathMid;
     if (!path || !entry.mid) continue;
     const size = chipSize(entry.mid, MID_HEIGHT, font);
     const reach = Math.max(0, path.length * 0.36 - alongOf(path, size) / 2);

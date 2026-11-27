@@ -169,8 +169,9 @@ export class Inspector {
     return h('div', { class: 'dm-insp-actions' }, ...items);
   }
 
-  button(path, label, onclick, { danger = false, primary = false, title } = {}) {
-    return h('button', { class: `dm-button small dm-press edit${danger ? ' danger' : ''}${primary ? ' primary' : ''}`, type: 'button', title, onclick }, path ? icon(path, 13) : null, h('span', {}, label));
+  /** keep: un comando che non cambia la mappa (il Promemoria), attivo anche in sola lettura. */
+  button(path, label, onclick, { danger = false, primary = false, title, keep = false } = {}) {
+    return h('button', { class: `dm-button small dm-press${keep ? ' keep' : ' edit'}${danger ? ' danger' : ''}${primary ? ' primary' : ''}`, type: 'button', title, onclick }, path ? icon(path, 13) : null, h('span', {}, label));
   }
 
   // ------------------------------------------------------------------ un apparato
@@ -238,7 +239,7 @@ export class Inspector {
       cables,
       this.notes(id),
       this.buttons(
-        this.button(uiIcons.bell, 'Promemoria', () => this.actions.remind(get()), { title: 'Una voce nel calendario legata a questo apparato (una scadenza, un intervento)' }),
+        this.button(uiIcons.bell, 'Promemoria', () => this.actions.remind(get()), { keep: true, title: 'Una voce nel calendario legata a questo apparato (una scadenza, un intervento)' }),
         this.button(uiIcons.duplicate, 'Duplica', () => this.actions.duplicate(), { title: `Duplica (${shortcut('D')})` }),
         this.button(uiIcons.trash, 'Elimina', () => this.actions.remove(), { danger: true, title: 'Elimina (Canc)' })),
     ];

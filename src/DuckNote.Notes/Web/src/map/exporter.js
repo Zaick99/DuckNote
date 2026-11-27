@@ -2,11 +2,10 @@
 // programmi che non capiscono le variabili CSS), in PNG (lo stesso SVG disegnato su una tela, a
 // doppia risoluzione) e gli inventari in CSV (li scrive la finestra, col punto e virgola).
 
-import { NODE_W, NODE_H, KIND, CABLE, boundsOf, zoneOf } from './model.js';
-import { kinds as kindIcons } from '../common/icons.js';
-import { fit, measure } from '../common/dom.js';
+import { KIND, CABLE, boundsOf, zoneOf } from './model.js';
+import { measure } from '../common/dom.js';
 import {
-  FONT, MONO, NAME_FONT, SUB_FONT, SUB_TEXT_FONT, CHIP_FONT, subtitleOf, strokeOf, zoneHead, linkLayout,
+  FONT, MONO, CHIP_FONT, strokeOf, zoneHead, linkLayout, usedPorts, cardMarkup,
 } from './scene.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
@@ -18,6 +17,41 @@ function colour(name, fallback = '#888888') {
 }
 
 const STATE_COLOUR = { up: '--c-Green', down: '--c-Red', wait: '--c-Orange', unknown: '--c-LabelQuaternary' };
+
+/** I tratteggi dei cavi, come in map.css. */
+const DASH = { down: '6 4', net: '0.1 5.5', wifi: '5 5' };
+
+/** La pittura dell'esportazione: gli stessi pezzi della scheda dello schermo, coi colori scritti. */
+function exportPaint(c, kind, state) {
+  const tone = colour(`--c-${kind.tone}`);
+  const down = state === 'down';
+  const badge = { up: c.green, down: c.red, wait: c.orange }[state] ?? c.third;
+  return (part, info = {}) => {
+    switch (part) {
+      case 'ring': return 'fill="none" stroke="none"';
+      case 'tab':
+      case 'card': return `fill="${c.card}" stroke="${down ? c.redBorder : c.edge}"`;
+      case 'cloud': return `fill="${c.card}" stroke="${down ? c.red : colour(`--t-${kind.tone}-border`, tone)}" stroke-width="1.2"`;
+      case 'tabname': return `font-size="11.5" font-weight="600" fill="${c.label}"`;
+      case 'badge': return `font-size="9" font-weight="700" letter-spacing="0.36" fill="${badge}"`;
+      case 'accent': return `stroke="${tone}" stroke-width="2" stroke-linecap="round" opacity="0.6"`;
+      case 'tile': return `fill="${colour(`--t-${kind.tone}-soft`, '#eeeeee')}"`;
+      case 'icon': return `fill="none" stroke="${tone}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"`;
+      case 'title': return `font-size="13" font-weight="600" fill="${c.label}"`;
+      case 'ip': return `font-size="11" font-family="${esc(MONO)}" fill="${c.accent}"`;
+      case 'info': return `font-size="10.5" fill="${down ? c.red : state === 'up' ? c.second : c.third}"`;
+      case 'dot': return `fill="${colour(STATE_COLOUR[state] ?? STATE_COLOUR.unknown)}" stroke="${c.card}" stroke-width="2"`;
+      case 'bay': return `fill="${c.field}" stroke="${c.edge}" stroke-width="0.8"`;
+      case 'jack': {
+        const used = info.used;
+        if (!used) return `fill="${c.card}" stroke="${c.control}" stroke-width="0.8"`;
+        const fill = used.style === 'down' ? c.red : used.tone ? colour(`--c-${used.tone}`) : c.second;
+        return `fill="${fill}" stroke="${fill}"`;
+      }
+      default: return '';
+    }
+  };
+}
 
 /** La mappa come SVG a se', col nome in testa. */
 export function mapSvg(map, store, { title = true } = {}) {
@@ -37,6 +71,11 @@ export function mapSvg(map, store, { title = true } = {}) {
     third: colour('--c-LabelTertiary', '#8d949c'),
     red: colour('--c-Red', '#c0392b'),
     redBorder: colour('--t-Red-border', '#c0392b59'),
+    green: colour('--c-Green', '#2e9e5b'),
+    orange: colour('--c-Orange', '#e8890c'),
+    accent: colour('--c-Accent', '#e8890c'),
+    field: colour('--c-BgFieldAlt', '#f3f3f5'),
+    control: colour('--c-BorderControl', '#c9c9ce'),
   };
   const out = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${x0} ${y0} ${width} ${height}" font-family="${esc(FONT)}">`);
@@ -49,18 +88,23 @@ export function mapSvg(map, store, { title = true } = {}) {
 
   for (const zone of map.zones) {
     const tone = colour(`--c-${zone.tone}`);
-    out.push(`<g transform="translate(${zone.x} ${zone.y})">`);
-    out.push(`<rect width="${zone.w}" height="${zone.h}" rx="16" fill="${colour(`--t-${zone.tone}-zone`, 'none')}" stroke="${colour(`--t-${zone.tone}-border`, tone)}"/>`);
-    const head = zoneHead(zone);
-    out.push(`<rect x="12" y="10" width="${head.width}" height="24" rx="7" fill="${c.card}" stroke="${c.edge}"/>`);
-    out.push(`<circle cx="25" cy="22" r="3.5" fill="${tone}"/>`);
-    out.push(`<text x="34" y="26" font-size="12" font-weight="600" fill="${c.label}">${esc(head.name)}</text>`);
-    if (head.sub) out.push(`<text x="${34 + head.nameWidth + 10}" y="26" font-size="11" font-family="${esc(MONO)}" fill="${c.second}">${esc(head.sub)}</text>`);
-    out.push('</g>');
+    out.push(`<rect x="${zone.x}" y="${zone.y}" width="${zone.w}" height="${zone.h}" rx="16" fill="${colour(`--t-${zone.tone}-zone`, 'none')}" stroke="${colour(`--t-${zone.tone}-border`, tone)}"/>`);
   }
+  // le testate delle zone vanno sopra ai cavi (vedi sotto), come sullo schermo
+  const heads = map.zones.map((zone) => {
+    const tone = colour(`--c-${zone.tone}`);
+    const head = zoneHead(zone);
+    return `<g transform="translate(${zone.x} ${zone.y})">`
+      + `<rect x="12" y="10" width="${head.width}" height="24" rx="7" fill="${c.card}" stroke="${c.edge}"/>`
+      + `<circle cx="25" cy="22" r="3.5" fill="${tone}"/>`
+      + `<text x="34" y="26" font-size="12" font-weight="600" fill="${c.label}">${esc(head.name)}</text>`
+      + (head.sub ? `<text x="${34 + head.nameWidth + 10}" y="26" font-size="11" font-family="${esc(MONO)}" fill="${c.second}">${esc(head.sub)}</text>` : '')
+      + '</g>';
+  });
 
   // prima tutte le linee, poi tutte le etichette: nessun cavo passa sopra a una scritta
-  const layout = linkLayout(map);
+  const layout = linkLayout(map, false, (node) => store.stateOf(node));
+  const ports = usedPorts(layout);
   const chips = [];
   const chip = (label, spot, height, colourText) => {
     if (!label || !spot) return;
@@ -71,32 +115,24 @@ export function mapSvg(map, store, { title = true } = {}) {
     chips.push(`<g transform="translate(${left.toFixed(1)} ${top.toFixed(1)})">${leader}<rect width="${w}" height="${height}" rx="${height > 17 ? 6 : 5}" fill="${c.card}" stroke="${c.edge}"/>`
       + `<text x="6" y="${height > 17 ? 12.5 : 11.5}" font-size="10.5" font-family="${esc(MONO)}" fill="${colourText}">${esc(label)}</text></g>`);
   };
-  for (const { link, a, b, path, pa, pb, mid, spots } of layout) {
-    if (!path) continue;
-    const down = store.stateOf(a) === 'down' || store.stateOf(b) === 'down';
-    const stroke = down ? c.red : { fiber: colour('--c-Teal'), wifi: colour('--c-Purple'), vpn: colour('--c-Blue'), wan: colour('--c-Blue') }[link.kind] ?? c.third;
-    const dash = down ? ' stroke-dasharray="6 4"' : { wifi: ' stroke-dasharray="5 5"', vpn: ' stroke-dasharray="1 5"' }[link.kind] ?? '';
-    out.push(`<line x1="${path.p.x.toFixed(1)}" y1="${path.p.y.toFixed(1)}" x2="${path.q.x.toFixed(1)}" y2="${path.q.y.toFixed(1)}" stroke="${stroke}" stroke-width="${strokeOf(link)}" stroke-linecap="round"${dash}/>`);
+  for (const { link, points, wire, pa, pb, mid, spots } of layout) {
+    if (!points) continue;
+    const stroke = wire.style === 'trunk' ? c.second : wire.tone ? colour(`--c-${wire.tone}`) : c.third;
+    const dash = DASH[wire.style] ? ` stroke-dasharray="${DASH[wire.style]}"` : '';
+    const d = points.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+    const width = strokeOf(link) + (wire.style === 'trunk' ? 0.6 : 0);
+    out.push(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${width.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"${dash}${wire.style === 'down' ? ' opacity="0.85"' : ''}/>`);
     chip(mid, spots?.mid, 18, c.second);
     chip(pa, spots?.a, 16, c.third);
     chip(pb, spots?.b, 16, c.third);
   }
-  out.push(...chips);
+  out.push(...heads, ...chips);
 
   for (const node of map.nodes) {
     const kind = KIND[node.kind] ?? KIND.other;
-    const tone = colour(`--c-${kind.tone}`);
     const state = store.stateOf(node);
-    const down = state === 'down';
     out.push(`<g transform="translate(${node.x} ${node.y})">`);
-    out.push(`<rect width="${NODE_W}" height="${NODE_H}" rx="12" fill="${c.card}" stroke="${down ? c.redBorder : c.edge}"/>`);
-    out.push(`<rect x="8" y="8" width="36" height="36" rx="9" fill="${colour(`--t-${kind.tone}-soft`, '#eeeeee')}"/>`);
-    out.push(`<path transform="translate(14 14)" d="${kindIcons[node.kind] ?? kindIcons.other}" fill="none" stroke="${tone}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`);
-    const sub = subtitleOf(node);
-    const single = !sub.mono && sub.text === (node.name || kind.label);
-    out.push(`<text x="54" y="${single ? 31 : 23}" font-size="12.5" font-weight="600" fill="${c.label}">${esc(fit(node.name || kind.label, NAME_FONT, NODE_W - 66))}</text>`);
-    if (!single) out.push(`<text x="54" y="39" font-size="11"${sub.mono ? ` font-family="${esc(MONO)}"` : ''} fill="${down ? c.red : c.second}">${esc(fit(sub.text, sub.mono ? SUB_FONT : SUB_TEXT_FONT, NODE_W - 66))}</text>`);
-    if (state !== 'none') out.push(`<circle cx="43" cy="9" r="4.5" fill="${colour(STATE_COLOUR[state] ?? STATE_COLOUR.unknown)}" stroke="${c.card}" stroke-width="2"/>`);
+    out.push(cardMarkup(node, state, store.hostOf(node), ports.get(node.id) ?? null, exportPaint(c, kind, state)));
     out.push('</g>');
   }
   out.push('</svg>');

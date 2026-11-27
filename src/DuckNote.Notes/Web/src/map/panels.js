@@ -3,7 +3,7 @@
 
 import { h, icon, fill, shortcut } from '../common/dom.js';
 import { ui as uiIcons, kinds as kindIcons } from '../common/icons.js';
-import { KINDS, NODE_W, NODE_H, hostKey, kindFromScan, nameFromScan } from './model.js';
+import { KINDS, CARD_W, CARD_H, TAB_H, hostKey, kindFromScan, nameFromScan } from './model.js';
 import { segments } from '../common/segments.js';
 
 // ------------------------------------------------------------------ pulsanti
@@ -40,7 +40,7 @@ export function dragOut(event, { label, kind, canvas, onClick, onDrop }) {
       document.body.append(ghost);
       document.body.classList.add('dm-dragging-out');
     }
-    ghost.style.transform = `translate(${e.clientX - NODE_W / 2}px, ${e.clientY - NODE_H / 2}px)`;
+    ghost.style.transform = `translate(${e.clientX - CARD_W / 2}px, ${e.clientY - CARD_H / 2 + TAB_H - 1}px)`;
     canvas.classList.toggle('drop', over(e));
   };
   const up = (e) => {

@@ -95,13 +95,23 @@ public sealed class MapPage : UserControl, IDuckPage
 
         if (_ready)
         {
+            // la vista nativa compare di colpo: la pagina entra da se' (dissolvenza breve)
+            Call("dm.shown(true)");
             PushHosts();
             GiveKeyboard();
             Call("dm.focus()");
         }
     }
 
-    public void OnHidden() => _front = false;
+    public void OnHidden()
+    {
+        _front = false;
+
+        if (_ready)
+        {
+            Call("dm.hidden()");
+        }
+    }
 
     private static string PageHtml()
     {
@@ -281,6 +291,8 @@ public sealed class MapPage : UserControl, IDuckPage
             case "ready":
                 _ready = true;
                 PushTheme();
+                // la pagina sa se si vede: l'onda dell'apertura aspetta che si veda
+                Call(_front ? "dm.shown(false)" : "dm.hidden()");
                 Load(focus: _front);
                 break;
 

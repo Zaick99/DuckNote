@@ -12,6 +12,9 @@ mkdirSync(out, { recursive: true });
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1200, height: 780 } });
+// le prove misurano e trascinano subito dopo aver aperto: le entrate animate diventano istantanee
+// ("riduci movimento"); le prove delle animazioni le riaccendono
+await page.emulateMedia({ reducedMotion: 'reduce' });
 const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.setContent(pageHtml());
@@ -34,7 +37,7 @@ const messages = () => page.evaluate(() => dm.outbox());
 const frame = () => page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 const reset = async (doc = null, options = {}) => {
-  await page.evaluate(([d, o]) => dm.load(d, o), [doc, options]);
+  await page.evaluate(([d, o]) => dm.load(d, o), [doc, { mode: 'edit', ...options }]);
   await page.evaluate(() => dm.outbox());
   await page.mouse.move(5, 5);
 };
@@ -309,7 +312,7 @@ await check('il nome si scrive nella scheda e si vede sulla mappa', async () => 
   const node = (await map()).nodes.find((n) => n.id === 'nrouter');
   assert(node.name === 'Router principale con spazi', node.name);
   await frame();
-  const shown = await page.textContent('[data-id="nrouter"] .dm-node-name');
+  const shown = await page.textContent('[data-id="nrouter"] .dm-node-tabname');
   assert(shown.startsWith('Router princip'), shown);
 });
 
@@ -355,7 +358,7 @@ await check('le etichette di porte e VLAN non si coprono e restano visibili', as
   nodes.push({ id: 'nnas', kind: 'nas', name: 'NAS', x: 400, y: -40 });
   links.push({ id: 'lagg1', a: 'nsw', b: 'nnas', pa: 'Gi1/0/23', pb: 'LAN1', speed: '10G', vlan: '20' });
   links.push({ id: 'lagg2', a: 'nsw', b: 'nnas', pa: 'Gi1/0/24', pb: 'LAN2', speed: '10G', vlan: '20' });
-  nodes.push({ id: 'nap', kind: 'ap', name: 'AP', x: 0, y: -90 });
+  nodes.push({ id: 'nap', kind: 'ap', name: 'AP', x: 0, y: -130 });
   links.push({ id: 'lshort', a: 'nsw', b: 'nap', pa: 'Gi1/0/9', pb: 'PoE', vlan: '10,20,30' });
   await reset({ v: 1, current: 'mlab', maps: [{ id: 'mlab', name: 'Etichette', nodes, links, zones: [], view: { x: 640, y: 240, k: 1 } }] });
   await frame();
@@ -364,10 +367,14 @@ await check('le etichette di porte e VLAN non si coprono e restano visibili', as
     const r = el.querySelector('rect').getBoundingClientRect();
     return { id: el.closest('[data-id]').dataset.id, cls: el.getAttribute('class'), shown: getComputedStyle(el).display !== 'none', x: r.x, y: r.y, w: r.width, h: r.height };
   }));
-  const expected = links.length * 3;
+  // i nove cavi che escono da sopra o da sotto si attaccano alla loro porta, che si accende sul
+  // pannello: li' il nome della porta non serve. I due verso il NAS escono di lato e lo tengono.
+  const expected = links.length * 3 - 9;
   const shown = boxes.filter((b) => b.shown);
   assert(shown.length === expected, `etichette visibili ${shown.length} su ${expected}`);
-  const cards = await page.$$eval('.dm-node-card', (els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
+  const lit = await page.$$eval('[data-id="nsw"] .dm-jack.used', (els) => els.map((el) => Number(el.dataset.port)).sort((x, y) => x - y));
+  assert(lit.join(',') === '1,2,3,4,5,6,7,8,9,23,24', `porte accese: ${lit}`);
+  const cards = await page.$$eval('.dm-node-card, .dm-node-tab', (els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
   const hit = (a, b) => a.x < b.x + b.w - 0.5 && a.x + a.w > b.x + 0.5 && a.y < b.y + b.h - 0.5 && a.y + a.h > b.y + 0.5;
   const clashes = [];
   for (let i = 0; i < shown.length; i++) {
@@ -384,7 +391,9 @@ await check('togliere un dato dalla scheda lo toglie anche dalla mappa', async (
   await reset({ ...two, maps: [{ ...two.maps[0], nodes: far, links: [{ id: 'lone', a: 'nrouter', b: 'nswitch', speed: '1G', vlan: '10', pa: 'eth1', pb: 'Gi0/1' }],
     zones: [{ id: 'zlan', name: 'LAN', cidr: '10.0.0.0/24', vlan: '10', x: -40, y: -60, w: 300, h: 460 }] }] });
   await frame();
-  assert(await visible('[data-id="lone"] .dm-link-chip') && await visible('[data-id="lone"] .dm-port-a') && await visible('[data-id="lone"] .dm-port-b'), 'etichette mancanti all inizio');
+  // Gi0/1 e' la porta 1 dello switch: il cavo ci si attacca e la accende, senza etichetta
+  assert(await visible('[data-id="lone"] .dm-link-chip') && await visible('[data-id="lone"] .dm-port-a') && !(await visible('[data-id="lone"] .dm-port-b')), 'etichette mancanti all inizio');
+  assert(await page.isVisible('[data-id="nswitch"] .dm-jack.used[data-port="1"]'), 'la porta 1 non si e\' accesa');
 
   await page.click('[data-id="lone"] .dm-link-hit', { force: true });
   await page.selectOption('.dm-inspector select', '');
@@ -395,6 +404,7 @@ await check('togliere un dato dalla scheda lo toglie anche dalla mappa', async (
   await page.fill('.dm-inspector [data-field="pb"]', '');
   await frame();
   for (const part of ['.dm-link-chip', '.dm-port-a', '.dm-port-b']) assert(!(await visible(`[data-id="lone"] ${part}`)), `${part} ancora visibile`);
+  assert((await page.$$('[data-id="nswitch"] .dm-jack.used')).length === 0, 'la porta 1 e\' rimasta accesa');
 
   // la zona: senza rete e senza VLAN resta solo il nome
   await page.evaluate(() => dm.store.select(['zlan']));
@@ -464,13 +474,104 @@ await check('dm.reveal trova un apparato anche in un altra mappa', async () => {
 
 await check('sola lettura: niente si modifica', async () => {
   await reset(two, { readonly: true });
-  await page.click('.dm-kinds .dm-kind-tile:has-text("PC")');
+  assert(!(await page.isVisible('.dm-library')), 'la libreria si vede');
+  assert(await page.isDisabled('.dm-edit-toggle'), 'Modifica mappa si puo\' premere');
   await page.click('[data-id="nswitch"] .dm-node-card');
   await page.keyboard.press('Delete');
+  await page.keyboard.press('e');
   const m = await map();
   assert(m.nodes.length === 2, 'modificata in sola lettura');
   assert(await page.isDisabled('.dm-inspector [data-field="name"]'), 'il campo del nome non e\' bloccato');
   assert(await page.isVisible('.dm-chip:has-text("Sola lettura")'), 'manca l avviso');
+  assert(!(await page.isVisible('.dm-toolbar .dm-segment')) && !(await page.isVisible('.dm-tool:has-text("Zona")')), 'gli strumenti si vedono');
+});
+
+await check('la mappa si apre da guardare e Modifica mappa apre gli strumenti', async () => {
+  await reset(two, { mode: undefined });
+  assert(await page.evaluate(() => document.querySelector('.dm-app').classList.contains('viewing')), 'non e\' in vista');
+  assert(!(await page.isVisible('.dm-library')) && !(await page.isVisible('.dm-tool:has-text("Zona")')), 'libreria o strumenti in vista');
+  assert((await page.textContent('.dm-edit-toggle')).includes('Modifica mappa'), 'manca Modifica mappa');
+  // in vista trascinare un apparato sposta la visuale, non l'apparato
+  const before = (await map()).nodes.find((n) => n.id === 'nswitch');
+  const view = await page.evaluate(() => ({ ...dm.scene.view }));
+  await drag(await center('[data-id="nswitch"] .dm-node-card'), { x: 480, y: 520 });
+  const after = (await map()).nodes.find((n) => n.id === 'nswitch');
+  const moved = await page.evaluate(() => ({ ...dm.scene.view }));
+  assert(after.x === before.x && after.y === before.y, 'l apparato si e\' spostato in vista');
+  assert(Math.abs(moved.x - view.x) > 20, 'la vista non si e\' spostata');
+  // la scheda in vista: si legge, non si scrive; il Promemoria resta
+  assert(await page.isVisible('.dm-inspector') && await page.isDisabled('.dm-inspector [data-field="name"]'), 'la scheda non e\' in sola lettura');
+  assert(await page.isEnabled('.dm-inspector .dm-button:has-text("Promemoria")'), 'il Promemoria e\' spento');
+  assert(!(await page.isVisible('.dm-inspector .dm-button:has-text("Elimina")')), 'Elimina in vista');
+
+  await page.click('.dm-edit-toggle');
+  assert(await page.isVisible('.dm-library') && await page.isVisible('.dm-tool:has-text("Zona")'), 'Modifica non apre libreria e strumenti');
+  assert((await page.textContent('.dm-edit-toggle')).includes('Fine'), 'manca Fine');
+  assert(await page.isEnabled('.dm-inspector [data-field="name"]'), 'la scheda resta bloccata');
+  const box = await center('[data-id="nswitch"] .dm-node-card');
+  await drag(box, { x: box.x + 96, y: box.y });
+  assert((await map()).nodes.find((n) => n.id === 'nswitch').x !== before.x, 'in modifica l apparato non si sposta');
+
+  // E torna a guardare
+  await page.click('.dm-canvas', { position: { x: 300, y: 640 } });
+  await page.keyboard.press('e');
+  assert(await page.evaluate(() => document.querySelector('.dm-app').classList.contains('viewing')), 'E non torna alla vista');
+});
+
+await check('una mappa vuota si apre gia\' in modifica', async () => {
+  await reset(null, { mode: undefined });
+  assert(!(await page.evaluate(() => document.querySelector('.dm-app').classList.contains('viewing'))), 'vuota ma in vista');
+  assert(await page.isVisible('.dm-library') && await page.isVisible('.dm-empty'), 'manca l invito');
+});
+
+await check('Reti e Legenda raccontano la mappa e accendono una VLAN', async () => {
+  const doc = {
+    v: 1,
+    current: 'mnet',
+    maps: [{
+      id: 'mnet',
+      name: 'Reti',
+      nodes: [
+        { id: 'ncore', kind: 'switch', name: 'core', host: '10.0.0.2', x: 0, y: 0, ports: 8 },
+        { id: 'npc1', kind: 'pc', name: 'pc1', host: '10.0.10.21', x: -240, y: 240 },
+        { id: 'nprn', kind: 'printer', name: 'stampante', host: '10.0.10.20', x: 0, y: 240 },
+        { id: 'nnas', kind: 'nas', name: 'nas', x: 240, y: 240 },
+      ],
+      links: [
+        { id: 'lpc1', a: 'ncore', b: 'npc1', pa: 'Gi0/1', vlan: '10' },
+        { id: 'lprn', a: 'ncore', b: 'nprn', pa: 'Gi0/2', vlan: '10' },
+        { id: 'lnas', a: 'ncore', b: 'nnas', pa: 'Gi0/3', vlan: '30,40' },
+      ],
+      zones: [
+        { id: 'zoff', name: 'Uffici', cidr: '10.0.10.0/24', vlan: '10', tone: 'Green', x: -280, y: 200, w: 480, h: 160 },
+        { id: 'zrack', name: 'Rack', x: 200, y: 200, w: 300, h: 160 },
+      ],
+      view: { x: 600, y: 200, k: 1 },
+    }],
+  };
+  const hosts = [
+    { key: '10.0.0.2', ip: '10.0.0.2', state: 'up' },
+    { key: '10.0.10.21', ip: '10.0.10.21', state: 'up' },
+    { key: '10.0.10.20', ip: '10.0.10.20', state: 'down' },
+  ];
+  await reset(doc, { mode: 'view', hosts });
+  await frame();
+  const nets = await page.$$eval('.dm-net', (els) => els.map((el) => el.textContent));
+  // la zona Uffici con la sua VLAN e la rete, poi le VLAN 30 e 40 del trunk, che non hanno zona; il Rack non e' una rete
+  assert(nets.length === 3 && nets[0].includes('VLAN 10') && nets[0].includes('Uffici') && nets[0].includes('10.0.10.0/24')
+    && nets[1].includes('VLAN 30') && nets[2].includes('VLAN 40'), JSON.stringify(nets));
+  const legend = await page.$$eval('.dm-legend-row', (els) => els.map((el) => el.querySelector('svg').getAttribute('class')));
+  // pc1 risponde (VLAN 10: una VLAN), la stampante e' giu' (spento), il NAS ha due VLAN (trunk)
+  assert(legend.join(' ') === 'dm-legend-sample w-down dm-legend-sample w-access dm-legend-sample w-trunk', legend.join(' '));
+  await page.click('.dm-net:has-text("Uffici")');
+  assert((await page.evaluate(() => dm.scene.filter.vlan)) === 10 && (await page.textContent('.dm-toolbar .dm-tool:has-text("VLAN")')).includes('VLAN 10'), 'la VLAN non si accende');
+  await frame();
+  assert(await page.evaluate(() => document.querySelector('[data-id="lnas"]').classList.contains('dim')), 'il trunk senza VLAN 10 resta acceso');
+  await page.click('.dm-net:has-text("Uffici")');
+  assert((await page.evaluate(() => dm.scene.filter.vlan)) === null, 'la VLAN non si spegne');
+  // in modifica i riquadri lasciano il posto alla libreria e agli strumenti
+  await page.click('.dm-edit-toggle');
+  assert(!(await page.isVisible('.dm-overview')), 'i riquadri restano in modifica');
 });
 
 await check('i tasti della finestra arrivano alla finestra', async () => {
@@ -522,6 +623,46 @@ await check('dm.clear dimentica tutto', async () => {
   const doc = JSON.parse(await page.evaluate(() => dm.doc()));
   assert(doc.maps.length === 1 && doc.maps[0].nodes.length === 0, JSON.stringify(doc));
   assert((await page.$$('.dm-node')).length === 0 && (await page.$$('.dm-host')).length === 0, 'resta qualcosa sullo schermo');
+});
+
+await check('la mappa arriva a onda e la pagina rientra in fretta', async () => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  try {
+    await page.evaluate(() => dm.shown(false));
+    await reset({ ...two, maps: [{ ...two.maps[0], links: [{ id: 'lone', a: 'nrouter', b: 'nswitch', pa: 'eth1', pb: 'Gi0/1' }] }] }, { mode: 'view' });
+    // subito dopo l'apertura gli apparati stanno ancora arrivando, il cavo dietro di loro
+    const early = await page.evaluate(() => ({
+      router: Number(document.querySelector('[data-id="nrouter"] .dm-node-body').style.opacity || 1),
+      cable: Number(document.querySelector('.dm-links [data-id="lone"]').style.opacity || 1),
+    }));
+    assert(early.router < 1 && early.cable < 1, `niente onda: ${JSON.stringify(early)}`);
+    await page.waitForTimeout(1100);
+    const late = await page.evaluate(() => ({
+      body: document.querySelector('[data-id="nswitch"] .dm-node-body').getAttribute('transform'),
+      opacity: document.querySelector('[data-id="nswitch"] .dm-node-body').style.opacity,
+      cable: document.querySelector('.dm-links [data-id="lone"]').style.opacity,
+    }));
+    assert(late.body === null && late.opacity === '' && late.cable === '', `l onda non finisce: ${JSON.stringify(late)}`);
+
+    // nascosta dalla finestra: il contenuto si spegne; aperta un'altra nota intanto, l'onda aspetta
+    await page.evaluate(() => dm.hidden());
+    assert(await page.evaluate(() => document.querySelector('.dm-app').classList.contains('dm-away')), 'nascosta ma accesa');
+    await page.evaluate((d) => dm.load(d, { mode: 'view' }), two);
+    await page.waitForTimeout(150);
+    assert(!(await page.evaluate(() => document.querySelector('[data-id="nrouter"] .dm-node-body').style.opacity)), 'l onda e\' partita a pagina nascosta');
+    await page.evaluate(() => dm.shown(true));
+    const back = await page.evaluate(() => ({
+      arrive: document.querySelector('.dm-app').classList.contains('dm-arrive'),
+      away: document.querySelector('.dm-app').classList.contains('dm-away'),
+      wave: Number(document.querySelector('[data-id="nrouter"] .dm-node-body').style.opacity || 1) < 1,
+    }));
+    assert(back.arrive && !back.away && back.wave, JSON.stringify(back));
+    await page.waitForTimeout(1100);
+    assert(!(await page.evaluate(() => document.querySelector('.dm-app').classList.contains('dm-arrive'))), 'la dissolvenza resta');
+  } finally {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.evaluate(() => dm.shown(false));
+  }
 });
 
 assert(errors.length === 0, `errori nella pagina: ${errors.join(' | ')}`);

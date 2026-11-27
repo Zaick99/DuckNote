@@ -50,6 +50,8 @@ export class Store {
     this.listeners = new Set();
     this.histories = new Map();
     this.revision = 0;
+    // cambia a ogni stato nuovo degli host: i cavi giu' diventano rossi, le linguette dicono UP o DOWN
+    this.hostsRevision = 0;
   }
 
   get map() {
@@ -90,6 +92,7 @@ export class Store {
     this.hosts = [];
     this.groups = [];
     this.states.clear();
+    this.hostsRevision++;
     this.emit('doc');
   }
 
@@ -430,6 +433,7 @@ export class Store {
         if (key && !this.states.has(key)) this.states.set(key, host);
       }
     }
+    this.hostsRevision++;
     this.emit('hosts');
   }
 

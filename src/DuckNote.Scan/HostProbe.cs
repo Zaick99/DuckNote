@@ -77,17 +77,13 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
 
         if (ping.Online)
         {
-            result.Status = HostStatus.Online;
-            result.AverageMs = ping.AverageMs;
-            result.RoundTrip = ping.Describe();
-            result.Loss = $"{ping.LossPercent}%";
-
-            if (ping.Ttl > 0)
-            {
-                result.Ttl = ping.Ttl.ToString();
-                result.OperatingSystem = TtlFingerprint.GuessOperatingSystem(ping.Ttl);
-                result.Hops = TtlFingerprint.CountHops(ping.Ttl).ToString();
-            }
+            Reached(ping, result);
+        }
+        else if (ping.Inconclusive)
+        {
+            // il ping non e' partito da qui: l'host resta da verificare, non spento
+            result.Status = HostStatus.Error;
+            result.Error = "Il ping non e' partito da questo computer: riprova fra poco.";
         }
 
         // Il MAC e' un dettaglio: se la tabella ARP non si lascia leggere, quel che ha detto il
@@ -111,6 +107,63 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
                 result.Status = HostStatus.IcmpFiltered;
             }
         }
+    }
+
+    private static void Reached(PingOutcome ping, HostScanResult result)
+    {
+        result.Status = HostStatus.Online;
+        result.AverageMs = ping.AverageMs;
+        result.RoundTrip = ping.Describe();
+        result.Loss = $"{ping.LossPercent}%";
+
+        if (ping.Ttl > 0)
+        {
+            result.Ttl = ping.Ttl.ToString();
+            result.OperatingSystem = TtlFingerprint.GuessOperatingSystem(ping.Ttl);
+            result.Hops = TtlFingerprint.CountHops(ping.Ttl).ToString();
+        }
+    }
+
+    /// <summary>
+    /// Un host che era acceso e non ha risposto: prima di dirlo spento lo si richiama con calma.
+    /// Ping uno dopo l'altro con piu' pazienza; poi, se ne aveva, le porte che erano aperte (un
+    /// host che risponde su una porta e' acceso anche se il ping si e' perso). Torna Online se ha
+    /// risposto al ping, IcmpFiltered se solo da una porta, Error se dal computer non e' partito
+    /// niente, altrimenti Unreachable.
+    /// </summary>
+    public static async Task<HostScanResult> ConfirmAsync(
+        string target, string address, IReadOnlyList<int> knownPorts, TimeSpan patience, CancellationToken cancellationToken = default)
+    {
+        HostScanResult result = new() { Address = address, Input = target, Status = HostStatus.Unreachable };
+
+        PingOutcome ping = await PingProbe.SendAsync(address, 2, patience, cancellationToken).ConfigureAwait(false);
+
+        if (ping.Online)
+        {
+            Reached(ping, result);
+            return result;
+        }
+
+        if (knownPorts.Count > 0)
+        {
+            IReadOnlyList<int> open = await PortProbe
+                .ScanAsync(address, [.. knownPorts.Take(3)], patience, null, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (open.Count > 0)
+            {
+                result.Status = HostStatus.IcmpFiltered;
+                return result;
+            }
+        }
+
+        if (ping.Inconclusive)
+        {
+            result.Status = HostStatus.Error;
+            result.Error = "Il ping non e' partito da questo computer: riprova fra poco.";
+        }
+
+        return result;
     }
 
     private async Task<HashSet<int>> ScanPortsAsync(

@@ -52,6 +52,34 @@ document.body.innerHTML = `
   </div>
   <div class="dn-overlay"></div>`;
 
+// Sul Mac la vista nativa compare di colpo: nascosta dalla finestra la pagina si spegne, e quando
+// torna entra in fretta (dissolvenza e 6 pixel di salita). Se la si usa senza che la finestra
+// l'abbia detto (un clic, un tasto), si riaccende comunque.
+const still = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wakeEvents = ['pointerdown', 'keydown', 'focusin'];
+
+function wake() {
+  document.documentElement.classList.remove('dn-away');
+  for (const name of wakeEvents) window.removeEventListener(name, wake, true);
+}
+
+function pageAway() {
+  const root = document.documentElement;
+  root.classList.remove('dn-arrive');
+  root.classList.add('dn-away');
+  for (const name of wakeEvents) window.addEventListener(name, wake, true);
+}
+
+function pageArrive(fade) {
+  const root = document.documentElement;
+  wake();
+  if (!fade || still()) return;
+  root.classList.remove('dn-arrive');
+  void root.offsetWidth;
+  root.classList.add('dn-arrive');
+  setTimeout(() => root.classList.remove('dn-arrive'), 320);
+}
+
 const titleBox = document.querySelector('.dn-title');
 const metaLine = document.querySelector('.dn-meta');
 const emptyHint = document.querySelector('.dn-empty');
@@ -455,6 +483,18 @@ window.dn = {
   },
 
   focus() { view?.focus(); },
+
+  /** La pagina torna in primo piano; fade: entra con una dissolvenza breve. */
+  shown(fade = false) {
+    pageArrive(fade);
+    return true;
+  },
+
+  /** La finestra nasconde la pagina (un'altra pagina in primo piano). */
+  hidden() {
+    pageAway();
+    return true;
+  },
 
   // un titolo dell'indice: la pagina scorre fin li', con un po' d'aria sopra
   heading(index) {

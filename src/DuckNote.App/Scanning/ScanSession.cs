@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using DuckNote.App.Ui;
 using DuckNote.Notes.Settings;
 using DuckNote.Scan;
@@ -28,6 +29,14 @@ public sealed class ScanSession : Observable
     private CancellationTokenSource? _stop;
     private int _done;
     private int _total;
+
+    /// <summary>
+    /// Gli host accesi che in questo giro non hanno risposto: restano com'erano finche' un
+    /// secondo controllo, con calma, non dice che sono davvero spenti (vedi <see cref="Confirm"/>).
+    /// </summary>
+    private readonly List<Doubt> _doubts = [];
+
+    private sealed record Doubt(string Target, HostRow Row, HostScanResult First);
 
     public ObservableCollection<HostRow> Rows { get; } = [];
 
@@ -315,10 +324,12 @@ public sealed class ScanSession : Observable
         {
             // prima il ping di chi si conosce gia', poi l'analisi completa dei nuovi e di chi e'
             // appena tornato acceso
+            _doubts.Clear();
             List<string> wokeUp = await Pass(light, Ping(options), detailed: false);
             full.AddRange(wokeUp.Where(host => !full.Contains(host, StringComparer.OrdinalIgnoreCase)));
             _total = light.Count + full.Count;
             await Pass(full, options, detailed: true);
+            await Confirm(options);
 
             // attivi fra quelli di questo giro: con keep la tabella ne ha anche altri
             int up = queue.Count(host => Find(host) is { IsUp: true });
@@ -326,6 +337,8 @@ public sealed class ScanSession : Observable
         }
         catch (OperationCanceledException)
         {
+            // fermata a meta': chi era in dubbio resta com'era (acceso), nessuno e' spento per caso
+            _doubts.Clear();
             Say(string.Create(CultureInfo.CurrentCulture, $"Fermata. {UpCount} host trovati in {clock.Elapsed.TotalSeconds:F1} s."));
         }
         catch (Exception problem) when (problem is not OutOfMemoryException)
@@ -374,22 +387,30 @@ public sealed class ScanSession : Observable
     private void Take(HostScanResult result, bool detailed, List<string> wokeUp)
     {
         _done++;
+        string target = result.Input.Length > 0 ? result.Input : result.Address;
+        HostRow? known = (result.Input.Length > 0 ? Find(result.Input) : null) ?? Find(result.Address);
 
-        if (detailed)
+        if (known is { IsUp: true } && !result.IsAlive)
+        {
+            // era acceso e stavolta non ha risposto: un ping perso sotto il carico dell'analisi
+            // non basta per dirlo spento. Resta com'era, coi suoi dettagli, fino alla verifica.
+            _doubts.Add(new Doubt(target, known, result));
+        }
+        else if (detailed)
         {
             Absorb(result);
-            _full.Add(result.Input.Length > 0 ? result.Input : result.Address);
+            _full.Add(target);
             _full.Add(result.Address);
         }
-        else if (((result.Input.Length > 0 ? Find(result.Input) : null) ?? Find(result.Address)) is { } row)
+        else if (known is not null)
         {
-            bool wasUp = row.IsUp;
-            row.Refresh(result);
+            bool wasUp = known.IsUp;
+            known.Refresh(result);
             RaiseAll();
 
-            if (!wasUp && row.IsUp)
+            if (!wasUp && known.IsUp)
             {
-                wokeUp.Add(result.Input.Length > 0 ? result.Input : result.Address);
+                wokeUp.Add(target);
             }
         }
         else
@@ -407,6 +428,80 @@ public sealed class ScanSession : Observable
     }
 
     private readonly Stopwatch _progress = Stopwatch.StartNew();
+
+    /// <summary>
+    /// La verifica degli host accesi che non hanno risposto, a giro finito e con la rete calma:
+    /// pochi alla volta, ping con piu' pazienza e le porte che avevano aperte. Spento solo chi
+    /// non risponde neanche cosi'; chi risponde resta acceso coi suoi dettagli.
+    /// </summary>
+    private async Task Confirm(ScanOptions options)
+    {
+        if (_doubts.Count == 0 || _stop is null)
+        {
+            return;
+        }
+
+        List<Doubt> doubts = [.. _doubts];
+        _doubts.Clear();
+        Say(string.Create(CultureInfo.CurrentCulture, $"Ricontrollo {doubts.Count} host che non hanno risposto..."));
+
+        TimeSpan patience = TimeSpan.FromMilliseconds(Math.Clamp(options.PingTimeout.TotalMilliseconds * 1.5, 1000, 4000));
+        CancellationToken token = _stop.Token;
+        using SemaphoreSlim calm = new(16);
+
+        HostScanResult[] seconds = await Task.WhenAll(doubts.Select(async doubt =>
+        {
+            await calm.WaitAsync(token).ConfigureAwait(false);
+
+            try
+            {
+                return await HostProbe.ConfirmAsync(doubt.Target, doubt.First.Address, KnownPorts(doubt.Row), patience, token).ConfigureAwait(false);
+            }
+            finally
+            {
+                calm.Release();
+            }
+        }));
+
+        void Settle()
+        {
+            for (int i = 0; i < doubts.Count; i++)
+            {
+                HostRow row = doubts[i].Row;
+                HostScanResult second = seconds[i];
+
+                // la riga puo' essere uscita intanto (messa da parte, nota cambiata)
+                if (!Rows.Contains(row))
+                {
+                    continue;
+                }
+
+                // ha risposto al ping: tempi nuovi; solo da una porta: resta com'era
+                if (second.Status == HostStatus.Online || !second.IsAlive)
+                {
+                    row.Refresh(second);
+                }
+            }
+
+            RaiseAll();
+        }
+
+        if (UiThread.Elsewhere())
+        {
+            await UiThread.Run(Settle);
+        }
+        else
+        {
+            Settle();
+        }
+    }
+
+    /// <summary>Le porte che l'host aveva aperte, per la verifica (al massimo tre).</summary>
+    private static IReadOnlyList<int> KnownPorts(HostRow row) =>
+        [.. Regex.Matches(row.OpenPorts, @"\d+")
+            .Select(match => int.TryParse(match.Value, NumberStyles.None, CultureInfo.InvariantCulture, out int port) ? port : 0)
+            .Where(port => port is > 0 and < 65536)
+            .Take(3)];
 
     /// <summary>Le stesse regole, ma solo il ping: niente porte, nomi o sonde.</summary>
     private static ScanOptions Ping(ScanOptions full) => new()

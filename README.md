@@ -13,7 +13,7 @@ For Windows and macOS. One file, nothing to install.
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![macOS](https://img.shields.io/badge/macOS-14%2B-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-271-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-293-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
@@ -30,7 +30,7 @@ For Windows and macOS. One file, nothing to install.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/map-dark.png">
-  <img src="assets/readme/map-light.png" alt="DuckNote with the Mappa page open: an office network drawn from Internet down to access points, printers and cameras, grouped in coloured zones, every device with its state" width="900">
+  <img src="assets/readme/map-light.png" alt="DuckNote with the Mappa page open to look at: an office network drawn from Internet down to access points, printers and cameras, every device a card with its state, cables at right angles coloured by VLAN, and on the left the panels Reti and Legenda" width="900">
 </picture>
 
 </div>
@@ -121,7 +121,17 @@ edge makes it **peek** over the page for as long as you use it, and
 **Movement says what happened.** Buttons press in and spring back, the
 segmented controls slide their pill to the chosen item, pages and cards fade
 in: the same curves on Windows and on the Mac, written out by hand where the
-platform has none of its own.
+platform has none of its own. Every page arrives in a quick fade — the sheet,
+the map and the calendar too, which on the Mac are web pages that fade by
+themselves. The map arrives in a wave, from Internet down to the last device,
+its cables behind them; the calendar day by day; the hosts of **Rete** in a
+cascade, and those a running scan finds slide in one by one. With *Reduce
+motion* on in the system, nothing moves.
+
+**Notifications look like the cards of the map.** A tab says what they are
+about — **Rete**, **Promemoria**, **Calendario**, **Aggiornamento**,
+**Errore** — and when, in the colour of the news; below, a coloured line, the
+icon on its tile, the title, the text and the buttons.
 
 While locked, the whole window is one colour and asks for the password in
 place; only the version and day/night stay on top.
@@ -197,13 +207,14 @@ later), copy it.
 
 | Command | What it does |
 |---|---|
-| `192.168.1.0/24` + **Analizza** | scan a range (CIDR, `from-to`, `.1-254`, comma-separated lists) |
-| **Host della nota** | keep in the list only the hosts of the note (sheets and map), and check them |
+| `192.168.1.0/24` + **Analizza** | scan a range (CIDR, `from-to`, `.1-254`, comma-separated lists); while a scan runs the same button is **Ferma** (stop) |
+| **Controlla la nota** | keep in the list only the hosts of the note (sheets and map), and check them now |
+| **Controlla «gruppo»** | with a group chosen, the same button scans all of it: its networks, ranges and addresses |
+| **Esporta** ▾ | what is shown, into the sheet as a table (**Tabella nella nota**) or to a CSV file that Excel opens as is |
 | **Tutti · Attivi · Spenti · Da controllare** | all, up, down, to check |
-| **Tutti i gruppi** ▾ | which hosts to show: all, those of the note (**Nota**), those of a scan group, or those found by a range scan outside every group (**Ricerca**); groups are created and edited from the same menu |
-| **Analizza «gruppo»** | with a group chosen, the second button scans all of it: its networks, ranges and addresses |
+| **Tutti i gruppi** ▾ | which hosts to show: all, those of the note (**Nota**), those of a scan group, or those found by a range scan outside every group (**Ricerca**); from the same menu **Nuovo gruppo…** and **Modifica un gruppo** ▸ |
+| ✎ | with a group chosen, the pencil next to it edits it |
 | search box | free text, or by field: `ip:` `nome:` `mac:` `porta:` `os:` `tipo:` `produttore:` `gruppo:` `web:` `nota:` `stato:` |
-| export / to the note | what is shown, to CSV (opens in Excel as is) or into the sheet as a table |
 | **Messi da parte** | hosts set aside, one click (or a right-click on the table) to take them back |
 
 Every row starts with a dot — **green online, orange to check, red offline** —
@@ -213,10 +224,27 @@ operating system it looks like, the kind of device, open ports and services,
 HTTP/SSH/FTP/SMTP banners, TLS certificate, SNMP, UPnP, SMB shares, WMI
 inventory.
 
+**The card has the commands of its host.** **Ricontrolla** analyses it again,
+in full. **Apri** ▾ offers what its open ports allow: its web pages (`https`
+first), its shares (in the Finder on the Mac, in Explorer on Windows), a
+terminal with SSH on the Mac, Remote Desktop on Windows. The bell starts a
+**Promemoria** tied to it. **⋯** copies its address, shows it on the map (when
+a device of a map has its address), adds it to a group or takes it out
+(**Gruppi** ▸), and sets it aside. The same commands are in the right-click
+menu of the table.
+
 **The full analysis runs once per start.** After that, the monitor and every
 new check only **ping**: names, MAC, ports and the rest stay as they were found.
 A host that comes back on is analysed in full again. Automatic checks never
 pop up a notification; the ones you start do.
+
+**A host that was up is not called down on one lost ping.** When it does not
+answer, it keeps its state and its details until the end of the scan; then it
+is asked again, calmly, a few at a time — pings with more patience and, if it
+had open ports, a connection to them — and only if it is silent again it turns
+red. Pings go out in steps (the second one 300 ms after the first, not
+together), at most 256 at a time, and a ping that fails on this computer
+(resources over, say) leaves the host **to check**, not down.
 
 ### Scan groups
 
@@ -239,10 +267,14 @@ wrong.
 
 </div>
 
+- **groups are edited in one click**: the pencil next to the chosen group,
+  **Modifica un gruppo** ▸ in the menu for any of them, and from a host —
+  right-click, or **⋯** in its card — **Gruppi** ▸ adds it to a group, takes
+  it out of one that lists it, or starts **Nuovo gruppo con questo host…**;
 - **Monitora**, group by group: on, the hosts of the group are checked by the
   monitor like those of the note — single addresses at once, the hosts of its
   networks after their first scan; off, the group is scanned only when you
-  press **Analizza**.
+  press **Controlla «gruppo»**.
 - a scan of a range no longer drops the hosts of the groups, and a host found
   by a range scan shows up in its group by itself;
 - the hosts of a monitored group do not get the pencil of the note: the pencil
@@ -261,14 +293,23 @@ vault is on. A note can hold several maps (an office, a home, a lab): the menu
 with the map's name switches between them, and creates, renames, duplicates
 and deletes them.
 
+**A map opens to look at.** Clean, without the library and the tools, with
+two panels on the left: **Reti** — every zone with its VLAN and subnet, and the
+VLANs of cables outside every zone; a click lights up only that VLAN — and
+**Legenda**, with only the kinds of cable the map really uses. **Modifica
+mappa** (or `E`) opens the library, the tools and the editable card; **Fine**
+goes back to looking. An empty map opens ready to draw. In the view a click
+on a device shows its card to read, with **Promemoria**, and dragging moves
+the view.
+
 <div align="center">
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/map-switch-dark.png">
-  <img src="assets/readme/map-switch-light.png" alt="The map at 100%: the core switch selected, its card with address, state, MAC, model, place and the front panel of its 24 ports; cables labelled with ports, speed and VLAN" width="900">
+  <img src="assets/readme/map-switch-light.png" alt="The map being edited, at 100%: the library on the left, the core switch selected with its ports lit by their cables, its card on the right with address, state, MAC, model, place and the panel of its 24 ports; cables at right angles labelled with speed and VLAN" width="900">
 </picture>
 
-*A switch and its card: state, model, place, and the front panel of its ports.*
+*Editing: the library, a switch with its ports lit by their cables, and its card.*
 
 </div>
 
@@ -280,6 +321,14 @@ and deletes them.
 | right | the card of what is selected: a device, a cable, a zone, or several of them |
 | bottom | how many devices, cables and zones, how many devices are down; the zoom |
 
+**Every device is a card.** On its tab, the name and the state — **UP**,
+**DOWN**, **?** to check —; on the card, the icon of its kind, the model, the
+address and what is known now: the response time and the system, *non
+risponde*, the place. Switches, routers and firewalls with their number of
+ports carry their front panel, and every port a cable names lights up in the
+colour of that cable (resting on it says port, device, speed and VLAN).
+Internet is a cloud.
+
 **Every device with an address is checked like an address in a sheet.** Green
 up, red down, grey never checked; a cable to a device that is down turns red
 and dashed. The monitor pings the devices of the map together with the hosts of
@@ -288,22 +337,29 @@ one click checks it now, another opens it in **Rete**, and **Promemoria** starts
 an item of the calendar tied to the device.
 
 **Cables carry what it takes to rebuild the network.** The type — copper,
-fibre, Wi-Fi, VPN, WAN, each drawn its own way — the speed, from 10M to 100G
-(faster cables are drawn thicker), the port at each end (`Gi1/0/12`, `eth0`)
-and the VLANs (`10`, `10,20,30-35`, `trunk`). Two cables between the same two
-devices run side by side, as an aggregate or a spare link does.
+fibre, Wi-Fi, VPN, WAN — the speed, from 10M to 100G (faster cables are drawn
+thicker), the port at each end (`Gi1/0/12`, `eth0`) and the VLANs (`10`,
+`10,20,30-35`, `trunk`). They run **at right angles**, from side to side of
+the cards, around the other cards and without running over each other; a
+cable that names a port of a switch leaves from that port. **Green** when a
+device answers, **red and dashed** when one end is down, **in the colour of its
+VLAN** for an access port (the colour of the zone with that VLAN), **light and
+thicker** for a trunk, dotted for Internet and VPN, dashed for Wi-Fi, teal for
+fibre. Two cables between the same two devices run side by side, as an
+aggregate or a spare link does.
 
-**Labels never cover each other.** Ports sit near the ends of their cable,
-speed and VLAN in the middle. Each label takes the first free place along its
+**Labels never cover each other.** Ports sit near the ends of their cable (on
+a switch, the lit port says it already), speed and VLAN on the longest stretch. Each label takes the first free place along its
 cable, then beside it, keeping clear of devices, zone titles and other labels;
 when it has to stand aside, a dotted thread ties it to its cable. Short cables
 keep their labels too.
 
 **Switches show their front panel.** Give a switch, router or firewall its
-number of ports and the card draws them: a port is taken when a cable names it
-(the number at the end of the name: `Gi1/0/12` is port 12), a click on it
-selects that cable, and the card says how many are free. Fibre uplinks (`Te`,
-`sfp`) are counted apart.
+number of ports and both its card on the map and its editable card draw them:
+a port is taken when a cable names it (the number at the end of the name:
+`Gi1/0/12` is port 12; up to 8 ports in one row, then odd on top and even below
+like the real thing), a click on it in the card selects that cable, and the
+card says how many are free. Fibre uplinks (`Te`, `sfp`) are counted apart.
 
 **Zones are subnets.** A coloured area with a name, a network
 (`192.168.10.0/24`, with its number of usable addresses) and a VLAN. Moving a
@@ -338,9 +394,9 @@ are arranged. One `Ctrl+Z` undoes it.
 - align and distribute several devices from their card;
 - undo and redo for everything, map by map.
 
-**Export** to PNG (twice the screen resolution), to SVG (plain colours: it
-opens in any drawing program) and to two CSV files, the device inventory and
-the cable list, that Excel opens as they are.
+**Export** to PNG (twice the screen resolution), to SVG (the same cards and
+cables in plain colours: it opens in any drawing program) and to two CSV files,
+the device inventory and the cable list, that Excel opens as they are.
 
 **Not done**: the map is drawn, not discovered. DuckNote does not read LLDP,
 CDP or the MAC tables of switches; what is connected to what is up to you.
@@ -371,7 +427,7 @@ DuckNote is open.
 | top bar | previous and next month, **Oggi** (today), the search, **Certificati** (certificates), **Nuovo** (new) |
 | the month | six weeks from Monday; each day with its items, timed ones with their hour, and `+N` for the rest. A click chooses the day, a double click adds an item to it, an item that does not repeat is dragged to another day |
 | right | the chosen day; **In ritardo** (late: things to do and deadlines not done, up to 30 days back); the next 14 days. A tick marks a thing to do as done |
-| an item | a click opens its card, to read: when, how often, reminders, what it is linked to, notes. The pencil (or `E`) edits it; **Annulla** and **Salva** come back to the card |
+| an item | a click opens its card, to read: when, how often, reminders, what it is linked to, notes. The pencil (or `E`) edits it; **Annulla** and **Salva** come back to the card. **Elimina** in the card always asks first |
 
 **Four kinds of item**: **Appuntamento** (an appointment, with its hour),
 **Da fare** (a thing to do), **Scadenza** (a deadline) and **Appunto** (a note
@@ -379,8 +435,9 @@ for the day). Each can:
 
 - **repeat** every day, week, two weeks, month, three or six months, year —
   until a date if you want; the 31st falls on the last day of shorter months
-  and comes back to the 31st after them. Deleting asks whether to remove only
-  that time or all of them;
+  and comes back to the 31st after them. Deleting always asks: an item that
+  repeats asks whether to remove only that time or all of them, and the notice
+  at the bottom can still undo it;
 - **remind** at the moment, minutes, hours, days or weeks before; items of the
   whole day remind at 9:00;
 - **link to a host or to a device of the map**: the item shows its state (green
@@ -462,6 +519,7 @@ On the map:
 
 | Keys | Action |
 |---|---|
+| `E` | **Modifica mappa** (edit) and back to looking (**Fine**) |
 | `V`, `C` | **Sposta** (move), **Collega** (connect) |
 | `Z` | a zone around the selected devices, or a new one |
 | `Delete` or `Backspace` | delete what is selected (a device takes its cables with it) |
@@ -562,7 +620,7 @@ repository, so building them needs no Node.js:
 
 After changing one, `npm ci && node build.mjs` rebuilds it and `npm test`
 tests it in Chromium with Playwright (mouse and keyboard as a person uses
-them: 32 scenarios for the map, 20 for the calendar, 19 for the editor).
+them: 36 scenarios for the map, 22 for the calendar, 19 for the editor).
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one

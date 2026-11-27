@@ -163,6 +163,12 @@ export function detailView(state, occurrence, actions) {
         type: 'button',
         onclick: () => actions.done(occurrence, !occurrence.done),
       }, icon(uiIcons.check, 12), h('span', {}, occurrence.done ? 'Da fare di nuovo' : 'Fatto')) : null,
+      state.readonly ? null : h('button', {
+        class: 'dm-button small danger dc-delete',
+        type: 'button',
+        title: 'Elimina (chiede conferma)',
+        onclick: (event) => actions.remove(occurrence, event.currentTarget),
+      }, icon(uiIcons.trash, 12), h('span', {}, 'Elimina')),
       h('span', { class: 'dm-spacer' }),
       h('button', { class: 'dm-button small', type: 'button', onclick: () => actions.back() }, 'Chiudi')));
 }

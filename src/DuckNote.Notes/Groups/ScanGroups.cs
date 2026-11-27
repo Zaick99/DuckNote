@@ -141,6 +141,37 @@ public static class ScanGroups
 
     public static string NewId() => "g" + Convert.ToHexString(RandomNumberGenerator.GetBytes(5)).ToLowerInvariant();
 
+    /// <summary>
+    /// Il gruppo con un host in piu' (dalla pagina Rete: "Aggiungi a un gruppo"): l'indirizzo va
+    /// in fondo alle righe, se non c'e' gia' scritto. Il gruppo resta lo stesso se c'era.
+    /// </summary>
+    public static ScanGroup WithTarget(ScanGroup group, string target)
+    {
+        string clean = target.Trim();
+
+        return clean.Length == 0 || group.Targets.Contains(clean, StringComparer.OrdinalIgnoreCase)
+            ? group
+            : group with { Targets = Normalize([.. group.Targets, clean]) };
+    }
+
+    /// <summary>
+    /// Le righe del gruppo che nominano proprio questo host (il suo IP o uno dei suoi nomi): sono
+    /// quelle che "Togli dal gruppo" puo' togliere. Un host che ci sta per una rete o un
+    /// intervallo non ha righe sue.
+    /// </summary>
+    public static IReadOnlyList<string> Listed(ScanGroup group, IEnumerable<string> names)
+    {
+        HashSet<string> known = new(names.Where(name => name.Length > 0), StringComparer.OrdinalIgnoreCase);
+        return [.. group.Targets.Where(known.Contains)];
+    }
+
+    /// <summary>Il gruppo senza le righe che nominano questo host.</summary>
+    public static ScanGroup WithoutHost(ScanGroup group, IEnumerable<string> names)
+    {
+        HashSet<string> gone = new(Listed(group, names), StringComparer.OrdinalIgnoreCase);
+        return gone.Count == 0 ? group : group with { Targets = [.. group.Targets.Where(target => !gone.Contains(target))] };
+    }
+
     private static bool IsId(string id) => id.Length is >= 2 and <= 24 && id.All(c => char.IsAsciiLetterLower(c) || char.IsAsciiDigit(c));
 
     private static string Text(JsonNode? node) => node is JsonValue value && value.TryGetValue(out string? text) ? text : string.Empty;

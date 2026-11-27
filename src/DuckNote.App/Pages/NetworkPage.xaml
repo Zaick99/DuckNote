@@ -34,32 +34,43 @@
                HorizontalAlignment="Stretch" VerticalAlignment="Center" Tag="192.168.1.0/24  oppure  .1-254" KeyDown="OnRangeKey"
                ToolTip="CIDR, da-a, .1-254 oppure piu' indirizzi separati da virgole"/>
       <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
-        <Button x:Name="BtnScan" Style="{StaticResource PrimaryBtn}" Height="34" Click="OnScanRange">
+        <!-- un pulsante solo per l'analisi: Analizza, e Ferma mentre e' in corso -->
+        <Button x:Name="BtnScan" Style="{StaticResource PrimaryBtn}" Height="34" Click="OnScanRange"
+                ToolTip="Analizza l'intervallo scritto a sinistra (Invio)">
           <StackPanel Orientation="Horizontal">
-            <TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="11"/>
-            <TextBlock Text="Analizza" Margin="7,0,0,0"/>
+            <TextBlock x:Name="ScanIcon" Text="&#xE768;" Style="{StaticResource Icon}" FontSize="11"/>
+            <TextBlock x:Name="ScanText" Text="Analizza" Margin="7,0,0,0"/>
           </StackPanel>
         </Button>
         <!-- la nota, o il gruppo scelto qui sotto -->
         <Button x:Name="BtnNote" Style="{StaticResource SoftBtn}" Height="34" Margin="8,0,0,0" Click="OnScanNote"
-                ToolTip="Solo gli indirizzi scritti nelle pagine della nota">
+                ToolTip="Controlla adesso gli indirizzi scritti nella nota e sulle sue mappe">
           <StackPanel Orientation="Horizontal">
-            <TextBlock x:Name="NoteIcon" Text="&#xE8A5;" Style="{StaticResource Icon}" FontSize="11"/>
-            <TextBlock x:Name="NoteText" Text="Host della nota" Margin="7,0,0,0"/>
+            <TextBlock x:Name="NoteIcon" Text="&#xE73E;" Style="{StaticResource Icon}" FontSize="11"/>
+            <TextBlock x:Name="NoteText" Text="Controlla la nota" Margin="7,0,0,0"/>
           </StackPanel>
-        </Button>
-        <Button x:Name="BtnStop" Style="{StaticResource QuietBtn}" Height="34" Margin="8,0,0,0" Click="OnStop" IsEnabled="False"
-                ToolTip="Ferma la scansione in corso">
-          <TextBlock Text="&#xE71A;" Style="{StaticResource Icon}" FontSize="11"/>
         </Button>
       </StackPanel>
       <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="14,0,0,0" VerticalAlignment="Center">
         <Rectangle Style="{StaticResource ToolSep}"/>
-        <Button Style="{StaticResource Toolbtn}" Height="34" Width="34" Click="OnExport" ToolTip="Esporta in CSV gli host mostrati">
-          <TextBlock Text="&#xE896;" Style="{StaticResource Icon}"/>
-        </Button>
-        <Button Style="{StaticResource Toolbtn}" Height="34" Width="34" Click="OnToNote" ToolTip="Porta nella nota, come tabella, gli host mostrati">
-          <TextBlock Text="&#xE70F;" Style="{StaticResource Icon}"/>
+        <!-- portare fuori gli host mostrati: nella nota come tabella, o in un file -->
+        <Button x:Name="BtnExport" Style="{StaticResource QuietBtn}" Height="34" Click="OnExportMenu"
+                ToolTip="Gli host mostrati: come tabella nella nota, o in un file CSV">
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="&#xE896;" Style="{StaticResource Icon}" FontSize="12"/>
+            <TextBlock Text="Esporta" Margin="7,0,0,0"/>
+            <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="9" Margin="7,1,0,0"/>
+          </StackPanel>
+          <Button.ContextMenu>
+            <ContextMenu x:Name="ExportMenu">
+              <MenuItem Header="Tabella nella nota" Click="OnToNote">
+                <MenuItem.Icon><TextBlock Text="&#xE8A5;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Accent}"/></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem Header="File CSV..." Click="OnExport">
+                <MenuItem.Icon><TextBlock Text="&#xE896;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
+              </MenuItem>
+            </ContextMenu>
+          </Button.ContextMenu>
         </Button>
       </StackPanel>
     </Grid>
@@ -92,6 +103,7 @@
       <!-- il gruppo: tutti, la nota, un gruppo proprio, quelli fuori da tutto; un menu, perche' i
            gruppi li fa chi usa la nota -->
       <Border Grid.Column="1" Style="{StaticResource WellBox}" Padding="3" Margin="10,0,0,0" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal">
         <Button x:Name="BtnGroup" Style="{StaticResource Toolbtn}" Height="26" Padding="10,0" Click="OnGroupMenu"
                 ToolTip="Quali host mostrare: tutti, quelli della nota o di un gruppo. Da qui si creano e si modificano i gruppi">
           <StackPanel Orientation="Horizontal">
@@ -104,6 +116,12 @@
             <ContextMenu x:Name="GroupMenu"/>
           </Button.ContextMenu>
         </Button>
+        <!-- il gruppo scelto si modifica con un clic -->
+        <Button x:Name="BtnGroupEdit" Style="{StaticResource Toolbtn}" Width="26" Height="26" Margin="2,0,0,0" Visibility="Collapsed" Click="OnGroupEdit"
+                ToolTip="Modifica il gruppo: nome, reti e indirizzi, monitoraggio">
+          <TextBlock Text="&#xE70F;" Style="{StaticResource Icon}" FontSize="11"/>
+        </Button>
+        </StackPanel>
       </Border>
       <TextBox x:Name="FilterBox" Grid.Column="3" Style="{StaticResource SearchField}" Height="32" Width="280"
                VerticalAlignment="Center" Tag="Cerca: testo, ip: nome: porta: os:" TextChanged="OnFilter"
@@ -153,11 +171,20 @@
               <MenuItem x:Name="RowAnalyse" Header="Analizza di nuovo" Click="OnRowAnalyse">
                 <MenuItem.Icon><TextBlock Text="&#xE768;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Green}"/></MenuItem.Icon>
               </MenuItem>
+              <MenuItem x:Name="RowOpen" Header="Apri">
+                <MenuItem.Icon><TextBlock Text="&#xE8A7;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Blue}"/></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem x:Name="RowMap" Header="Mostra sulla mappa" Click="OnRowMap">
+                <MenuItem.Icon><TextBlock Text="&#xE707;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Teal}"/></MenuItem.Icon>
+              </MenuItem>
               <MenuItem x:Name="RowCopy" Header="Copia indirizzo" Click="OnRowCopy">
                 <MenuItem.Icon><TextBlock Text="&#xE8C8;" Style="{StaticResource Icon}" FontSize="12"/></MenuItem.Icon>
               </MenuItem>
               <MenuItem x:Name="RowRemind" Header="Aggiungi un promemoria..." Click="OnRowRemind">
                 <MenuItem.Icon><TextBlock Text="&#xEA8F;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Orange}"/></MenuItem.Icon>
+              </MenuItem>
+              <MenuItem x:Name="RowGroups" Header="Gruppi">
+                <MenuItem.Icon><TextBlock Text="&#xE81E;" Style="{StaticResource Icon}" FontSize="12" Foreground="{DynamicResource Accent}"/></MenuItem.Icon>
               </MenuItem>
               <Separator/>
               <MenuItem x:Name="RowHide" Header="Metti da parte" Click="OnRowHide">
@@ -202,22 +229,63 @@
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Border Padding="16,14" BorderBrush="{DynamicResource SeparatorSoft}" BorderThickness="0,0,0,1">
-            <Grid>
-              <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-              </Grid.ColumnDefinitions>
-              <Border Width="44" Height="44" CornerRadius="22" Background="{DynamicResource BgFieldAlt}" VerticalAlignment="Center">
-                <Ellipse x:Name="CardDot" Width="14" Height="14"/>
-              </Border>
-              <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
-                <TextBlock x:Name="CardTitle" Style="{StaticResource TxtSub}" TextTrimming="CharacterEllipsis"/>
-                <TextBlock x:Name="CardSub" Style="{StaticResource TxtCaption}" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource FMono}"/>
-                <Border x:Name="CardChip" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="8,1">
-                  <TextBlock x:Name="CardStatus" FontSize="10.5" FontWeight="SemiBold"/>
+            <StackPanel>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="44" Height="44" CornerRadius="22" Background="{DynamicResource BgFieldAlt}" VerticalAlignment="Center">
+                  <Ellipse x:Name="CardDot" Width="14" Height="14"/>
                 </Border>
-              </StackPanel>
-            </Grid>
+                <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                  <TextBlock x:Name="CardTitle" Style="{StaticResource TxtSub}" TextTrimming="CharacterEllipsis"/>
+                  <TextBlock x:Name="CardSub" Style="{StaticResource TxtCaption}" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource FMono}"/>
+                  <Border x:Name="CardChip" HorizontalAlignment="Left" Margin="0,6,0,0" Padding="8,1">
+                    <TextBlock x:Name="CardStatus" FontSize="10.5" FontWeight="SemiBold"/>
+                  </Border>
+                </StackPanel>
+              </Grid>
+              <!-- i comandi dell'host: ricontrollare, aprire (web, condivisioni, desktop remoto), promemoria, altro -->
+              <Grid Margin="0,12,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="CardCheck" Style="{StaticResource SoftBtn}" Height="28" Padding="10,0" Click="OnCardCheck"
+                        ToolTip="Analizza di nuovo questo host, per intero">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE72C;" Style="{StaticResource Icon}" FontSize="11"/>
+                    <TextBlock Text="Ricontrolla" Margin="6,0,0,0" FontSize="12"/>
+                  </StackPanel>
+                </Button>
+                <Button x:Name="CardOpen" Grid.Column="1" Style="{StaticResource SoftBtn}" Height="28" Padding="10,0" Margin="6,0,0,0" Click="OnCardOpen"
+                        ToolTip="Le pagine web, le condivisioni e il desktop remoto di questo host">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#xE8A7;" Style="{StaticResource Icon}" FontSize="11"/>
+                    <TextBlock Text="Apri" Margin="6,0,0,0" FontSize="12"/>
+                    <TextBlock Text="&#xE70D;" Style="{StaticResource Icon}" FontSize="8" Margin="6,1,0,0"/>
+                  </StackPanel>
+                  <Button.ContextMenu>
+                    <ContextMenu x:Name="OpenMenu"/>
+                  </Button.ContextMenu>
+                </Button>
+                <Button x:Name="CardRemind" Grid.Column="3" Style="{StaticResource Toolbtn}" Width="28" Height="28" Click="OnRowRemind"
+                        ToolTip="Aggiungi un promemoria su questo host">
+                  <TextBlock Text="&#xEA8F;" Style="{StaticResource Icon}" FontSize="12"/>
+                </Button>
+                <Button x:Name="CardMore" Grid.Column="4" Style="{StaticResource Toolbtn}" Width="28" Height="28" Margin="6,0,0,0" Click="OnCardMore"
+                        ToolTip="Altro: copia l'indirizzo, mostralo sulla mappa, mettilo da parte">
+                  <TextBlock Text="&#xE712;" Style="{StaticResource Icon}" FontSize="12"/>
+                  <Button.ContextMenu>
+                    <ContextMenu x:Name="MoreMenu"/>
+                  </Button.ContextMenu>
+                </Button>
+              </Grid>
+            </StackPanel>
           </Border>
           <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="CardBody" Margin="16,0,16,14"/>
