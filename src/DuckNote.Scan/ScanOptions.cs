@@ -14,6 +14,18 @@ public sealed class ScanOptions
     public IReadOnlyList<int> Ports { get; init; } = DefaultPorts;
 
     public bool ScanDeadHosts { get; init; }
+
+    /// <summary>
+    /// Un host che non risponde al ping si prova sulle porte (<see cref="LivenessPorts"/> e
+    /// quelle che aveva aperte) prima di dirlo spento: risponde anche chi rifiuta la connessione.
+    /// </summary>
+    public bool ProbePortsWhenSilent { get; init; } = true;
+
+    /// <summary>Si provano anche le porte che aiutano a riconoscere l'apparato (iPhone, AirPlay, Cast, adb...).</summary>
+    public bool IdentifyDevices { get; init; } = true;
+
+    /// <summary>Le porte della prova di vita: le piu' comuni su PC, telefoni, stampanti, apparati di rete.</summary>
+    public static readonly IReadOnlyList<int> LivenessPorts = [80, 443, 22, 445, 139, 3389, 62078, 8080, 53, 7000, 9100, 554, 5000, 8443];
     public bool ResolveDns { get; init; } = true;
     public bool ProbeNetBios { get; init; } = true;
     public bool ProbeMdns { get; init; } = true;

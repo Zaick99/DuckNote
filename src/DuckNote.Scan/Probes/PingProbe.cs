@@ -78,7 +78,9 @@ public static class PingProbe
                 {
                     roundTrips.Add(reply.RoundtripTime);
 
-                    if (reply.Options is { Ttl: > 0 })
+                    // solo su Windows il TTL della risposta e' quello dell'host: su macOS e Linux
+                    // .NET ci rimette quello mandato (128), e ogni host sembrava Windows
+                    if (OperatingSystem.IsWindows() && reply.Options is { Ttl: > 0 })
                     {
                         ttl = reply.Options.Ttl;
                     }
@@ -101,6 +103,11 @@ public static class PingProbe
 
         cancellationToken.ThrowIfCancellationRequested();
         bool online = roundTrips.Count > 0;
+
+        if (online && ttl == 0 && !OperatingSystem.IsWindows())
+        {
+            ttl = await ReadTtlAsync(target, timeout, cancellationToken).ConfigureAwait(false);
+        }
 
         return new PingOutcome(online, roundTrips, ttl, Math.Max(1, sent), roundTrips.Count)
         {
@@ -145,6 +152,20 @@ public static class PingProbe
         }
 
         return true;
+    }
+
+    /// <summary>Il TTL vero di un host che ha risposto (macOS, Linux), passando dallo stesso cancello dei ping.</summary>
+    private static async Task<int> ReadTtlAsync(string target, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        await Gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await IcmpTtl.ReadAsync(target, timeout, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            Gate.Release();
+        }
     }
 
     /// <summary>Un tentativo, dopo <paramref name="wait"/>: se e' partito, la risposta, e se a fallire e' stato questo computer.</summary>

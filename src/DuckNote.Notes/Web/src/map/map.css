@@ -2,6 +2,67 @@
    (token, pulsanti, campi, popup) e' in common/base.css. */
 @import '../common/base.css';
 
+/* ------------------------------------------------------------------ la tavolozza della mappa */
+
+/* I colori di Vantage (github.com/levi-xy/vantage, licenza MIT): la tela, le schede, le prese e
+   i cavi li prendono da qui, chiari e scuri; il resto della pagina resta nel tema di DuckNote. */
+.dm-app {
+  --vt-canvas: #e3e8ef;
+  --vt-panel: #ffffff;
+  --vt-inset: #f0f3f7;
+  --vt-line: #c9d1dc;
+  --vt-ink: #0f172a;
+  --vt-muted: #4b5870;
+  --vt-chip: #e4e9f0;
+  --vt-in: #1f6feb;
+  --vt-out: #c2620a;
+  --vt-ok: #12a06e;
+  --vt-ok-text: #0b7a54;
+  --vt-crit: #d93f3f;
+  --vt-crit-text: #b42323;
+  --vt-warn: #b7791f;
+  --vt-port-off: #97a3b5;
+  --vt-dots: #c5cdd8;
+  --vt-tone-Blue: #2563eb;
+  --vt-tone-Teal: #0f766e;
+  --vt-tone-Green: #4d7c0f;
+  --vt-tone-Yellow: #b7791f;
+  --vt-tone-Purple: #7c3aed;
+  --vt-tone-Pink: #db2777;
+  --vt-tone-Red: #d93f3f;
+  --vt-tone-Gray: #4b5870;
+  --vt-tone-Indigo: #4f46e5;
+  --vt-tone-Orange: #c2410c;
+}
+:root[data-theme="dark"] .dm-app {
+  --vt-canvas: #0a0d12;
+  --vt-panel: #11161d;
+  --vt-inset: #0d1117;
+  --vt-line: #222b37;
+  --vt-ink: #e6ebf2;
+  --vt-muted: #97a3b4;
+  --vt-chip: #1a212b;
+  --vt-in: #4c9eff;
+  --vt-out: #f59e42;
+  --vt-ok: #34d399;
+  --vt-ok-text: #4ade9f;
+  --vt-crit: #f87171;
+  --vt-crit-text: #fca5a5;
+  --vt-warn: #fbbf24;
+  --vt-port-off: #4a5566;
+  --vt-dots: #1c2430;
+  --vt-tone-Blue: #60a5fa;
+  --vt-tone-Teal: #2dd4bf;
+  --vt-tone-Green: #a3e635;
+  --vt-tone-Yellow: #fbbf24;
+  --vt-tone-Purple: #a78bfa;
+  --vt-tone-Pink: #f472b6;
+  --vt-tone-Red: #f87171;
+  --vt-tone-Gray: #97a3b4;
+  --vt-tone-Indigo: #818cf8;
+  --vt-tone-Orange: #fb923c;
+}
+
 /* ------------------------------------------------------------------ la libreria */
 
 .dm-library {
@@ -79,9 +140,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 200px;
-  height: 65px;
-  padding: 0 10px 0 12px;
+  width: 248px;
+  height: 96px;
+  padding: 0 10px 0 14px;
   border: 1px solid var(--c-AccentBorder);
   border-radius: 10px;
   background: var(--c-BgContent);
@@ -93,10 +154,10 @@
 .dm-ghost::before {
   content: '';
   position: absolute;
-  left: 9px;
-  top: -20px;
-  width: 64px;
-  height: 20px;
+  left: 13px;
+  top: -15px;
+  width: 72px;
+  height: 15px;
   border: 1px solid var(--c-AccentBorder);
   border-bottom: 0;
   border-radius: 6px 6px 0 0;
@@ -109,108 +170,77 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 
 /* ------------------------------------------------------------------ la tela */
 
+/* in vista la tela e' liscia, come in Vantage; in modifica ha i puntini della griglia */
 .dm-canvas {
   position: absolute;
   inset: 0;
   outline: none;
-  background-color: var(--canvas);
-  background-image: radial-gradient(circle, var(--dots) 1px, transparent 1.3px);
+  background-color: var(--vt-canvas);
+  background-image: radial-gradient(circle, var(--vt-dots) 1px, transparent 1.3px);
   touch-action: none;
 }
+.viewing .dm-canvas { background-image: none; }
 .dm-canvas.drop { box-shadow: inset 0 0 0 2px var(--c-AccentBorder); }
 .dm-canvas.grab, .dm-canvas.grab * { cursor: grab !important; }
 .dm-canvas.panning, .dm-canvas.panning * { cursor: grabbing !important; }
 .connecting .dm-canvas .dm-node { cursor: crosshair; }
-.dm-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.dm-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: var(--vt-ink); }
 
-/* le zone */
-.dm-zone-box { fill: var(--tone-zone); stroke: var(--tone-border); stroke-width: 1; pointer-events: none; }
+/* le zone: come le cornici di Vantage, col bordo di sopra colorato e la linguetta del nome */
+.dm-zone-box { fill: var(--zone); fill-opacity: 0.06; stroke: var(--zone); stroke-opacity: 0.4; stroke-width: 1; pointer-events: none; }
+.dm-zone-bar { stroke: var(--zone); pointer-events: none; }
 .dm-zone-edge { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: move; }
 .dm-zone-head { cursor: move; }
-.dm-zone-chip { fill: var(--c-BgContent); stroke: var(--c-Separator); }
-.dm-zone-dot { fill: var(--tone); }
-.dm-zone-name { font: 600 12px var(--font-text); fill: var(--c-Label); }
-.dm-zone-sub { font: 11px var(--font-mono); fill: var(--c-LabelSecondary); }
-.dm-zone.selected .dm-zone-box { stroke: var(--c-Accent); stroke-width: 1.5; }
-.dm-zone.selected .dm-zone-chip { stroke: var(--c-AccentBorder); }
+.dm-zone-chip { fill: var(--vt-panel); }
+.dm-zone-chip-edge { stroke: var(--vt-line); pointer-events: none; }
+.dm-zone-name { font: 700 13px var(--font-text); fill: var(--vt-ink); }
+.dm-zone-sub { font: 11px var(--font-mono); fill: var(--vt-muted); }
+.dm-zone.selected .dm-zone-box { stroke: var(--vt-in); stroke-opacity: 1; stroke-width: 1.5; }
+.dm-zone.selected .dm-zone-chip-edge { stroke: var(--vt-in); }
 .dm-grips { display: none; }
 .dm-zone.selected .dm-grips { display: inline; }
-.dm-grip { fill: var(--c-BgContent); stroke: var(--c-Accent); stroke-width: 1.4; }
+.dm-grip { fill: var(--vt-panel); stroke: var(--vt-in); stroke-width: 1.4; }
 .dm-grip[data-corner="nw"], .dm-grip[data-corner="se"] { cursor: nwse-resize; }
 .dm-grip[data-corner="ne"], .dm-grip[data-corner="sw"] { cursor: nesw-resize; }
 
-/* i cavi: ad angolo retto, del colore di quello che portano (wireOf in scene.js). --wire e' il
-   colore scelto per il cavo: verde se risponde, quello della VLAN per una porta access, ... */
+/* i cavi: i colori e i tratti li scrive scene.js (wireOf), come in Vantage */
 .dm-link { cursor: pointer; }
-.dm-link-hit { fill: none; stroke: transparent; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; pointer-events: stroke; }
-.dm-link-line { fill: none; stroke: var(--wire, var(--c-LabelTertiary)); stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.dm-link.w-up .dm-link-line { opacity: 0.9; }
-.dm-link.w-trunk .dm-link-line { stroke: var(--c-LabelSecondary); }
-.dm-link.w-wifi .dm-link-line { stroke-dasharray: 5 5; }
-.dm-link.w-net .dm-link-line { stroke-dasharray: 0.1 5.5; }
-.dm-link.w-down .dm-link-line { stroke-dasharray: 6 4; opacity: 0.85; }
-.dm-link:hover .dm-link-hit { stroke: var(--c-BgHover); }
-.dm-link.selected .dm-link-hit { stroke: var(--c-AccentSoft); }
-.dm-link.selected .dm-link-line { opacity: 1; }
-.dm-link.selected.w-plain .dm-link-line, .dm-link.selected.w-trunk .dm-link-line { stroke: var(--c-Accent); }
-.dm-link-labels { cursor: pointer; }
-/* le etichette dei cavi (SVG): "dm-tag", da non confondere coi chip di stato della scheda (HTML) */
-.dm-tag rect { fill: var(--c-BgContent); stroke: var(--c-Separator); }
-.dm-tag text { font: 10.5px var(--font-mono); fill: var(--c-LabelSecondary); pointer-events: none; }
-.dm-port text { fill: var(--c-LabelTertiary); }
-.dm-leader { stroke: var(--c-LabelQuaternary); stroke-width: 0.8; stroke-dasharray: 2 2; pointer-events: none; }
-.dm-link-labels.selected .dm-leader { stroke: var(--c-Accent); }
-.dm-link-labels:hover .dm-tag rect { stroke: var(--c-BorderControl); }
-.dm-link-labels.selected .dm-tag rect { stroke: var(--c-AccentBorder); }
-.dm-link-labels.selected .dm-tag text { fill: var(--c-Label); }
-.lod-far .dm-labels { display: none; }
+.dm-link-hit { pointer-events: stroke; }
+.dm-link-halo, .dm-link-under, .dm-link-line { pointer-events: none; }
+.dm-link:hover .dm-link-halo { stroke: var(--vt-in); stroke-opacity: 0.2; }
+.dm-link.selected .dm-link-halo { stroke: var(--vt-in); stroke-opacity: 0.35; }
+.dm-link-labels { pointer-events: none; }
+.dm-link-speed { font-family: var(--font-text); }
+/* da lontano le velocita' si nascondono; i loghi delle VPN restano finche' si riconoscono */
+.lod-far .dm-link-speed { display: none; }
+.lod-tiny .dm-link-badge { display: none; }
 
-/* gli apparati: una scheda con la linguetta (nome e stato), l'icona, il modello, l'indirizzo e
-   quello che si sa adesso; switch, router e firewall con le porte hanno sotto il pannello. */
+/* gli apparati: il disegno (colori compresi) lo fa scene.js; qui solo scelta, mouse e distanza */
 .dm-node { cursor: default; }
-.dm-node-ring { fill: none; stroke: transparent; stroke-width: 3; }
-.dm-node-card, .dm-node-tab, .dm-node-cloud { fill: var(--c-BgContent); stroke: var(--c-Separator); stroke-width: 1; }
-.dm-node-cloud { stroke: var(--tone-border); stroke-width: 1.2; }
-.dm-node:hover .dm-node-card, .dm-node:hover .dm-node-tab { stroke: var(--c-BorderControl); }
-.dm-node:hover .dm-node-cloud { stroke: var(--tone); }
-.dm-node-accent { stroke: var(--tone); stroke-width: 2; stroke-linecap: round; opacity: 0.6; }
-.dm-node-tile { fill: var(--tone-soft); }
-.dm-node-icon { fill: none; stroke: var(--tone); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.dm-node-tile, .dm-node-icon, .dm-node-accent, .dm-node-tabname, .dm-node-badge, .dm-node-title, .dm-node-ip, .dm-node-info,
-.dm-node-dot, .dm-node-ring, .dm-jack-bay, .dm-zone-name, .dm-zone-sub, .dm-zone-dot { pointer-events: none; }
-.dm-node-tabname { font: 600 11.5px var(--font-text); fill: var(--c-Label); }
-.dm-node-badge { font: 700 9px var(--font-text); letter-spacing: 0.04em; fill: var(--c-LabelTertiary); }
-.dm-node.st-up .dm-node-badge { fill: var(--c-Green); }
-.dm-node.st-down .dm-node-badge { fill: var(--c-Red); }
-.dm-node.st-wait .dm-node-badge { fill: var(--c-Orange); }
-.dm-node-title { font: 600 13px var(--font-text); fill: var(--c-Label); }
-.dm-node-ip { font: 11px var(--font-mono); fill: var(--c-Accent); }
-.dm-node-info { font: 10.5px var(--font-text); fill: var(--c-LabelTertiary); }
-.dm-node.st-up .dm-node-info { fill: var(--c-LabelSecondary); }
-.dm-node.st-down .dm-node-info { fill: var(--c-Red); }
-.dm-node-dot { fill: var(--c-LabelQuaternary); stroke: var(--c-BgContent); stroke-width: 2; }
-.dm-node.st-up .dm-node-dot { fill: var(--c-Green); }
-.dm-node.st-down .dm-node-dot { fill: var(--c-Red); }
-.dm-node.st-wait .dm-node-dot { fill: var(--c-Orange); }
-.dm-node.st-down .dm-node-card, .dm-node.st-down .dm-node-tab { stroke: var(--c-RedBorder); }
-.dm-node.st-down .dm-node-cloud { stroke: var(--c-Red); }
-.dm-node.selected .dm-node-card, .dm-node.selected .dm-node-tab, .dm-node.selected .dm-node-cloud { stroke: var(--c-Accent); stroke-width: 1.5; }
-.dm-node.selected .dm-node-ring { stroke: var(--c-AccentSoft); }
-.dm-node.target .dm-node-card, .dm-node.target .dm-node-tab, .dm-node.target .dm-node-cloud { stroke: var(--c-Accent); stroke-width: 2; }
-.dm-node.target .dm-node-ring { stroke: var(--c-AccentBorder); }
-.lod-tiny .dm-node-info, .lod-tiny .dm-node-ip, .lod-tiny .dm-node-badge { display: none; }
-
-/* il pannello delle porte: libere vuote, usate del colore del loro cavo */
-.dm-jack-bay { fill: var(--c-BgFieldAlt); stroke: var(--c-Separator); stroke-width: 0.8; }
-.dm-jack { fill: var(--c-BgContent); stroke: var(--c-BorderControl); stroke-width: 0.8; }
-.dm-jack.used { fill: var(--port); stroke: var(--port); }
-.dm-jack.used.w-down { fill: var(--c-Red); stroke: var(--c-Red); }
-.dm-jack:hover { stroke: var(--c-Accent); stroke-width: 1.4; }
-.lod-far .dm-jack { pointer-events: none; }
+.viewing .dm-node { cursor: pointer; }
+.dm-node-ring { pointer-events: none; }
+.dm-node:not(.st-down):hover .dm-node-card { stroke: var(--vt-muted); }
+.dm-node.selected .dm-node-ring { stroke: var(--vt-in); stroke-opacity: 0.45; }
+.dm-node.selected .dm-node-card { stroke: var(--vt-in); }
+.dm-node.target .dm-node-ring { stroke: var(--vt-in); stroke-opacity: 0.7; }
+.dm-node.target .dm-node-card { stroke: var(--vt-in); }
+.dm-node text, .dm-node-tile, .dm-node-icon, .dm-node-bar, .dm-node-tab-edge, .dm-panel, .dm-jack text, .dm-jack g, .dm-zone-name, .dm-zone-sub { pointer-events: none; }
+.dm-jack:hover > g > rect:first-child { stroke: var(--vt-in); }
+.dm-jack { cursor: default; }
+/* il riquadro della porta col mouse sopra (come l'HoverCard di Vantage) */
+.dm-port-tip { position: absolute; left: 0; top: 0; z-index: 30; width: 224px; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--vt-line); border-radius: 8px; background: var(--vt-panel); color: var(--vt-ink); font: 12px/17px var(--font-text); box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08); pointer-events: none; }
+.dm-port-tip[hidden] { display: none; }
+.dm-port-tip > span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-port-tip .dm-tip-head { font-weight: 700; }
+.dm-port-tip .dm-tip-port { font: 400 11px var(--font-mono); color: var(--vt-muted); }
+.dm-port-tip .ok { color: var(--vt-ok-text); }
+.dm-port-tip .crit { color: var(--vt-crit-text); }
+.dm-port-tip .muted, .dm-port-tip .dm-tip-line.muted { color: var(--vt-muted); }
+.lod-tiny .dm-node-info, .lod-tiny .dm-node-ip, .lod-far .dm-jack text { display: none; }
 
 .dm-handles { opacity: 0; }
-.dm-handle { fill: var(--c-BgContent); stroke: var(--c-Accent); stroke-width: 1.5; cursor: crosshair; }
-.dm-handle:hover { fill: var(--c-Accent); }
+.dm-handle { fill: var(--vt-panel); stroke: var(--vt-in); stroke-width: 1.5; cursor: crosshair; }
+.dm-handle:hover { fill: var(--vt-in); }
 .dm-node:hover .dm-handles, .connecting .dm-node .dm-handles { opacity: 1; }
 .dragging .dm-handles, .panning .dm-handles, .lod-far .dm-handles { opacity: 0 !important; pointer-events: none; }
 
@@ -225,7 +255,7 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 
 .dm-zoom {
   position: absolute;
-  right: 12px;
+  left: 12px;
   bottom: 12px;
   display: flex;
   align-items: center;
@@ -236,10 +266,12 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
   background: var(--c-BgContent);
 }
 .dm-zoom .dm-sep { margin: 0 3px; height: 18px; }
+.dm-zoom .dm-fit { height: 28px; padding: 0 10px; }
+.dm-zoom .dm-edit-toggle { margin-left: 4px; }
 .dm-zoom-value { min-width: 48px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--c-LabelSecondary); font: 600 11.5px var(--font-mono); cursor: default; }
 .dm-zoom-value:hover { background: var(--c-BgHover); color: var(--c-Label); }
 
-.dm-statusline { position: absolute; left: 14px; bottom: 14px; display: flex; align-items: center; gap: 12px; color: var(--c-LabelTertiary); font-size: 11.5px; pointer-events: none; max-width: calc(100% - 260px); white-space: nowrap; overflow: hidden; }
+.dm-statusline { position: absolute; right: 16px; bottom: 16px; justify-content: flex-end; display: flex; align-items: center; gap: 12px; color: var(--c-LabelTertiary); font-size: 11.5px; pointer-events: none; max-width: calc(100% - 260px); white-space: nowrap; overflow: hidden; }
 .dm-statusline > * { display: inline-flex; align-items: center; gap: 6px; }
 .dm-status-down { color: var(--c-Red); font-weight: 600; }
 .dm-status-hint { color: var(--c-Accent); }
@@ -294,6 +326,34 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .dm-port-cell.on.k-fiber { border-color: var(--t-Teal-border); background: var(--t-Teal-soft); }
 .dm-port-cell.on.k-wifi, .dm-port-cell.on.k-vpn { border-color: var(--t-Purple-border); background: var(--t-Purple-soft); }
 .dm-port-cell.on:hover { border-color: var(--c-Accent); }
+.dm-port-cell.sfp { border-style: dashed; }
+/* i servizi VPN: il colore principale del logo (nel tema scuro una tinta che si legge sul nero) */
+.dm-app {
+  --vpn-tailscale: #242424; --vpn-netbird: #f68330; --vpn-meshnet: #4687ff; --vpn-zerotier: #e0960f;
+  --vpn-cloudflare: #f38020; --vpn-wireguard: #88171a; --vpn-openvpn: #ea7e20; --vpn-ipsec: #5b5bd6;
+}
+:root[data-theme="dark"] .dm-app { --vpn-tailscale: #e8e8e8; --vpn-wireguard: #e2575b; --vpn-zerotier: #ffb441; --vpn-ipsec: #8b8bf0; }
+.dm-vpns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; flex: 1; min-width: 0; }
+.dm-vpn { display: flex; align-items: center; gap: 6px; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid var(--c-Separator); border-radius: 7px; background: var(--c-BgFieldAlt); color: var(--c-LabelSecondary); font: 500 11.5px var(--font-text); text-align: left; cursor: pointer; }
+.dm-vpn > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dm-vpn .dm-vpn-logo { flex: none; }
+.dm-vpn:hover { border-color: var(--vpn, var(--c-AccentBorder)); color: var(--c-Label); }
+.dm-vpn.on { border-color: var(--vpn, var(--c-AccentBorder)); box-shadow: inset 0 0 0 1px var(--vpn, var(--c-AccentBorder)); background: var(--c-BgField); color: var(--c-Label); font-weight: 600; }
+.dm-vpn.none { color: var(--c-LabelTertiary); }
+.viewing .dm-inspector .dm-vpn.edit:not(.on) { display: none; }
+.viewing .dm-inspector .dm-vpns { grid-template-columns: 1fr; }
+.dm-legend-vpn { display: inline-flex; align-items: center; gap: 4px; }
+.dm-link-badge { pointer-events: none; }
+.dm-port-cell.sfp.on { border-style: solid; }
+/* il numero di porte: il campo e le scelte rapide del tipo */
+.dm-count { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+.dm-count .dm-field { width: 64px; flex: none; }
+.dm-picks { display: flex; flex-wrap: wrap; gap: 3px; min-width: 0; }
+.dm-pick { min-width: 26px; height: 22px; padding: 0 6px; border: 1px solid var(--c-Separator); border-radius: 6px; background: var(--c-BgFieldAlt); color: var(--c-LabelSecondary); font: 600 11px var(--font-mono); cursor: pointer; }
+.dm-pick:hover { border-color: var(--c-AccentBorder); color: var(--c-Label); }
+.dm-pick.on { border-color: var(--c-AccentBorder); background: var(--c-AccentSoft); color: var(--c-Label); }
+/* da guardare il numero basta: le scelte rapide servono a cambiarlo */
+.viewing .dm-inspector .dm-pick, .readonly .dm-inspector .dm-pick { display: none; }
 .dm-ports { display: flex; flex-direction: column; gap: 6px; }
 
 .dm-cables { display: flex; flex-direction: column; gap: 2px; }
@@ -315,6 +375,16 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .dm-kind-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .dm-kind-grid .dm-kind-tile { cursor: default; }
 .dm-kind-grid .dm-kind-tile:focus { outline: none; border-color: var(--c-Accent); }
+
+/* ------------------------------------------------------------------ le schede delle mappe */
+
+/* in vista, come in Vantage: una scheda per mappa, sottolineata quella aperta */
+.dm-map-tabs { display: none; align-items: stretch; gap: 2px; min-width: 0; height: 100%; overflow: hidden; }
+.viewing .dm-map-tabs { display: flex; }
+.dm-map-tab { flex: none; max-width: 200px; height: 34px; padding: 0 10px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--c-LabelSecondary); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
+.dm-map-tab:hover { color: var(--c-Label); }
+.dm-map-tab.on { border-bottom-color: var(--c-Accent); color: var(--c-Label); font-weight: 600; }
+.dm-map-tab.add { color: var(--c-LabelTertiary); }
 
 /* ------------------------------------------------------------------ vista e modifica */
 
@@ -347,26 +417,30 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .viewing .dm-inspector select.dm-field:disabled { background-image: none; }
 .viewing .dm-inspector .dm-field.big:disabled { margin-left: 0; width: 100%; }
 
-/* i riquadri della vista: reti e legenda, in alto a sinistra */
+/* i riquadri della vista: reti e legenda, in alto a destra come in Vantage, nei suoi colori */
 .dm-overview {
   position: absolute;
-  left: 12px;
+  right: 12px;
   top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  width: 248px;
+  gap: 10px;
+  width: 300px;
   max-height: calc(100% - 64px);
   overflow-y: auto;
   pointer-events: none;
+  transition: opacity 0.15s ease;
 }
 .dm-overview > * { pointer-events: auto; }
 .dm-app:not(.viewing) .dm-overview { display: none; }
+.dm-app.inspecting .dm-overview { opacity: 0; pointer-events: none; }
+.dm-app.inspecting .dm-overview > * { pointer-events: none; }
 .dm-over-card {
-  border: 1px solid var(--c-Separator);
-  border-radius: 12px;
-  background: var(--c-BgContent);
-  box-shadow: 0 4px 14px var(--c-Shadow);
+  padding: 0 0 10px;
+  border: 1px solid var(--vt-line);
+  border-radius: 10px;
+  background: var(--vt-panel);
+  color: var(--vt-ink);
   overflow: hidden;
 }
 .dm-over-card[hidden] { display: none; }
@@ -375,57 +449,44 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
   align-items: center;
   gap: 6px;
   width: 100%;
-  height: 32px;
-  padding: 0 10px 0 12px;
+  height: 40px;
+  padding: 0 14px 0 16px;
   border: 0;
   background: none;
-  color: var(--c-LabelSecondary);
+  color: var(--vt-ink);
   text-align: left;
   cursor: default;
 }
-.dm-over-head:hover { background: var(--c-BgHover); }
-.dm-over-title { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; }
-.dm-over-count { color: var(--c-LabelTertiary); font: 600 10.5px var(--font-mono); }
-.dm-net-list, .dm-legend-list { display: flex; flex-direction: column; gap: 1px; padding: 0 6px 6px; }
+.dm-over-head .dm-icon { color: var(--vt-muted); }
+.dm-over-title { font-size: 15px; font-weight: 700; }
+.dm-net-list, .dm-legend-list { display: flex; flex-direction: column; gap: 8px; padding: 0 16px 4px; }
 
 .dm-net {
-  display: grid;
-  grid-template-columns: 3px auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  min-height: 30px;
-  padding: 3px 6px 3px 4px;
-  border: 0;
-  border-radius: 7px;
-  background: none;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  padding: 0;
+  border: 1px solid var(--vt-line);
+  border-radius: 6px;
+  background: var(--vt-inset);
+  color: var(--vt-ink);
   text-align: left;
+  overflow: hidden;
   cursor: default;
 }
-.dm-net:hover { background: var(--c-BgHover); }
-.dm-net.on { background: var(--tone-soft); }
-.dm-net.off { opacity: 0.5; }
-.dm-net-stripe { align-self: stretch; border-radius: 2px; background: var(--tone); }
-.dm-net-vlan { padding: 1px 6px; border-radius: 5px; background: var(--tone-soft); color: var(--tone); font: 600 10.5px var(--font-mono); white-space: nowrap; }
-.dm-net-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
-.dm-net-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 500; }
-.dm-net-none { color: var(--c-LabelTertiary); font-weight: 400; }
-.dm-net-cidr { overflow: hidden; text-overflow: ellipsis; color: var(--c-LabelTertiary); font: 10.5px var(--font-mono); white-space: nowrap; }
+.dm-net:hover { border-color: var(--net); }
+.dm-net.on { border-color: var(--net); box-shadow: inset 0 0 0 1px var(--net); }
+.dm-net.off { opacity: 0.45; }
+.dm-net-stripe { flex: none; width: 4px; background: var(--net); }
+.dm-net-text { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1; padding: 6px 10px; line-height: 16px; }
+.dm-net-vlan { flex: none; color: var(--net); font: 700 10px var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; }
+.dm-net-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; }
+.dm-net-none { color: var(--vt-muted); font-weight: 400; }
+.dm-net-cidr { flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; color: var(--vt-muted); font: 11px var(--font-mono); white-space: nowrap; }
 
-.dm-legend-row { display: flex; align-items: center; gap: 10px; min-height: 26px; padding: 2px 6px; }
+.dm-legend-row { display: flex; align-items: center; gap: 12px; min-height: 20px; font-size: 13px; color: var(--vt-ink); }
 .dm-legend-sample { flex: none; overflow: visible; }
-.dm-legend-sample path { fill: none; stroke: var(--wire, var(--c-LabelTertiary)); stroke-width: 2.2; stroke-linecap: round; }
-.dm-legend-sample.w-up { --wire: var(--c-Green); }
-.dm-legend-sample.w-down { --wire: var(--c-Red); }
-.dm-legend-sample.w-down path { stroke-dasharray: 6 4; }
-.dm-legend-sample.w-trunk { --wire: var(--c-LabelSecondary); }
-.dm-legend-sample.w-trunk path { stroke-width: 2.8; }
-.dm-legend-sample.w-net { --wire: var(--c-Blue); }
-.dm-legend-sample.w-net path { stroke-dasharray: 0.1 5.5; }
-.dm-legend-sample.w-wifi { --wire: var(--c-Purple); }
-.dm-legend-sample.w-wifi path { stroke-dasharray: 5 5; }
-.dm-legend-sample.w-fiber { --wire: var(--c-Teal); }
-.dm-legend-label { display: flex; flex-direction: column; min-width: 0; font-size: 12px; line-height: 1.25; }
-.dm-legend-sub { color: var(--c-LabelTertiary); font-size: 10.5px; }
+.dm-legend-label { min-width: 0; }
 
 /* finestre strette: i riquadri lasciano posto alla mappa */
 @media (max-width: 720px) {

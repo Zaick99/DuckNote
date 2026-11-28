@@ -26,6 +26,15 @@ public sealed class HostScanResult
     public string OperatingSystem { get; set; } = string.Empty;
     public string DeviceType { get; set; } = string.Empty;
 
+    /// <summary>Il modello, quando l'apparato lo dice (mDNS, WMI, la stampante): "MacBook Pro (MacBookPro18,3)".</summary>
+    public string Model { get; set; } = string.Empty;
+
+    /// <summary>Da che cosa si e' riconosciuto: "TTL 64 · porta 62078 (iPhone/iPad) · MAC Apple".</summary>
+    public string Evidence { get; set; } = string.Empty;
+
+    /// <summary>I servizi annunciati con mDNS: "airplay, companion-link, device-info".</summary>
+    public string MdnsServices { get; set; } = string.Empty;
+
     public IReadOnlyList<int> OpenPorts { get; set; } = [];
     public string Services { get; set; } = string.Empty;
 

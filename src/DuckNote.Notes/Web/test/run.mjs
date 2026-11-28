@@ -46,6 +46,19 @@ const center = async (selector) => {
   assert(box, `${selector} non c'e'`);
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 };
+// il clic su un apparato va sul suo corpo, all'altezza dell'icona: a destra c'e' il pannello
+// delle porte, e ogni presa e' un bersaglio suo (il riquadro della porta col mouse sopra)
+const body = (id) => center(`[data-id="${id}"] .dm-node-tile`);
+const clickNode = async (id, { modifiers = [] } = {}) => {
+  const at = await body(id);
+  for (const key of modifiers) await page.keyboard.down(key);
+  await page.mouse.click(at.x, at.y);
+  for (const key of modifiers) await page.keyboard.up(key);
+};
+const dblclickNode = async (id) => {
+  const at = await body(id);
+  await page.mouse.dblclick(at.x, at.y);
+};
 const drag = async (from, to, { steps = 12, shift = false } = {}) => {
   if (shift) await page.keyboard.down('Shift');
   await page.mouse.move(from.x, from.y);
@@ -133,10 +146,12 @@ await check('la scheda del cavo cambia velocita VLAN e porte', async () => {
   const link = (await map()).links[0];
   assert(link.kind === 'fiber' && link.speed === '10G' && link.pa === 'sfp1' && link.pb === 'Gi0/8' && link.vlan === '10,20', JSON.stringify(link));
   await frame();
-  const label = await page.textContent('[data-id="lone"] .dm-link-chip text');
-  assert(label === '10G · VLAN 10,20', label);
+  const label = await page.textContent('.dm-link-labels[data-id="lone"] .dm-link-speed');
+  assert(label === '10G', label);
+  // due VLAN: e' un trunk, con la seconda linea chiara sotto
+  assert(await page.evaluate(() => document.querySelector('.dm-link[data-id="lone"]').classList.contains('trunk')), 'il cavo non e\' un trunk');
   // la porta 8 dello switch adesso e' occupata nel pannello frontale
-  await page.click('[data-id="nswitch"] .dm-node-card');
+  await clickNode('nswitch');
   const used = await page.$$eval('.dm-port-cell.on', (cells) => cells.map((c) => c.textContent));
   assert(used.join(',') === '8', used.join(','));
 });
@@ -176,8 +191,8 @@ await check('selezione col rettangolo e allinea a sinistra', async () => {
 
 await check('Z fa una zona attorno agli apparati e la zona li porta con se', async () => {
   await reset(two);
-  await page.click('[data-id="nrouter"] .dm-node-card');
-  await page.click('[data-id="nswitch"] .dm-node-card', { modifiers: ['Shift'] });
+  await clickNode('nrouter');
+  await clickNode('nswitch', { modifiers: ['Shift'] });
   await page.keyboard.press('z');
   let m = await map();
   assert(m.zones.length === 1, JSON.stringify(m.zones));
@@ -279,7 +294,7 @@ await check('copia e incolla con la tastiera duplicano cavi compresi', async () 
 
 await check('Canc elimina l apparato e i suoi cavi', async () => {
   await reset({ ...two, maps: [{ ...two.maps[0], links: [{ id: 'lone', a: 'nrouter', b: 'nswitch' }] }] });
-  await page.click('[data-id="nswitch"] .dm-node-card');
+  await clickNode('nswitch');
   await page.keyboard.press('Delete');
   const m = await map();
   assert(m.nodes.length === 1 && m.links.length === 0, JSON.stringify(m));
@@ -305,7 +320,7 @@ await check('Disponi mette Internet in alto e gli apparati finali in basso', asy
 
 await check('il nome si scrive nella scheda e si vede sulla mappa', async () => {
   await reset(two);
-  await page.dblclick('[data-id="nrouter"] .dm-node-card');
+  await dblclickNode('nrouter');
   await page.keyboard.press(`${mod}+a`);
   await page.keyboard.type('Router principale con spazi');
   await page.keyboard.press('Enter');
@@ -318,7 +333,7 @@ await check('il nome si scrive nella scheda e si vede sulla mappa', async () => 
 
 await check('un indirizzo scritto entra solo quando ci si ferma', async () => {
   await reset(two);
-  await page.click('[data-id="nswitch"] .dm-node-card');
+  await clickNode('nswitch');
   await page.click('.dm-inspector [data-field="host"]');
   await page.keyboard.type('10.0.0.');
   await page.waitForTimeout(300);
@@ -347,33 +362,33 @@ await check('esportazioni PNG SVG e CSV', async () => {
   assert(csv && csv.name === 'Prova - cavi.csv' && csv.rows[0].join('|') === 'Router|eth1|Switch|Gi0/1|Rame|1G||', JSON.stringify(csv?.rows));
 });
 
-await check('le etichette di porte e VLAN non si coprono e restano visibili', async () => {
+await check('le velocita sui cavi non si coprono e le porte si accendono sul pannello', async () => {
   // uno switch con otto cavi a ventaglio verso apparati vicini, due cavi paralleli e uno cortissimo
   const nodes = [{ id: 'nsw', kind: 'switch', name: 'Switch', x: 0, y: 0, ports: 24 }];
   const links = [];
   for (let i = 0; i < 8; i++) {
-    nodes.push({ id: `npc${i}`, kind: 'pc', name: `PC ${i}`, x: -560 + i * 160, y: 190 });
+    nodes.push({ id: `npc${i}`, kind: 'pc', name: `PC ${i}`, x: -1120 + i * 300, y: 260 });
     links.push({ id: `lpc${i}`, a: 'nsw', b: `npc${i}`, pa: `Gi1/0/${i + 1}`, pb: 'eth0', speed: '1G', vlan: String(10 + i) });
   }
-  nodes.push({ id: 'nnas', kind: 'nas', name: 'NAS', x: 400, y: -40 });
+  nodes.push({ id: 'nnas', kind: 'nas', name: 'NAS', x: 760, y: -40 });
   links.push({ id: 'lagg1', a: 'nsw', b: 'nnas', pa: 'Gi1/0/23', pb: 'LAN1', speed: '10G', vlan: '20' });
   links.push({ id: 'lagg2', a: 'nsw', b: 'nnas', pa: 'Gi1/0/24', pb: 'LAN2', speed: '10G', vlan: '20' });
-  nodes.push({ id: 'nap', kind: 'ap', name: 'AP', x: 0, y: -130 });
+  nodes.push({ id: 'nap', kind: 'ap', name: 'AP', x: 0, y: -200 });
   links.push({ id: 'lshort', a: 'nsw', b: 'nap', pa: 'Gi1/0/9', pb: 'PoE', vlan: '10,20,30' });
-  await reset({ v: 1, current: 'mlab', maps: [{ id: 'mlab', name: 'Etichette', nodes, links, zones: [], view: { x: 640, y: 240, k: 1 } }] });
+  await reset({ v: 1, current: 'mlab', maps: [{ id: 'mlab', name: 'Etichette', nodes, links, zones: [], view: { x: 600, y: 260, k: 0.5 } }] });
   await frame();
-  // la pillola, non il gruppo: il filo che lega un'etichetta lontana al suo cavo puo' passare sotto le altre
-  const boxes = await page.$$eval('.dm-labels .dm-tag', (els) => els.map((el) => {
-    const r = el.querySelector('rect').getBoundingClientRect();
-    return { id: el.closest('[data-id]').dataset.id, cls: el.getAttribute('class'), shown: getComputedStyle(el).display !== 'none', x: r.x, y: r.y, w: r.width, h: r.height };
+  const boxes = await page.$$eval('.dm-link-labels', (els) => els.map((el) => {
+    const r = el.querySelector('.dm-link-speed').getBoundingClientRect();
+    return { id: el.dataset.id, text: el.textContent, shown: getComputedStyle(el).display !== 'none' && r.width > 0, x: r.x, y: r.y, w: r.width, h: r.height };
   }));
-  // i nove cavi che escono da sopra o da sotto si attaccano alla loro porta, che si accende sul
-  // pannello: li' il nome della porta non serve. I due verso il NAS escono di lato e lo tengono.
-  const expected = links.length * 3 - 9;
+  // la velocita' sta accanto al capo di arrivo di ogni cavo che ce l'ha (il cavo dell'AP non ce l'ha)
   const shown = boxes.filter((b) => b.shown);
-  assert(shown.length === expected, `etichette visibili ${shown.length} su ${expected}`);
+  assert(shown.length === 10 && shown.filter((b) => b.text === '1G').length === 8 && shown.filter((b) => b.text === '10G').length === 2, JSON.stringify(shown.map((b) => `${b.id}:${b.text}`)));
+  // ogni porta nominata si accende sul pannello, coi trattini della sua VLAN; quelle libere restano spente
   const lit = await page.$$eval('[data-id="nsw"] .dm-jack.used', (els) => els.map((el) => Number(el.dataset.port)).sort((x, y) => x - y));
   assert(lit.join(',') === '1,2,3,4,5,6,7,8,9,23,24', `porte accese: ${lit}`);
+  const bars = await page.$$eval('[data-id="nsw"] .dm-jack.used[data-port="9"] rect[width="4"]', (els) => els.map((el) => el.getAttribute('height')));
+  assert(bars.join(',') === '4,4,4', `trattini della porta trunk: ${bars}`);
   const cards = await page.$$eval('.dm-node-card, .dm-node-tab', (els) => els.map((el) => el.getBoundingClientRect()).map((r) => ({ x: r.x, y: r.y, w: r.width, h: r.height })));
   const hit = (a, b) => a.x < b.x + b.w - 0.5 && a.x + a.w > b.x + 0.5 && a.y < b.y + b.h - 0.5 && a.y + a.h > b.y + 0.5;
   const clashes = [];
@@ -385,25 +400,140 @@ await check('le etichette di porte e VLAN non si coprono e restano visibili', as
   await page.screenshot({ path: `${out}etichette.png` });
 });
 
+await check('porte su ogni apparato: scelte rapide, eth0 e il riquadro della porta', async () => {
+  const doc = {
+    v: 1,
+    current: 'mport',
+    maps: [{
+      id: 'mport',
+      name: 'Porte',
+      nodes: [
+        { id: 'nsw', kind: 'switch', name: 'Switch', x: 0, y: 0, ports: 8, sfp: 2 },
+        { id: 'npc', kind: 'pc', name: 'Workstation', x: 40, y: 260 },
+        { id: 'nsrv', kind: 'server', name: 'Server', x: 760, y: 0, ports: 2 },
+      ],
+      links: [
+        { id: 'lpc', a: 'nsw', b: 'npc', pa: 'Gi0/3', pb: 'eth0', speed: '1G', vlan: '10' },
+        { id: 'lsrv', a: 'nsw', b: 'nsrv', pa: 'Te1/0/1', pb: 'eth1', speed: '10G', vlan: '10,20' },
+      ],
+      zones: [{ id: 'zoff', name: 'Uffici', vlan: '10', tone: 'Green', x: -40, y: 200, w: 400, h: 200 }],
+      view: { x: 220, y: 120, k: 1 },
+    }],
+  };
+  await reset(doc);
+  await frame();
+  // il PC non ha porte: la scheda le offre, con le scelte rapide del tipo
+  await clickNode('npc');
+  assert(await page.isVisible('.dm-inspector [data-field="ports"]'), 'il PC non ha il campo delle porte');
+  const picks = await page.$$eval('.dm-inspector .dm-pick[data-pick^="ports-"]', (els) => els.map((el) => el.textContent));
+  assert(picks.join(',') === '–,1,2', `scelte del PC: ${picks}`);
+  await page.click('.dm-inspector [data-pick="ports-2"]');
+  await frame();
+  assert((await map()).nodes.find((n) => n.id === 'npc').ports === 2, 'la scelta rapida non scrive le porte');
+  // eth0 e' la prima presa (il PC conta da zero), Gi0/3 la terza dello switch, Te1/0/1 la prima SFP
+  const lit = async (id) => page.$$eval(`[data-id="${id}"] .dm-jack.used`, (els) => els.map((el) => `${el.dataset.kind}:${el.dataset.port}`).sort());
+  assert((await lit('npc')).join(',') === 'rj45:1', `PC: ${await lit('npc')}`);
+  assert((await lit('nsw')).join(',') === 'cage:1,rj45:3', `switch: ${await lit('nsw')}`);
+  assert((await lit('nsrv')).join(',') === 'rj45:2', `server: ${await lit('nsrv')}`);
+  // il pannello nella scheda dello switch conta anche le SFP
+  await clickNode('nsw');
+  const cells = await page.$$eval('.dm-port-cell.on', (els) => els.map((el) => el.textContent));
+  assert(cells.join(',') === '3,S1', `celle accese: ${cells}`);
+  await page.keyboard.press('Escape');
+  // il riquadro della porta col mouse sopra: numero, nome, chi c'e' dall'altra parte, VLAN
+  await page.hover('[data-id="nsw"] .dm-jack.used[data-port="3"]');
+  await page.waitForSelector('.dm-port-tip:not([hidden])');
+  const tip = await page.textContent('.dm-port-tip');
+  assert(tip.includes('Porta 3') && tip.includes('Gi0/3') && tip.includes('Workstation') && tip.includes('VLAN 10 · Uffici'), tip);
+  await page.hover('[data-id="nsw"] .dm-jack[data-kind="cage"][data-port="1"]');
+  const sfp = await page.textContent('.dm-port-tip');
+  assert(sfp.includes('SFP 1') && sfp.includes('Server') && sfp.includes('taggate 10, 20'), sfp);
+  await page.mouse.move(5, 5);
+  assert(!(await page.isVisible('.dm-port-tip')), 'il riquadro resta');
+});
+
+await check('collegamenti VPN col logo e il colore del servizio', async () => {
+  const doc = {
+    v: 1,
+    current: 'mvpn',
+    maps: [{
+      id: 'mvpn',
+      name: 'Sedi',
+      nodes: [
+        { id: 'nfw', kind: 'firewall', name: 'Sede', x: 0, y: 0, ports: 4 },
+        { id: 'nnas', kind: 'nas', name: 'NAS casa', x: 0, y: 320, ports: 2 },
+        { id: 'nvps', kind: 'server', name: 'VPS', x: 520, y: 320 },
+      ],
+      links: [
+        { id: 'lts', a: 'nfw', b: 'nnas', kind: 'vpn', vpn: 'tailscale', pa: 'tailscale0', pb: 'tailscale0' },
+        { id: 'lwg', a: 'nfw', b: 'nvps', kind: 'vpn', vpn: 'wireguard', pa: 'wg0', pb: 'wg0', speed: '1G' },
+      ],
+      zones: [],
+      view: { x: 260, y: 120, k: 1 },
+    }],
+  };
+  await reset(doc, { mode: 'view' });
+  await frame();
+  // il colore del logo, a pallini, e il logo a meta' strada
+  const look = await page.$$eval('.dm-link', (els) => Object.fromEntries(els.map((el) => [el.dataset.id, `${el.dataset.vpn} ${el.querySelector('.dm-link-line').getAttribute('stroke')} ${el.querySelector('.dm-link-line').getAttribute('stroke-linecap')}`])));
+  assert(look.lts === 'tailscale var(--vpn-tailscale) round' && look.lwg === 'wireguard var(--vpn-wireguard) round', JSON.stringify(look));
+  const badges = await page.$$eval('.dm-link-labels', (els) => els.map((el) => [el.dataset.id, el.querySelectorAll('.dm-link-badge path').length, getComputedStyle(el).display !== 'none']));
+  assert(badges.every(([, paths, on]) => paths > 0 && on), JSON.stringify(badges));
+  // wg0 e tailscale0 sono interfacce, non prese: il pannello del firewall resta spento
+  assert((await page.$$('[data-id="nfw"] .dm-jack.used')).length === 0, 'una VPN ha acceso una presa');
+  // la legenda: una riga per servizio, col logo
+  const legend = await page.$$eval('.dm-legend-row', (els) => els.map((el) => el.dataset.legend));
+  assert(legend.includes('vpn-tailscale') && legend.includes('vpn-wireguard') && !legend.includes('style-dotted'), legend.join(' '));
+  // la scheda del collegamento: si cambia il servizio e cambia il colore
+  await page.click('.dm-edit-toggle');
+  await page.click('[data-id="lts"] .dm-link-hit', { force: true });
+  assert((await page.textContent('.dm-inspector .dm-insp-title')) === 'Collegamento VPN', 'titolo della scheda');
+  assert(await page.isVisible('.dm-inspector .dm-vpn.on[data-vpn="tailscale"]'), 'Tailscale non e\' scelto');
+  await page.click('.dm-inspector .dm-vpn[data-vpn="netbird"]');
+  await frame();
+  assert((await map()).links.find((l) => l.id === 'lts').vpn === 'netbird', 'il servizio non cambia');
+  assert((await page.getAttribute('.dm-link[data-id="lts"] .dm-link-line', 'stroke')) === 'var(--vpn-netbird)', 'il colore non cambia');
+  // un collegamento non VPN non mostra i servizi
+  await page.click('.dm-inspector .dm-choice.k-eth');
+  await frame();
+  assert(!(await page.isVisible('.dm-inspector .dm-vpns')), 'i servizi restano su un cavo');
+  assert((await page.getAttribute('.dm-link[data-id="lts"]', 'data-vpn')) === '', 'il cavo resta della VPN');
+  await page.keyboard.press(`${mod}+z`);
+  // l'esportazione porta il logo e il colore per esteso
+  await messages();
+  await page.click('button:has-text("Esporta")');
+  await page.click('.dm-menu-row:has-text("Disegno SVG")');
+  await page.click('button:has-text("Esporta")');
+  await page.click('.dm-menu-row:has-text("Elenco cavi")');
+  const sent = (await messages()).filter((x) => x.t === 'export');
+  const svg = sent.find((x) => x.format === 'svg')?.text ?? '';
+  // Annulla ha rimesso NetBird: arancio NetBird e rosso WireGuard, senza variabili
+  assert(svg.includes('#f68330') && svg.includes('#88171a') && !svg.includes('var(--'), 'colori dei servizi mancanti nell esportazione');
+  const rows = sent.find((x) => x.format === 'csv')?.rows ?? [];
+  assert(rows.some((row) => row.includes('VPN · NetBird')) && rows.some((row) => row.includes('VPN · WireGuard')), JSON.stringify(rows));
+});
+
 await check('togliere un dato dalla scheda lo toglie anche dalla mappa', async () => {
   const visible = (selector) => page.$eval(selector, (el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0);
   const far = two.maps[0].nodes.map((n) => (n.id === 'nswitch' ? { ...n, y: 320, ports: 8 } : { ...n }));
   await reset({ ...two, maps: [{ ...two.maps[0], nodes: far, links: [{ id: 'lone', a: 'nrouter', b: 'nswitch', speed: '1G', vlan: '10', pa: 'eth1', pb: 'Gi0/1' }],
     zones: [{ id: 'zlan', name: 'LAN', cidr: '10.0.0.0/24', vlan: '10', x: -40, y: -60, w: 300, h: 460 }] }] });
   await frame();
-  // Gi0/1 e' la porta 1 dello switch: il cavo ci si attacca e la accende, senza etichetta
-  assert(await visible('[data-id="lone"] .dm-link-chip') && await visible('[data-id="lone"] .dm-port-a') && !(await visible('[data-id="lone"] .dm-port-b')), 'etichette mancanti all inizio');
+  const stroke = () => page.getAttribute('.dm-link[data-id="lone"] .dm-link-line', 'stroke');
+  // Gi0/1 e' la porta 1 dello switch: il cavo ci si attacca e la accende; la VLAN sola colora il cavo
+  assert(await visible('.dm-link-labels[data-id="lone"]') && (await page.textContent('.dm-link-labels[data-id="lone"]')) === '1G', 'velocita\' mancante all inizio');
   assert(await page.isVisible('[data-id="nswitch"] .dm-jack.used[data-port="1"]'), 'la porta 1 non si e\' accesa');
+  assert((await stroke()).includes('--vt-tone-'), `il cavo access non ha il colore della VLAN: ${await stroke()}`);
 
   await page.click('[data-id="lone"] .dm-link-hit', { force: true });
   await page.selectOption('.dm-inspector select', '');
   await frame();
-  assert((await page.textContent('[data-id="lone"] .dm-link-chip text')) === 'VLAN 10', 'la velocita\' e\' rimasta');
+  assert(!(await visible('.dm-link-labels[data-id="lone"]')), 'la velocita\' e\' rimasta');
   await page.fill('.dm-inspector [data-field="vlan"]', '');
   await page.fill('.dm-inspector [data-field="pa"]', '');
   await page.fill('.dm-inspector [data-field="pb"]', '');
   await frame();
-  for (const part of ['.dm-link-chip', '.dm-port-a', '.dm-port-b']) assert(!(await visible(`[data-id="lone"] ${part}`)), `${part} ancora visibile`);
+  assert(!(await stroke()).includes('--vt-tone-'), 'il colore della VLAN e\' rimasto sul cavo');
   assert((await page.$$('[data-id="nswitch"] .dm-jack.used')).length === 0, 'la porta 1 e\' rimasta accesa');
 
   // la zona: senza rete e senza VLAN resta solo il nome
@@ -476,7 +606,7 @@ await check('sola lettura: niente si modifica', async () => {
   await reset(two, { readonly: true });
   assert(!(await page.isVisible('.dm-library')), 'la libreria si vede');
   assert(await page.isDisabled('.dm-edit-toggle'), 'Modifica mappa si puo\' premere');
-  await page.click('[data-id="nswitch"] .dm-node-card');
+  await clickNode('nswitch');
   await page.keyboard.press('Delete');
   await page.keyboard.press('e');
   const m = await map();
@@ -560,9 +690,13 @@ await check('Reti e Legenda raccontano la mappa e accendono una VLAN', async () 
   // la zona Uffici con la sua VLAN e la rete, poi le VLAN 30 e 40 del trunk, che non hanno zona; il Rack non e' una rete
   assert(nets.length === 3 && nets[0].includes('VLAN 10') && nets[0].includes('Uffici') && nets[0].includes('10.0.10.0/24')
     && nets[1].includes('VLAN 30') && nets[2].includes('VLAN 40'), JSON.stringify(nets));
-  const legend = await page.$$eval('.dm-legend-row', (els) => els.map((el) => el.querySelector('svg').getAttribute('class')));
-  // pc1 risponde (VLAN 10: una VLAN), la stampante e' giu' (spento), il NAS ha due VLAN (trunk)
-  assert(legend.join(' ') === 'dm-legend-sample w-down dm-legend-sample w-access dm-legend-sample w-trunk', legend.join(' '));
+  const legend = await page.$$eval('.dm-legend-row', (els) => els.map((el) => el.dataset.legend));
+  // una VLAN sola (porta access), due VLAN (trunk), i trattini delle VLAN sulle porte del core;
+  // nessuna velocita' scritta e un tratto solo: quelle righe non servono
+  assert(legend.join(' ') === 'access trunk port-vlans', legend.join(' '));
+  // la stampante e' giu': il suo cavo e' rosso tratteggiato, quello di pc1 nel verde della zona
+  const lines = await page.$$eval('.dm-link', (els) => Object.fromEntries(els.map((el) => [el.dataset.id, `${el.querySelector('.dm-link-line').getAttribute('stroke')} ${el.querySelector('.dm-link-line').getAttribute('stroke-dasharray') ?? ''}`])));
+  assert(lines.lprn.startsWith('var(--vt-crit) 6 5') && lines.lpc1.startsWith('var(--vt-tone-Green)'), JSON.stringify(lines));
   await page.click('.dm-net:has-text("Uffici")');
   assert((await page.evaluate(() => dm.scene.filter.vlan)) === 10 && (await page.textContent('.dm-toolbar .dm-tool:has-text("VLAN")')).includes('VLAN 10'), 'la VLAN non si accende');
   await frame();

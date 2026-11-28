@@ -3,77 +3,113 @@
 // ci passa sotto. Ogni oggetto del modello ha il suo elemento, creato una volta e poi solo
 // aggiornato (render si chiama spesso: a ogni fotogramma di un trascinamento).
 
+import { vpnOf, vpnColor, badgeMarkup, badgePoint } from './vpn.js';
 import { s, attr, text, toggleClass, fit, measure, shown } from '../common/dom.js';
 import {
-  KIND, MIN_ZOOM, MAX_ZOOM, PORTED, TONES, TAB_H, carriesVlan, parseVlans, sizeOf, panelOf, portCell, boundsOf,
+  KIND, MIN_ZOOM, MAX_ZOOM, TONES, TAB_H, TAB_RAISE, PAD_X, CONTENT_TOP, ICON, TEXT_W,
+  carriesVlan, parseVlans, sizeOf, panelOf, panelBox, boundsOf,
 } from './model.js';
 import { kinds as kindIcons } from '../common/icons.js';
 import { cableRoutes } from './geometry.js';
 import { tween, Curves, still } from '../common/motion.js';
-import { placeLabels } from './labels.js';
 
 export const FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif';
 export const MONO = '"SF Mono", ui-monospace, Menlo, "Cascadia Mono", Consolas, monospace';
-export const NAME_FONT = `600 12.5px ${FONT}`;
-export const SUB_FONT = `11px ${MONO}`;
-export const SUB_TEXT_FONT = `11px ${FONT}`;
-export const CHIP_FONT = `10.5px ${MONO}`;
-export const ZONE_FONT = `600 12px ${FONT}`;
+export const ZONE_FONT = `700 13px ${FONT}`;
 export const ZONE_SUB_FONT = `11px ${MONO}`;
-export const TAB_FONT = `600 11.5px ${FONT}`;
-export const BADGE_FONT = `700 9px ${FONT}`;
-export const TITLE_FONT = `600 13px ${FONT}`;
-export const IP_FONT = `11px ${MONO}`;
-export const INFO_FONT = `10.5px ${FONT}`;
+const NAME_FONT = `700 14px ${FONT}`;
+const ROLE_FONT = `12px ${FONT}`;
+const STATUS_FONT = `700 11px ${FONT}`;
+const MODEL_FONT = `700 13px ${FONT}`;
+const ADDRESS_FONT = `11px ${MONO}`;
+const FIGURE_FONT = `12px ${FONT}`;
+const FIGURE_BOLD = `700 12px ${FONT}`;
+const CAPTION_FONT = `8.5px ${FONT}`;
+const CLOUD_FONT = `700 17px ${FONT}`;
 
-/** Dove comincia il testo nel corpo della scheda (dopo la tessera con l'icona). */
-export const TEXT_X = 54;
+// Il disegno di Vantage (github.com/levi-xy/vantage, licenza MIT), rifatto in SVG: le parti
+// fisiche delle prese hanno gli stessi colori nei due temi (un'apertura scura, i contatti d'oro).
+const OPENING = '#12161c';
+const GOLD = '#c9a227';
 
-/** Il distintivo dello stato nella linguetta: UP verde, DOWN rosso, ? arancio (da verificare). */
-export const BADGES = { up: 'UP', down: 'DOWN', wait: '?' };
+/** Le parole dello stato nella linguetta, come in Vantage: UP verde, DOWN rosso. */
+export const STATUS = { up: 'UP', down: 'DOWN' };
 
-/** La linguetta di un apparato: il nome, il distintivo dello stato e fin dove arriva. */
+/** Il colore di un tono nella tavolozza della mappa (quella degli apparati di Vantage). */
+export const toneVar = (tone) => `var(--vt-tone-${tone})`;
+
+const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const r1 = (value) => Math.round(value * 10) / 10;
+
+/** Il colore di un apparato: quello del suo tipo. */
+export const colorOf = (node) => toneVar((KIND[node.kind] ?? KIND.other).tone);
+
+/**
+ * La linguetta di un apparato, a cavallo del bordo di sopra: il nome, "· posto" e lo stato.
+ * Torna i testi gia' tagliati e la larghezza.
+ */
 export function tabOf(node, state) {
   const size = sizeOf(node);
-  const badge = BADGES[state] ?? '';
-  const badgeWidth = badge ? Math.ceil(measure(badge, BADGE_FONT)) + 8 : 0;
-  const room = Math.max(40, size.w - 20 - 20 - badgeWidth);
-  const name = fit(node.name || KIND[node.kind]?.label || 'Apparato', TAB_FONT, room);
-  const nameWidth = Math.ceil(measure(name, TAB_FONT));
-  return { name, badge, nameWidth, width: 10 + nameWidth + (badge ? badgeWidth : 0) + 10 };
-}
-
-/** Le righe del corpo della scheda: il modello (o il tipo), l'indirizzo, quello che si sa adesso. */
-export function cardLines(node, host, state) {
-  const size = sizeOf(node);
-  const room = size.w - TEXT_X - 12;
-  const kind = KIND[node.kind]?.label ?? 'Apparato';
-  const title = fit(node.model || (PORTED.has(node.kind) && node.ports ? `${kind} · ${node.ports} porte` : kind), TITLE_FONT, room);
-  const ip = node.host ? fit(node.host, IP_FONT, room) : '';
-  const facts = [];
-  if (state === 'up') facts.push(host?.rtt ? `risponde in ${host.rtt}` : 'risponde');
-  else if (state === 'down') facts.push('non risponde');
-  else if (state === 'wait') facts.push('da verificare');
-  else if (state === 'unknown') facts.push('mai controllato');
-  if (state === 'up' && host?.os) facts.push(host.os);
-  if (node.place) facts.push(node.place);
-  return { title, ip, info: fit(facts.join(' · ') || (node.host ? '' : 'senza indirizzo'), INFO_FONT, room) };
+  const status = STATUS[state] ?? '';
+  const statusW = status ? Math.ceil(measure(status, STATUS_FONT)) : 0;
+  const room = Math.max(48, size.w - 2 * PAD_X - 20 - (status ? statusW + 6 : 0));
+  const name = fit(node.name || KIND[node.kind]?.label || 'Apparato', NAME_FONT, room);
+  const nameW = Math.ceil(measure(name, NAME_FONT));
+  const left = room - nameW - 6;
+  const role = node.place && left > 24 ? fit(`· ${node.place}`, ROLE_FONT, left) : '';
+  const roleW = role ? Math.ceil(measure(role, ROLE_FONT)) : 0;
+  return { name, nameW, role, roleW, status, statusW, width: 10 + nameW + (role ? 6 + roleW : 0) + (status ? 6 + statusW : 0) + 10 };
 }
 
 /**
- * La nuvola di Internet in un riquadro w x h: quattro gobbe sopra una base piatta. Le stesse
- * proporzioni a ogni misura, cosi' resta una nuvola anche nell'esportazione.
+ * Le righe della scheda: il modello (o il tipo), l'indirizzo, e la riga dei valori come quella
+ * di Vantage ("Risposta 0.6 ms · Sistema Linux"), coi valori nel colore dell'apparato.
+ * figure: [{ label, value }] oppure { text, tone } quando c'e' solo da dire lo stato.
  */
-export function cloudPath(w, h) {
-  const x = (v) => (v * w).toFixed(1);
-  const y = (v) => (v * h).toFixed(1);
-  return `M${x(0.2)} ${y(0.88)} L${x(0.8)} ${y(0.88)}`
-    + ` C${x(0.95)} ${y(0.88)} ${x(0.99)} ${y(0.62)} ${x(0.86)} ${y(0.5)}`
-    + ` C${x(0.9)} ${y(0.25)} ${x(0.7)} ${y(0.1)} ${x(0.56)} ${y(0.2)}`
-    + ` C${x(0.48)} ${y(0.02)} ${x(0.26)} ${y(0.06)} ${x(0.26)} ${y(0.3)}`
-    + ` C${x(0.08)} ${y(0.28)} ${x(0.02)} ${y(0.5)} ${x(0.1)} ${y(0.64)}`
-    + ` C${x(0.01)} ${y(0.76)} ${x(0.07)} ${y(0.88)} ${x(0.2)} ${y(0.88)} Z`;
+export function cardLines(node, host, state, used) {
+  const panel = panelOf(node);
+  const room = (panel ? TEXT_W : sizeOf(node).w - PAD_X) - PAD_X - ICON - 10;
+  const kind = KIND[node.kind]?.label ?? 'Apparato';
+  const title = fit(node.model || (panel && node.ports ? `${kind} · ${node.ports} porte` : kind), MODEL_FONT, room);
+  const address = node.host ? fit(node.host, ADDRESS_FONT, room) : '';
+  const full = sizeOf(node).w - 2 * PAD_X - (panel ? sizeOf(node).w - PAD_X - TEXT_W : 0);
+  let figure;
+  if (state === 'down') figure = { text: 'Non risponde', tone: 'var(--vt-crit-text)' };
+  else if (state === 'wait') figure = { text: 'Da verificare', tone: 'var(--vt-warn)' };
+  else if (state === 'unknown') figure = { text: 'Mai controllato', tone: 'var(--vt-muted)' };
+  else if (state === 'none') figure = { text: node.place || 'Senza indirizzo: non si controlla', tone: 'var(--vt-muted)' };
+  else {
+    const pairs = [];
+    if (panel && used) pairs.push({ label: 'Porte', value: `${used.size}/${(node.ports || 0) + (node.sfp || 0)}` });
+    if (host?.rtt) pairs.push({ label: 'Risposta', value: host.rtt });
+    if (host?.os) pairs.push({ label: 'Sistema', value: host.os });
+    if (pairs.length === 0) pairs.push({ label: 'Stato', value: 'risponde' });
+    figure = fitPairs(pairs, Math.max(60, full));
+  }
+  return { title, address, figure };
 }
+
+/** Le coppie "nome valore" della riga dei valori finche' ci stanno (l'ultima tagliata). */
+function fitPairs(pairs, room) {
+  const out = [];
+  let used = 0;
+  for (const pair of pairs) {
+    const sep = out.length ? measure(' · ', FIGURE_FONT) : 0;
+    const label = `${pair.label} `;
+    const width = sep + measure(label, FIGURE_FONT) + measure(pair.value, FIGURE_BOLD);
+    if (used + width > room) {
+      const rest = room - used - sep - measure(label, FIGURE_FONT);
+      if (rest > 24) out.push({ label, value: fit(pair.value, FIGURE_BOLD, rest) });
+      break;
+    }
+    out.push({ label, value: pair.value });
+    used += width;
+  }
+  return out;
+}
+
+/** La nuvola di Vantage (viewBox 210 x 110), stirata sulla misura data. */
+const CLOUD = 'M50 102 C24 102 8 88 8 70 C8 54 20 44 36 42 C38 22 58 8 82 8 C100 8 114 16 122 28 C128 24 136 22 144 22 C164 22 178 36 180 52 C194 54 202 66 202 78 C202 92 190 102 174 102 Z';
 
 /** Il colore di ogni VLAN: quello della zona che la porta, oppure uno fisso dal suo numero. */
 export function vlanTones(map) {
@@ -88,37 +124,51 @@ const FREE_TONES = TONES.filter((tone) => tone !== 'Red' && tone !== 'Gray');
 
 export const vlanTone = (tones, id) => tones.get(id) ?? FREE_TONES[id % FREE_TONES.length];
 
+/** Lo spessore del cavo dalla velocita', come in Vantage: 100M sottile, 10G e oltre spesso. */
+const WIDTH = { '10M': 1, '100M': 1, '1G': 1.5, '2.5G': 2.5, '5G': 3, '10G': 4, '25G': 5, '40G': 6, '100G': 7 };
+export const strokeOf = (link) => WIDTH[link.speed] ?? 1.5;
+
+/** Il tratto: pieno, punteggiato (via Internet: VPN e WAN), tratteggiato (Wi-Fi), a pallini (un servizio VPN). */
+export const DASH = { solid: null, dotted: '1.5 4', dashed: '7 5', down: '6 5', brand: '0.01 6' };
+
+/** Lo spessore del disegno: quello della velocita'; i pallini di un servizio VPN almeno 3, che il colore si veda. */
+export const widthOf = (link, wire) => (wire.brand ? Math.max(3, strokeOf(link)) : strokeOf(link));
+
+/** I capi del tratto: tondi per i punti e i pallini, dritti per il resto. */
+export const capOf = (wire) => (wire.style === 'dotted' || wire.style === 'brand' ? 'round' : 'butt');
+
 /**
- * Come si disegna un cavo: rosso tratteggiato se un capo e' giu', punteggiato per Internet e
- * VPN, tratteggiato viola per il Wi-Fi; con una VLAN sola (porta access) nel colore della VLAN,
- * con piu' VLAN (trunk) chiaro e piu' spesso; altrimenti verde se risponde, grigio se non si sa.
- * style: la classe; tone: il colore (null per quello di serie).
+ * Come si disegna un cavo, con le regole di Vantage: rosso tratteggiato se un capo e' giu'; nel
+ * colore della VLAN se porta una VLAN sola (porta access); verde se un capo risponde; grigio se
+ * non si sa. Un trunk (piu' VLAN) ha una seconda linea chiara sotto ed e' scuro finche' non
+ * risponde. style: la riga della legenda; dash: il tratto; color: il colore (variabile CSS).
  */
 export function wireOf(link, stateA, stateB, tones) {
-  if (stateA === 'down' || stateB === 'down') return { style: 'down', tone: 'Red' };
-  if (link.kind === 'vpn' || link.kind === 'wan') return { style: 'net', tone: 'Blue' };
-  if (link.kind === 'wifi') return { style: 'wifi', tone: 'Purple' };
+  const down = stateA === 'down' || stateB === 'down';
+  const up = !down && (stateA === 'up' || stateB === 'up');
   const vlans = parseVlans(link.vlan);
-  if (vlans.all || vlans.ids.size > 1) return { style: 'trunk', tone: null };
-  if (vlans.ids.size === 1) return { style: 'access', tone: vlanTone(tones, [...vlans.ids][0]) };
-  if (link.kind === 'fiber') return { style: 'fiber', tone: 'Teal' };
-  if (stateA === 'up' || stateB === 'up') return { style: 'up', tone: 'Green' };
-  return { style: 'plain', tone: null };
+  const trunk = vlans.all || vlans.ids.size > 1;
+  const access = !trunk && vlans.ids.size === 1;
+  const tone = access ? vlanTone(tones, [...vlans.ids][0]) : null;
+  // un collegamento VPN che nomina il suo servizio ha il colore del logo (rosso solo se e' giu')
+  const brand = vpnOf(link);
+  const style = brand ? 'brand' : link.kind === 'vpn' || link.kind === 'wan' ? 'dotted' : link.kind === 'wifi' ? 'dashed' : 'solid';
+  const color = down ? 'var(--vt-crit)' : brand ? vpnColor(brand.id) : tone ? toneVar(tone) : up ? 'var(--vt-ok)' : trunk ? 'var(--vt-ink)' : 'var(--vt-muted)';
+  return { down, up, trunk: trunk && !brand, access: access && !brand, tone: brand ? null : tone, style, dash: down ? DASH.down : DASH[style], color, brand };
 }
 
-/** La seconda riga di un apparato nelle liste (libreria, inventario): l'indirizzo, oppure il tipo (e le porte). */
-export function subtitleOf(node) {
-  if (node.host) return { text: node.host, mono: true };
-  const kind = KIND[node.kind]?.label ?? 'Apparato';
-  return { text: PORTED.has(node.kind) && node.ports ? `${kind} · ${node.ports} porte` : kind, mono: false };
-}
+/** Il testo della velocita' accanto al cavo (per il Wi-Fi senza velocita', "Wi-Fi"). */
+export const speedText = (link) => link.speed || (link.kind === 'wifi' ? 'Wi-Fi' : '');
 
-/** L'etichetta in mezzo al cavo: velocita' e VLAN. */
-export function linkLabel(link) {
-  const parts = [];
-  if (link.speed) parts.push(link.speed);
-  if (link.vlan) parts.push(/^\d+$/.test(link.vlan) ? `VLAN ${link.vlan}` : `VLAN ${link.vlan}`);
-  return parts.join(' · ');
+/** Il punto dell'etichetta della velocita': un po' prima del capo di arrivo, accanto alla linea. */
+export function tagPoint(points) {
+  const end = points[points.length - 1];
+  const prev = points[points.length - 2];
+  const dx = Math.sign(end.x - prev.x);
+  const dy = Math.sign(end.y - prev.y);
+  return dy !== 0
+    ? { x: end.x + 6, y: end.y - dy * 22 + 4, anchor: 'start' }
+    : { x: end.x - dx * 26, y: end.y - 6, anchor: 'middle' };
 }
 
 export function zoneLabel(zone) {
@@ -128,37 +178,27 @@ export function zoneLabel(zone) {
   return parts.join(' · ');
 }
 
-/** Spessore del tratto dalla velocita' del cavo. */
-export function strokeOf(link) {
-  const speed = link.speed;
-  if (!speed) return 1.6;
-  const n = Number.parseFloat(speed) * (speed.endsWith('G') ? 1000 : 1);
-  if (n <= 100) return 1.25;
-  if (n <= 1000) return 1.75;
-  if (n <= 5000) return 2.25;
-  if (n <= 10000) return 2.75;
-  return 3.4;
-}
-
-/** La testata di una zona: nome e rete, tagliati perche' stiano nella zona, e la sua larghezza. */
+/** La linguetta di una zona: nome e rete, tagliati perche' stiano nella zona, e la sua larghezza. */
 export function zoneHead(zone) {
   const name = fit(zone.name || 'Zona', ZONE_FONT, Math.max(40, zone.w - 70));
   const nameWidth = Math.ceil(measure(name, ZONE_FONT));
   const label = zoneLabel(zone);
   const sub = label ? fit(label, ZONE_SUB_FONT, Math.max(0, zone.w - nameWidth - 84)) : '';
-  const subWidth = sub && sub !== '…' ? Math.ceil(measure(sub, ZONE_SUB_FONT)) + 10 : 0;
-  return { name, nameWidth, sub: subWidth ? sub : '', subWidth, width: 22 + nameWidth + subWidth + 12 };
+  const subWidth = sub && sub !== '…' ? Math.ceil(measure(sub, ZONE_SUB_FONT)) + 8 : 0;
+  return { name, nameWidth, sub: subWidth ? sub : '', subWidth, width: 10 + nameWidth + subWidth + 10 };
 }
 
-export const zoneHeadRect = (zone) => ({ x: zone.x + 12, y: zone.y + 10, w: zoneHead(zone).width, h: 24 });
+/** Dove sta la linguetta di una zona (a cavallo del suo bordo di sopra), in coordinate della mappa. */
+export const zoneHeadRect = (zone) => ({ x: zone.x + PAD_X, y: zone.y - TAB_RAISE, w: zoneHead(zone).width, h: TAB_H });
 
 /**
- * I cavi da disegnare: la strada di ognuno, i testi delle sue etichette e il posto dove vanno,
- * scelto perche' nessuna copra le altre (vedi labels.js). Lo usano lo schermo e l'esportazione.
+ * I cavi da disegnare: la strada di ognuno (ad angolo retto, dalla presa della porta quando la
+ * nomina), come disegnarlo e la velocita' da scriverci accanto. Lo usano lo schermo e
+ * l'esportazione.
  */
 export function linkLayout(map, quick = false, stateOf = () => 'none') {
   const nodes = new Map(map.nodes.map((n) => [n.id, n]));
-  const routes = cableRoutes(map, { quick, tabEnd: (node) => tabOf(node, stateOf(node)).width + 10 });
+  const routes = cableRoutes(map, { quick, tabEnd: (node) => PAD_X + tabOf(node, stateOf(node)).width });
   const tones = vlanTones(map);
   const entries = [];
   for (const link of map.links) {
@@ -166,32 +206,43 @@ export function linkLayout(map, quick = false, stateOf = () => 'none') {
     const b = nodes.get(link.b);
     if (!a || !b) continue;
     const route = routes.get(link.id) ?? null;
-    const segs = route?.segs ?? [];
-    const longest = segs.reduce((best, seg) => (!best || seg.length > best.length ? seg : best), null);
-    // un cavo attaccato alla porta di uno switch la accende sul pannello: il nome li' non serve
-    const onPanel = (end) => !!route?.ends[end].anchored;
+    const points = route?.points ?? null;
+    const speed = speedText(link);
+    const wire = wireOf(link, stateOf(a), stateOf(b), tones);
     entries.push({
       link,
       a,
       b,
       route,
-      points: route?.points ?? null,
-      pathA: segs[0] ?? null,
-      pathB: segs[segs.length - 1] ?? null,
-      pathMid: longest,
-      wire: wireOf(link, stateOf(a), stateOf(b), tones),
-      pa: onPanel('a') ? '' : fit(link.pa, CHIP_FONT, 120),
-      pb: onPanel('b') ? '' : fit(link.pb, CHIP_FONT, 120),
-      mid: fit(linkLabel(link), CHIP_FONT, 170),
+      points,
+      wire,
+      speed,
+      tag: points && speed ? tagPoint(points) : null,
+      // il logo del servizio VPN, sul tratto che entra nell'apparato d'arrivo
+      badge: points && wire.brand ? badgePoint(points) : null,
+      title: cableTitle(link, a, b),
     });
   }
-  const spots = placeLabels(map.nodes, entries, map.zones.map(zoneHeadRect), CHIP_FONT, { quick });
-  for (const entry of entries) entry.spots = spots.get(entry.link.id);
   return entries;
 }
 
-/** Le porte usate di ogni apparato: numero -> { tone, title }, dal cavo che ci arriva. */
-export function usedPorts(entries) {
+/** Il cavo in una riga, per il cartellino che compare col mouse sopra. */
+function cableTitle(link, a, b) {
+  const end = (node, port) => `${node.name || 'apparato'}${port ? ` ${port}` : ''}`;
+  const parts = [`${end(a, link.pa)} → ${end(b, link.pb)}`];
+  const brand = vpnOf(link);
+  if (brand) parts.push(brand.label);
+  if (link.speed) parts.push(link.speed);
+  if (link.vlan) parts.push(`VLAN ${link.vlan}`);
+  return parts.join(' · ');
+}
+
+/**
+ * Le porte usate di ogni apparato, presa per presa ('rj45:12', 'cage:1'): il cavo, le VLAN
+ * (una sola: non taggata, il trattino alto; piu' d'una: taggate, i trattini bassi), il nome di
+ * chi c'e' dall'altra parte (la didascalia), lo stato del collegamento (il LED).
+ */
+export function usedPorts(entries, stateOf = () => 'none', tones = new Map()) {
   const used = new Map();
   for (const entry of entries) {
     for (const [end, node, other] of [['a', entry.a, entry.b], ['b', entry.b, entry.a]]) {
@@ -199,90 +250,162 @@ export function usedPorts(entries) {
       if (!port) continue;
       if (!used.has(node.id)) used.set(node.id, new Map());
       const label = end === 'a' ? entry.link.pa : entry.link.pb;
-      const vlan = entry.link.vlan ? ` · VLAN ${entry.link.vlan}` : '';
-      used.get(node.id).set(port.number, { tone: entry.wire.tone, style: entry.wire.style, title: `${label} → ${other.name || 'apparato'}${entry.link.speed ? ` · ${entry.link.speed}` : ''}${vlan}` });
+      const vlans = parseVlans(entry.link.vlan);
+      const ids = [...vlans.ids].sort((x, y) => x - y);
+      const mine = stateOf(node);
+      const theirs = stateOf(other);
+      const link = mine === 'down' || theirs === 'down' ? 'down' : mine === 'up' || theirs === 'up' ? 'up' : 'off';
+      used.get(node.id).set(port.key, {
+        untagged: ids.length === 1 && !vlans.all ? vlanTone(tones, ids[0]) : null,
+        tagged: ids.length > 1 ? ids.slice(0, 4).map((id) => vlanTone(tones, id)) : vlans.all ? ['Gray'] : [],
+        caption: other.name || KIND[other.kind]?.label || '',
+        link,
+        // per il riquadro della porta col mouse sopra
+        label,
+        other: other.name || KIND[other.kind]?.label || '',
+        otherPort: end === 'a' ? entry.link.pb : entry.link.pa,
+        speed: entry.link.speed,
+        vlans: { untagged: ids.length === 1 && !vlans.all ? ids[0] : null, tagged: ids.length > 1 ? ids : [], all: vlans.all },
+        title: `${label} → ${other.name || 'apparato'}${entry.link.speed ? ` · ${entry.link.speed}` : ''}${entry.link.vlan ? ` · VLAN ${entry.link.vlan}` : ''}${link === 'up' ? ' · UP' : link === 'down' ? ' · DOWN' : ''}`,
+      });
     }
   }
   return used;
 }
 
-const esc = (value) => String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+// ------------------------------------------------------------------ la scheda
 
-/** La linguetta: un rettangolo con gli angoli di sopra arrotondati, appoggiato sul corpo. */
-export function tabPath(width) {
-  const r = 6;
-  const h = TAB_H + 1;
-  return `M10 ${h} V${r} Q10 0 ${10 + r} 0 H${10 + width - r} Q${10 + width} 0 ${10 + width} ${r} V${h} Z`;
+/** La linguetta: un rettangolo con gli angoli di sopra arrotondati; i lati scendono fino al bordo del corpo. */
+function tabPaths(width) {
+  const x0 = PAD_X + 0.5;
+  const x1 = PAD_X + width - 0.5;
+  const r = 7;
+  const fill = `M${x0} ${TAB_H} V${r} Q${x0} 0.5 ${x0 + r} 0.5 H${x1 - r} Q${x1} 0.5 ${x1} ${r} V${TAB_H} Z`;
+  const edge = `M${x0} ${TAB_RAISE + 1} V${r} Q${x0} 0.5 ${x0 + r} 0.5 H${x1 - r} Q${x1} 0.5 ${x1} ${r} V${TAB_RAISE + 1}`;
+  return { fill, edge };
 }
 
-const PART_CLASS = {
-  ring: 'dm-node-ring', tab: 'dm-node-tab', tabname: 'dm-node-tabname', badge: 'dm-node-badge', card: 'dm-node-card',
-  accent: 'dm-node-accent', tile: 'dm-node-tile', icon: 'dm-node-icon', title: 'dm-node-title', ip: 'dm-node-ip',
-  info: 'dm-node-info', cloud: 'dm-node-cloud', dot: 'dm-node-dot', bay: 'dm-jack-bay',
-};
-
-/**
- * La pittura dello schermo: ogni pezzo della scheda e' una classe, i colori li mette map.css
- * (secondo il tema, lo stato e la selezione). L'esportazione ne usa una sua, coi colori per esteso.
- */
-export function screenPaint(part, info = {}) {
-  if (part !== 'jack') return `class="${PART_CLASS[part]}"`;
-  const used = info.used;
-  const tone = used ? (used.tone ? `var(--c-${used.tone})` : 'var(--c-LabelSecondary)') : null;
-  return `class="dm-jack${used ? ` used w-${used.style}` : ''}" data-port="${info.n}"${tone ? ` style="--port: ${tone}"` : ''}`;
+/** Il bordo colorato di sopra del corpo (3 px, segue gli angoli arrotondati). */
+function topBar(w, r) {
+  const y = TAB_RAISE + 1.5;
+  return `M1.5 ${y + r - 1.5} Q1.5 ${y} ${r} ${y} H${w - r} Q${w - 1.5} ${y} ${w - 1.5} ${y + r - 1.5}`;
 }
 
-/** Il disegno di una scheda (o della nuvola di Internet), in coordinate dell'apparato. */
-export function cardMarkup(node, state, host, ports, paint = screenPaint) {
-  const size = sizeOf(node);
-  const icon = kindIcons[node.kind] ?? kindIcons.other;
-  if (node.kind === 'internet') {
-    const name = fit(node.name || 'Internet', TITLE_FONT, size.w - 56);
-    const sub = node.host ? fit(node.host, IP_FONT, size.w - 64) : '';
-    return `<path ${paint('ring')} d="${cloudPath(size.w, size.h)}" transform="translate(-4 -4) scale(${((size.w + 8) / size.w).toFixed(4)} ${((size.h + 8) / size.h).toFixed(4)})"/>`
-      + `<path ${paint('cloud')} d="${cloudPath(size.w, size.h)}"/>`
-      + `<path ${paint('icon')} transform="translate(${(size.w / 2 - 9).toFixed(1)} ${(size.h * 0.24).toFixed(1)}) scale(0.75)" d="${icon}"/>`
-      + `<text ${paint('title')} x="${size.w / 2}" y="${(size.h * 0.6).toFixed(1)}" text-anchor="middle">${esc(name)}</text>`
-      + (sub ? `<text ${paint('ip')} x="${size.w / 2}" y="${(size.h * 0.6 + 14).toFixed(1)}" text-anchor="middle">${esc(sub)}</text>` : '')
-      + (BADGES[state] ? `<circle ${paint('dot')} cx="${(size.w * 0.8).toFixed(1)}" cy="${(size.h * 0.3).toFixed(1)}" r="4.5"/>` : '');
+/** Una presa: RJ45 (apertura, contatti, LED) o gabbia SFP, nella sua cella, come in Vantage. */
+function jackMarkup(jack, used, flags, titles = false) {
+  const stroke = used ? (used.untagged ? toneVar(used.untagged) : 'var(--vt-muted)') : 'var(--vt-port-off)';
+  const linkLed = used?.link === 'up' ? 'var(--vt-ok)' : used?.link === 'down' ? 'var(--vt-crit)' : 'var(--vt-port-off)';
+  const parts = [];
+  if (flags.numbers) {
+    parts.push(`<text x="${r1(jack.w / 2)}" y="${r1(jack.numberY + 8.5)}" text-anchor="middle" font-size="9" fill="var(--vt-muted)">${jack.n}</text>`);
   }
-  const tab = tabOf(node, state);
-  const lines = cardLines(node, host, state);
-  const top = TAB_H - 1;
-  const parts = [
-    `<rect ${paint('ring')} x="-4" y="${top - 4}" width="${size.w + 8}" height="${size.h - top + 8}" rx="13"/>`,
-    `<path ${paint('tab')} d="${tabPath(tab.width)}"/>`,
-    `<text ${paint('tabname')} x="20" y="14">${esc(tab.name)}</text>`,
-    tab.badge ? `<text ${paint('badge')} x="${20 + tab.nameWidth + 6}" y="14">${esc(tab.badge)}</text>` : '',
-    `<rect ${paint('card')} y="${top}" width="${size.w}" height="${size.h - top}" rx="10"/>`,
-    `<path ${paint('accent')} d="M10 ${top + 0.5} H${size.w - 10}"/>`,
-    `<rect ${paint('tile')} x="12" y="${top + 12}" width="32" height="32" rx="8"/>`,
-    `<path ${paint('icon')} transform="translate(16 ${top + 16})" d="${icon}"/>`,
-    `<text ${paint('title')} x="${TEXT_X}" y="${top + 23}">${esc(lines.title)}</text>`,
-    lines.ip ? `<text ${paint('ip')} x="${TEXT_X}" y="${top + 39}">${esc(lines.ip)}</text>` : '',
-    lines.info ? `<text ${paint('info')} x="${TEXT_X}" y="${top + (lines.ip ? 55 : 39)}">${esc(lines.info)}</text>` : '',
-  ];
-  const panel = panelOf(node);
-  if (panel) {
-    const first = portCell(node, 1);
-    parts.push(`<rect ${paint('bay')} x="${first.x - 5}" y="${first.y - 5}" width="${panel.w + 10}" height="${panel.h + 10}" rx="5"/>`);
-    for (let n = 1; n <= node.ports; n++) {
-      const cell = portCell(node, n);
-      const used = ports?.get(n);
-      parts.push(`<rect ${paint('jack', { n, used })} x="${cell.x}" y="${cell.y}" width="${cell.w}" height="${cell.h}" rx="2"><title>${esc(used ? `Porta ${n}: ${used.title}` : `Porta ${n}: libera`)}</title></rect>`);
+  const [vw, vh] = jack.kind === 'cage' ? [34, 18] : [26, 22];
+  const sx = jack.jackW / vw;
+  const sy = jack.jackH / vh;
+  const turn = jack.flip ? ` transform="rotate(180 ${vw / 2} ${vh / 2})"` : '';
+  let inner;
+  if (jack.kind === 'cage') {
+    inner = `<rect x="4" y="5" width="${vw - 8}" height="8" fill="${OPENING}"/><rect x="4" y="2.5" width="${vw - 8}" height="1.2" fill="var(--vt-port-off)"/><circle cx="${vw - 3.5}" cy="${vh - 3}" r="1.3" fill="${linkLed}"/>`;
+  } else {
+    const pins = Array.from({ length: 8 }, (_, i) => `<rect x="${r1(6.6 + i * 1.65)}" y="4.6" width="0.9" height="3" fill="${GOLD}"/>`).join('');
+    inner = `<path d="M5 4 H21 V14 H17 V18 H9 V14 H5 Z" fill="${OPENING}"/>${pins}<rect x="2" y="17" width="3.5" height="2.2" rx=".5" fill="${linkLed}"/><rect x="20.5" y="17" width="3.5" height="2.2" rx=".5" fill="var(--vt-port-off)"/>`;
+  }
+  parts.push(`<g transform="translate(${r1(jack.jackX)} ${r1(jack.jackY)}) scale(${r1(sx * 1000) / 1000} ${r1(sy * 1000) / 1000})">`
+    + `<rect x="0.75" y="0.75" width="${vw - 1.5}" height="${vh - 1.5}" rx="2" fill="var(--vt-chip)" stroke="${stroke}" stroke-width="1.5"/>`
+    + `<g${turn}>${inner}</g></g>`);
+  if (used) {
+    const bars = [...(used.untagged ? [{ tone: used.untagged, h: 7 }] : []), ...used.tagged.map((tone) => ({ tone, h: 4 }))];
+    const total = bars.length * 4 + Math.max(0, bars.length - 1);
+    let bx = jack.w / 2 - total / 2;
+    for (const bar of bars) {
+      parts.push(`<rect x="${r1(bx)}" y="${r1(jack.barsY + 8 - bar.h)}" width="4" height="${bar.h}" fill="${toneVar(bar.tone)}"/>`);
+      bx += 5;
+    }
+    if (flags.captions && used.caption) {
+      parts.push(`<text x="${r1(jack.w / 2)}" y="${r1(jack.captionY + 8.5)}" text-anchor="middle" font-size="8.5" fill="var(--vt-muted)">${esc(fit(used.caption, CAPTION_FONT, jack.w))}</text>`);
     }
   }
-  return parts.join('');
+  const title = used ? `${jack.kind === 'cage' ? 'SFP' : 'Porta'} ${jack.n}: ${used.title}` : `${jack.kind === 'cage' ? 'SFP' : 'Porta'} ${jack.n}: libera`;
+  return `<g class="dm-jack${used ? ` used${used.link === 'down' ? ' down' : ''}` : ''}" data-port="${jack.n}" data-kind="${jack.kind}" transform="translate(${r1(jack.x)} ${r1(jack.y)})">${titles ? `<title>${esc(title)}</title>` : ''}`
+    + `<rect width="${r1(jack.w)}" height="${r1(jack.h)}" fill="transparent"/>${parts.join('')}</g>`;
+}
+
+/**
+ * Il disegno di un apparato in coordinate sue: la scheda di Vantage (linguetta, bordo colorato,
+ * icona, modello, indirizzo, riga dei valori, pannello frontale) o la nuvola per Internet. I
+ * colori sono variabili CSS: l'esportazione li sostituisce coi colori veri.
+ */
+export function cardMarkup(node, state, host, ports, { titles = false } = {}) {
+  const size = sizeOf(node);
+  const { w, h } = size;
+  const down = state === 'down';
+  const linked = !!node.host;
+  const color = colorOf(node);
+  const icon = kindIcons[node.kind] ?? kindIcons.other;
+
+  if (node.kind === 'internet') {
+    const name = fit(node.name || 'Internet', CLOUD_FONT, w * 0.6);
+    const sub = node.host ? fit(node.host, `11px ${FONT}`, w * 0.6) : '';
+    const sx = r1((w / 210) * 1000) / 1000;
+    const sy = r1((h / 110) * 1000) / 1000;
+    return `<path class="dm-node-ring" d="${CLOUD}" transform="translate(-6 -5) scale(${r1(((w + 12) / 210) * 1000) / 1000} ${r1(((h + 10) / 110) * 1000) / 1000})" fill="none" stroke="transparent" stroke-width="3" vector-effect="non-scaling-stroke"/>`
+      + `<path class="dm-node-card dm-node-cloud" d="${CLOUD}" transform="scale(${sx} ${sy})" fill="var(--vt-panel)" stroke="${down ? 'var(--vt-crit)' : 'var(--vt-line)'}" stroke-width="1.5" vector-effect="non-scaling-stroke"${linked ? '' : ' stroke-dasharray="5 4"'}/>`
+      + `<text class="dm-node-title" x="${w / 2}" y="${r1(h * 0.5 + 4)}" text-anchor="middle" font-size="17" font-weight="700" fill="${down ? 'var(--vt-crit-text)' : 'var(--vt-ink)'}">${esc(name)}</text>`
+      + (sub ? `<text class="dm-node-ip" x="${w / 2}" y="${r1(h * 0.5 + 20)}" text-anchor="middle" font-size="11" fill="var(--vt-muted)">${esc(sub)}</text>` : '');
+  }
+
+  const box = panelBox(node);
+  const radius = box ? 8 : 10;
+  const tab = tabOf(node, state);
+  const lines = cardLines(node, host, state, ports);
+  const paths = tabPaths(tab.width);
+  const top = TAB_RAISE + CONTENT_TOP;
+  const textX = PAD_X + ICON + 10;
+  const out = [
+    `<rect class="dm-node-ring" x="-4" y="${TAB_RAISE - 4}" width="${w + 8}" height="${h - TAB_RAISE + 8}" rx="${radius + 4}" fill="none" stroke="transparent" stroke-width="3"/>`,
+    `<rect class="dm-node-card" x="0.5" y="${TAB_RAISE + 0.5}" width="${w - 1}" height="${h - TAB_RAISE - 1}" rx="${radius}" fill="${box ? 'url(#dm-face)' : 'var(--vt-panel)'}" stroke="${down ? 'var(--vt-crit)' : 'var(--vt-line)'}" stroke-width="1"${linked ? '' : ' stroke-dasharray="5 4"'}/>`,
+    linked ? `<path class="dm-node-bar" d="${topBar(w, radius)}" fill="none" stroke="${down ? 'var(--vt-crit)' : color}" stroke-width="3"/>` : '',
+    `<path class="dm-node-tab" d="${paths.fill}" fill="${box ? 'var(--vt-chip)' : 'var(--vt-panel)'}"/>`,
+    `<path class="dm-node-tab-edge" d="${paths.edge}" fill="none" stroke="${down ? 'var(--vt-crit)' : 'var(--vt-line)'}" stroke-width="1"/>`,
+    `<text class="dm-node-tabname" x="${PAD_X + 10}" y="15.5" font-size="14" font-weight="700" fill="${down ? 'var(--vt-crit-text)' : 'var(--vt-ink)'}">${esc(tab.name)}`
+      + (tab.role ? `<tspan dx="6" font-size="12" font-weight="400" fill="var(--vt-muted)">${esc(tab.role)}</tspan>` : '')
+      + (tab.status ? `<tspan class="dm-node-status" dx="6" font-size="11" font-weight="700" fill="${down ? 'var(--vt-crit-text)' : 'var(--vt-ok-text)'}">${tab.status}</tspan>` : '')
+      + '</text>',
+    `<rect class="dm-node-tile" x="${PAD_X}" y="${top}" width="${ICON}" height="${ICON}" rx="8" fill="${linked ? color : 'var(--vt-chip)'}" fill-opacity="${linked ? 0.16 : 1}"/>`,
+    `<path class="dm-node-icon" transform="translate(${PAD_X + 5} ${top + 5})" d="${icon}" fill="none" stroke="${linked ? color : 'var(--vt-muted)'}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ];
+  const second = lines.address;
+  const firstY = second ? top + 14 : top + 21;
+  out.push(`<text class="dm-node-title" x="${textX}" y="${firstY}" font-size="13" font-weight="700" fill="${down ? 'var(--vt-crit-text)' : 'var(--vt-ink)'}">${esc(lines.title)}</text>`);
+  if (second) out.push(`<text class="dm-node-ip" x="${textX}" y="${firstY + 16}" font-size="11" font-family="${esc(MONO)}" fill="var(--vt-out)">${esc(second)}</text>`);
+  const figureY = top + ICON + 10 + 12;
+  if (Array.isArray(lines.figure)) {
+    const spans = lines.figure.map((pair, i) => `${i ? '<tspan fill="var(--vt-muted)"> · </tspan>' : ''}<tspan fill="var(--vt-muted)">${esc(pair.label)}</tspan><tspan font-weight="700" fill="${color}">${esc(pair.value)}</tspan>`).join('');
+    out.push(`<text class="dm-node-info" x="${PAD_X}" y="${figureY}" font-size="12">${spans}</text>`);
+  } else if (lines.figure?.text) {
+    out.push(`<text class="dm-node-info" x="${PAD_X}" y="${figureY}" font-size="12" fill="${lines.figure.tone}">${esc(fit(lines.figure.text, FIGURE_FONT, (box ? TEXT_W : w) - 2 * PAD_X))}</text>`);
+  }
+  if (box) {
+    out.push(`<rect class="dm-panel" x="${box.x + 0.5}" y="${box.y + 0.5}" width="${box.w - 1}" height="${box.h - 1}" rx="6" fill="var(--vt-inset)" stroke="var(--vt-line)" stroke-width="1"/>`);
+    out.push(`<g class="dm-jacks" transform="translate(${box.ox} ${box.oy})">${box.panel.jacks.map((jack) => jackMarkup(jack, ports?.get(jack.key), box.panel.flags, titles)).join('')}</g>`);
+  }
+  return out.join('');
 }
 
 /** I pallini da cui si tira un cavo, a meta' di ogni lato del corpo. */
 export function handlesMarkup(node) {
   const size = sizeOf(node);
-  const top = node.kind === 'internet' ? 0 : TAB_H - 1;
-  const middle = (top + size.h) / 2;
-  return [['t', size.w / 2, top], ['r', size.w, middle], ['b', size.w / 2, size.h], ['l', 0, middle]]
+  const top = node.kind === 'internet' ? 8 : TAB_RAISE;
+  const bottom = node.kind === 'internet' ? size.h - 8 : size.h;
+  const middle = (top + bottom) / 2;
+  return [['t', size.w / 2, top], ['r', size.w, middle], ['b', size.w / 2, bottom], ['l', 0, middle]]
     .map(([side, x, y]) => `<circle class="dm-handle" data-part="handle" data-side="${side}" cx="${x}" cy="${y}" r="5"/>`).join('');
 }
+
+/** Il gradiente delle placche (switch, router, firewall): come le placche metalliche di Vantage. */
+export const DEFS = '<defs><linearGradient id="dm-face" x1="0" y1="0" x2="0" y2="1">'
+  + '<stop offset="0" stop-color="var(--vt-chip)"/><stop offset="0.55" stop-color="var(--vt-panel)"/><stop offset="1" stop-color="var(--vt-inset)"/>'
+  + '</linearGradient></defs>';
 
 const toneVars = (tone) => `--tone: var(--c-${tone}); --tone-soft: var(--t-${tone}-soft); --tone-border: var(--t-${tone}-border); --tone-zone: var(--t-${tone}-zone)`;
 
@@ -299,7 +422,8 @@ export class Scene {
     this.listeners = new Set();
     this.pulse = new Set();
 
-    this.svg = s('svg', { class: 'dm-svg', role: 'img', 'aria-label': 'Mappa della rete' });
+    this.svg = s('svg', { class: 'dm-svg', role: 'img', 'aria-label': 'Mappa della rete', 'font-family': FONT });
+    this.svg.innerHTML = DEFS;
     this.world = s('g', { class: 'dm-world' });
     this.layers = {
       zones: s('g', { class: 'dm-zones' }),
@@ -375,13 +499,13 @@ export class Scene {
   }
 
   /** Inquadra il riquadro dato (in coordinate della mappa), con un margine. */
-  /** left: pixel a sinistra occupati da altro (i riquadri della vista): la mappa sta nel resto. */
-  frameRect(rect, { animate = true, maxZoom = 1.15, pad = 56, left = 0 } = {}) {
+  /** right: pixel a destra occupati da altro (i riquadri della vista): la mappa sta nel resto. */
+  frameRect(rect, { animate = true, maxZoom = 1.15, pad = 56, right = 0 } = {}) {
     const { w, h } = this.size;
     if (!rect || w < 10 || h < 10) return;
-    const room = w - left > 360 ? left : 0;
+    const room = w - right > 420 ? right : 0;
     const k = Math.min(maxZoom, Math.max(MIN_ZOOM, Math.min((w - room - pad * 2) / Math.max(rect.w, 1), (h - pad * 2) / Math.max(rect.h, 1))));
-    const x = room + (w - room) / 2 - (rect.x + rect.w / 2) * k;
+    const x = (w - room) / 2 - (rect.x + rect.w / 2) * k;
     const y = h / 2 - (rect.y + rect.h / 2) * k;
     if (animate) this.animateTo(x, y, k);
     else this.setView(x, y, k);
@@ -482,16 +606,19 @@ export class Scene {
 
   zoneElement(zone) {
     const g = s('g', { class: 'dm-zone', 'data-type': 'zone', 'data-id': zone.id });
-    g.innerHTML = `<rect class="dm-zone-box" rx="16"/><rect class="dm-zone-edge" rx="16"/>`
+    g.innerHTML = `<rect class="dm-zone-box" rx="10"/><path class="dm-zone-bar" fill="none" stroke-width="3"/><rect class="dm-zone-edge" rx="10"/>`
       + `<g class="dm-grips">${['nw', 'ne', 'se', 'sw'].map((c) => `<rect class="dm-grip" data-part="grip" data-corner="${c}" width="10" height="10" rx="3"/>`).join('')}</g>`;
     return g;
   }
 
-  /** La testata della zona, nello strato sopra ai cavi: stesso tipo e stesso id della zona. */
+  /**
+   * La linguetta della zona, come quelle delle schede (a cavallo del bordo di sopra), nello
+   * strato sopra ai cavi: stesso tipo e stesso id della zona.
+   */
   zoneHeadElement(zone) {
     const g = s('g', { class: 'dm-zone dm-zone-top', 'data-type': 'zone', 'data-id': zone.id });
-    g.innerHTML = `<g class="dm-zone-head" data-part="head"><rect class="dm-zone-chip" x="12" y="10" height="24" rx="7"/>`
-      + `<circle class="dm-zone-dot" cx="25" cy="22" r="3.5"/><text class="dm-zone-name" x="34" y="26"></text><text class="dm-zone-sub" y="26"></text></g>`;
+    g.innerHTML = `<g class="dm-zone-head" data-part="head"><path class="dm-zone-chip"/><path class="dm-zone-chip-edge" fill="none"/>`
+      + `<text class="dm-zone-name" x="${PAD_X + 10}" y="15.5"></text><text class="dm-zone-sub" y="15.5"></text></g>`;
     return g;
   }
 
@@ -501,7 +628,7 @@ export class Scene {
     for (const el of [g, top]) {
       if (!el) continue;
       attr(el, 'transform', `translate(${zone.x} ${zone.y})`);
-      attr(el, 'style', toneVars(zone.tone));
+      attr(el, 'style', `${toneVars(zone.tone)}; --zone: var(--vt-tone-${zone.tone})`);
       toggleClass(el, 'selected', sel);
       toggleClass(el, 'dim', lit && !lit.has(zone.id));
     }
@@ -509,12 +636,16 @@ export class Scene {
       attr(rect, 'width', zone.w);
       attr(rect, 'height', zone.h);
     }
+    attr(g.querySelector('.dm-zone-bar'), 'd', `M1.5 11 Q1.5 1.5 11 1.5 H${zone.w - 11} Q${zone.w - 1.5} 1.5 ${zone.w - 1.5} 11`);
     const head = zoneHead(zone);
+    const paths = tabPaths(head.width);
+    attr(top, 'transform', `translate(${zone.x} ${zone.y - TAB_RAISE})`);
+    attr(top.querySelector('.dm-zone-chip'), 'd', paths.fill);
+    attr(top.querySelector('.dm-zone-chip-edge'), 'd', paths.edge);
     text(top.querySelector('.dm-zone-name'), head.name);
     const subEl = top.querySelector('.dm-zone-sub');
     text(subEl, head.sub);
-    attr(subEl, 'x', 34 + head.nameWidth + 10);
-    attr(top.querySelector('.dm-zone-chip'), 'width', head.width);
+    attr(subEl, 'x', PAD_X + 10 + head.nameWidth + 8);
     const grips = g.querySelectorAll('.dm-grip');
     const at = { nw: [-5, -5], ne: [zone.w - 5, -5], se: [zone.w - 5, zone.h - 5], sw: [-5, zone.h - 5] };
     for (const grip of grips) {
@@ -529,8 +660,9 @@ export class Scene {
     // strade ed etichette si ricalcolano solo se la mappa e' cambiata (non per una selezione)
     const revision = `${this.store.revision}:${this.store.hostsRevision ?? 0}:${map.id}:${this.quick ? 'q' : ''}`;
     if (this.layout?.revision !== revision) {
-      const entries = linkLayout(map, this.quick, (node) => this.store.stateOf(node));
-      this.layout = { revision, entries, ports: usedPorts(entries) };
+      const stateOf = (node) => this.store.stateOf(node);
+      const entries = linkLayout(map, this.quick, stateOf);
+      this.layout = { revision, entries, ports: usedPorts(entries, stateOf, vlanTones(map)) };
     }
     for (const entry of this.layout.entries) {
       const { link } = entry;
@@ -538,17 +670,16 @@ export class Scene {
       let line = this.els.links.get(link.id);
       if (!line) {
         line = s('g', { class: 'dm-link', 'data-type': 'link', 'data-id': link.id });
-        line.innerHTML = '<path class="dm-link-hit"/><path class="dm-link-line"/>';
+        line.innerHTML = '<title></title><path class="dm-link-halo" fill="none" stroke-linejoin="round"/><path class="dm-link-under" fill="none" stroke-linejoin="round"/>'
+          + '<path class="dm-link-line" fill="none" stroke-linejoin="round"/><path class="dm-link-hit" fill="none" stroke-linejoin="round"/>';
         this.els.links.set(link.id, line);
         this.layers.links.append(line);
       }
-      // le etichette in uno strato loro, sopra a tutti i cavi: nessuna linea le attraversa
+      // la velocita' in uno strato suo, sopra a tutti i cavi: nessuna linea ci passa sopra
       let tags = this.els.labels.get(link.id);
       if (!tags) {
         tags = s('g', { class: 'dm-link-labels', 'data-type': 'link', 'data-id': link.id });
-        tags.innerHTML = '<g class="dm-tag dm-link-chip"><line class="dm-leader"/><rect height="18" rx="6"/><text y="12.5"></text></g>'
-          + '<g class="dm-tag dm-port dm-port-a"><line class="dm-leader"/><rect height="16" rx="5"/><text y="11.5"></text></g>'
-          + '<g class="dm-tag dm-port dm-port-b"><line class="dm-leader"/><rect height="16" rx="5"/><text y="11.5"></text></g>';
+        tags.innerHTML = '<text class="dm-link-speed" font-size="11" stroke-width="3" paint-order="stroke" stroke-linejoin="round"></text><g class="dm-link-badge"></g>';
         this.els.labels.set(link.id, tags);
         this.layers.labels.append(tags);
       }
@@ -559,11 +690,10 @@ export class Scene {
   }
 
   updateLink(line, tags, entry, lit) {
-    const { link, points, spots, wire } = entry;
+    const { link, points, wire, title } = entry;
     const sel = this.store.sel.has(link.id);
     const dim = lit && !lit.has(link.id);
-    attr(line, 'class', `dm-link k-${link.kind} w-${wire.style}${sel ? ' selected' : ''}${dim ? ' dim' : ''}`);
-    attr(line, 'style', wire.tone ? `--wire: var(--c-${wire.tone})` : null);
+    attr(line, 'class', `dm-link k-${link.kind} w-${wire.style}${wire.down ? ' down' : ''}${wire.up ? ' up' : ''}${wire.trunk ? ' trunk' : ''}${sel ? ' selected' : ''}${dim ? ' dim' : ''}`);
     attr(tags, 'class', `dm-link-labels${sel ? ' selected' : ''}${dim ? ' dim' : ''}`);
     if (!points) {
       shown(line, false);
@@ -571,46 +701,45 @@ export class Scene {
       return;
     }
     shown(line, true);
-    shown(tags, true);
     const d = points.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
-    attr(line.children[0], 'd', d);
-    attr(line.children[1], 'd', d);
-    attr(line.children[1], 'stroke-width', (strokeOf(link) + (wire.style === 'trunk' ? 0.6 : 0) + (sel ? 0.6 : 0)).toFixed(2));
-    this.chip(tags.children[0], entry.mid, spots?.mid);
-    this.chip(tags.children[1], entry.pa, spots?.a);
-    this.chip(tags.children[2], entry.pb, spots?.b);
-  }
-
-  /**
-   * Un'etichetta a pillola, centrata sul posto scelto; se e' dovuta stare lontana dal suo cavo,
-   * un filo sottile ve la lega. Nascosta se non ha testo.
-   */
-  chip(g, label, spot) {
-    if (!label || !spot) {
-      shown(g, false);
-      return;
-    }
-    shown(g, true);
-    const width = Math.ceil(measure(label, CHIP_FONT)) + 12;
-    const rect = g.querySelector('rect');
-    const height = Number(rect.getAttribute('height'));
-    const left = spot.at.x - width / 2;
-    const top = spot.at.y - height / 2;
-    attr(g, 'transform', `translate(${left.toFixed(1)} ${top.toFixed(1)})`);
-    attr(rect, 'width', width);
-    const leader = g.querySelector('.dm-leader');
-    if (spot.lead) {
-      shown(leader, true);
-      attr(leader, 'x1', (spot.anchor.x - left).toFixed(1));
-      attr(leader, 'y1', (spot.anchor.y - top).toFixed(1));
-      attr(leader, 'x2', (width / 2).toFixed(1));
-      attr(leader, 'y2', (height / 2).toFixed(1));
+    const width = widthOf(link, wire);
+    const [titleEl, halo, under, main, hit] = line.children;
+    text(titleEl, title);
+    for (const path of [halo, under, main, hit]) attr(path, 'd', d);
+    // scelto: un alone blu largo sotto; trunk: una seconda linea chiara piu' larga sotto
+    attr(halo, 'stroke', sel ? 'var(--vt-in)' : 'none');
+    attr(halo, 'stroke-width', width + 6);
+    attr(halo, 'stroke-opacity', 0.35);
+    attr(under, 'stroke', wire.trunk && !wire.down ? 'var(--vt-muted)' : 'none');
+    attr(under, 'stroke-width', width + 3);
+    attr(under, 'stroke-opacity', 0.5);
+    attr(under, 'stroke-dasharray', wire.dash);
+    attr(main, 'stroke', wire.color);
+    attr(main, 'stroke-width', width);
+    attr(main, 'stroke-dasharray', wire.dash);
+    attr(main, 'stroke-linecap', capOf(wire));
+    line.dataset.vpn = wire.brand?.id ?? '';
+    attr(hit, 'stroke', 'transparent');
+    attr(hit, 'stroke-width', Math.max(14, width + 8));
+    const [tag, badge] = tags.children;
+    shown(tags, !!(entry.tag && entry.speed) || !!entry.badge);
+    if (entry.tag && entry.speed) {
+      shown(tag, true);
+      attr(tag, 'x', entry.tag.x.toFixed(1));
+      attr(tag, 'y', entry.tag.y.toFixed(1));
+      attr(tag, 'text-anchor', entry.tag.anchor);
+      attr(tag, 'fill', wire.down ? 'var(--vt-crit-text)' : 'var(--vt-muted)');
+      attr(tag, 'stroke', 'var(--vt-canvas)');
+      text(tag, entry.speed);
     } else {
-      shown(leader, false);
+      shown(tag, false);
     }
-    const t = g.querySelector('text');
-    attr(t, 'x', 6);
-    text(t, label);
+    // il logo si ridisegna solo se cambia il servizio, il punto o lo stato
+    const look = entry.badge ? `${wire.brand.id}:${entry.badge.x.toFixed(1)}:${entry.badge.y.toFixed(1)}:${wire.down ? 1 : 0}` : '';
+    if (badge.dataset.look !== look) {
+      badge.dataset.look = look;
+      badge.innerHTML = entry.badge ? badgeMarkup(wire.brand, entry.badge.x, entry.badge.y, wire.down) : '';
+    }
   }
 
   renderNodes(map, lit) {
@@ -650,8 +779,8 @@ export class Scene {
     attr(g, 'style', toneVars(kind.tone));
     const ports = this.layout?.ports?.get(node.id) ?? null;
     const host = this.store.hostOf(node);
-    const sig = JSON.stringify([node.kind, node.name, node.model, node.host, node.place, node.ports, state, host?.rtt ?? '', host?.os ?? '',
-      ports ? [...ports].map(([n, p]) => `${n}:${p.tone}:${p.style}:${p.title}`) : null]);
+    const sig = JSON.stringify([node.kind, node.name, node.model, node.host, node.place, node.ports, node.sfp, state, host?.rtt ?? '', host?.os ?? '',
+      ports ? [...ports].map(([key, p]) => `${key}:${p.untagged}:${p.tagged}:${p.link}:${p.caption}:${p.title}`) : null]);
     if (g.dataset.sig === sig) return;
     g.dataset.sig = sig;
     g.firstChild.innerHTML = cardMarkup(node, state, host, ports);

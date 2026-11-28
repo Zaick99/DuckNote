@@ -113,23 +113,19 @@ public partial class App : Application
 
         if (updates.IsReady)
         {
-            Ui.Toast.Success($"DuckNote {version} e' pronta", "Si installa quando chiudi DuckNote, oppure adesso.", "Riavvia e aggiorna", () =>
-            {
-                if (updates.InstallNow())
-                {
-                    MainWindow?.Close();
-                }
-            }, tab: "Aggiornamento");
+            // un clic porta alle Impostazioni, dove "Riavvia e aggiorna" lo installa subito
+            Ui.Toast.Success($"DuckNote {version} e' pronta", "Si installa quando chiudi DuckNote; dalle Impostazioni anche adesso.",
+                () => (MainWindow as MainWindow)?.Navigate("settings"), tab: "Aggiornamento");
             return;
         }
 
         if (updates.CanOpenDownloaded)
         {
-            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded(), tab: "Aggiornamento");
+            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, () => updates.OpenDownloaded(), tab: "Aggiornamento");
             return;
         }
 
-        Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => OpenPage(release.Page), tab: "Aggiornamento");
+        Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, () => OpenPage(release.Page), tab: "Aggiornamento");
     }
 
     internal static void OpenPage(Uri page)

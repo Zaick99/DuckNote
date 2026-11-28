@@ -378,10 +378,11 @@ public partial class NetworkPage : UserControl, IDuckPage
             ("Stato", row.Status), ("Latenza", row.RoundTrip), ("Perdita", row.Loss), ("TTL", row.Ttl),
             ("Ultima volta attivo", row.LastSeen), ("Durata analisi", row.ScanMs > 0 ? $"{row.ScanMs} ms" : string.Empty));
         Section("Sistema",
-            ("Stima OS", row.Os), ("Tipo", row.DeviceType), ("Sistema (WMI)", row.WmiOs), ("Modello", row.WmiModel),
+            ("Stima OS", row.Os), ("Tipo", row.DeviceType), ("Modello", First(row.Model, row.WmiModel)), ("Riconosciuto da", row.Evidence),
+            ("Sistema (WMI)", row.WmiOs),
             ("Seriale", row.WmiSerial), ("CPU", row.WmiCpu), ("Memoria", row.WmiRam), ("Dischi", row.WmiDisks), ("Uptime", row.WmiUptime));
         Section("Servizi",
-            ("Porte aperte", row.OpenPorts), ("Servizi", row.Services), ("Condivisioni", row.Shares), ("RDP", row.RdpInfo));
+            ("Porte aperte", row.OpenPorts), ("Servizi", row.Services), ("Servizi mDNS", row.MdnsServices), ("Condivisioni", row.Shares), ("RDP", row.RdpInfo));
         Section("Applicazioni",
             ("Titolo web", row.HttpTitle), ("Server HTTP", row.HttpServer), ("SSH", row.SshBanner), ("FTP", row.FtpBanner),
             ("SMTP", row.SmtpBanner), ("UPnP", string.Join(" / ", ((string[])[row.UpnpDevice, row.UpnpServer]).Where(p => p.Length > 0))));

@@ -366,7 +366,7 @@ public partial class MainWindow
         {
             Toast.Show("ChipOrange", "Orange", "\uEA8F", $"{alerts.Count} promemoria",
                 string.Join(", ", alerts.Take(3).Select(alert => AgendaText.Alert(alert, now).Title)) + " e altri.",
-                [new ToastAction("Apri il calendario", () => Navigate("calendar"), Primary: true)], sticky: true);
+                () => Navigate("calendar"), sticky: true);
         }
         else
         {
@@ -381,17 +381,14 @@ public partial class MainWindow
                     _ => "Blue"
                 };
 
-                Toast.Show("Chip" + tone, tone, "\uEA8F", title, text,
+                // un clic apre la voce nel calendario; Fatto e Rimanda col tasto destro
+                Toast.Show("Chip" + tone, tone, "\uEA8F", title, text, () => ShowOccurrence(occurrence), sticky: true, more:
                 [
-                    new ToastAction("Fatto", () => _ws.MarkDone(occurrence), Primary: true),
-                    new ToastAction("Rimanda", null, Choices:
-                    [
-                        ("Fra 10 minuti", () => _ws.Snooze(occurrence, DateTime.Now.AddMinutes(10))),
-                        ("Fra un'ora", () => _ws.Snooze(occurrence, DateTime.Now.AddHours(1))),
-                        ("Domani alle 9", () => _ws.Snooze(occurrence, DateTime.Today.AddDays(1).AddHours(9)))
-                    ]),
-                    new ToastAction("Apri", () => ShowOccurrence(occurrence))
-                ], sticky: true);
+                    new ToastAction("Fatto", () => _ws.MarkDone(occurrence)),
+                    new ToastAction("Rimanda di 10 minuti", () => _ws.Snooze(occurrence, DateTime.Now.AddMinutes(10))),
+                    new ToastAction("Rimanda di un'ora", () => _ws.Snooze(occurrence, DateTime.Now.AddHours(1))),
+                    new ToastAction("Rimanda a domani alle 9", () => _ws.Snooze(occurrence, DateTime.Today.AddDays(1).AddHours(9)))
+                ]);
             }
         }
 
@@ -423,7 +420,7 @@ public partial class MainWindow
             }
 
             Toast.Show("Chip" + tone, tone, "\uE787", AgendaText.SummaryTitle(summary), AgendaText.SummaryText(summary, today),
-                [new ToastAction("Apri il calendario", () => Navigate("calendar"), Primary: true)], sticky: false);
+                () => Navigate("calendar"));
             Attention.Request(this, insist: false);
         };
         later.Start();
@@ -554,19 +551,19 @@ public partial class MainWindow
             _ws.Settings.MonitorEnabled ? string.Create(CultureInfo.CurrentCulture, $"{_ws.Settings.MonitorIntervalSec}s") : "fermo");
     }
 
-    private static void Announce(string message)
+    private void Announce(string message)
     {
         if (message.StartsWith("Analisi interrotta", StringComparison.Ordinal))
         {
-            Toast.Error("Analisi non riuscita", message, tab: "Rete");
+            Toast.Error("Analisi non riuscita", message, () => Navigate("network"), tab: "Rete");
         }
         else if (message.StartsWith("Fermata", StringComparison.Ordinal))
         {
-            Toast.Info("Analisi fermata", message, tab: "Rete");
+            Toast.Info("Analisi fermata", message, () => Navigate("network"), tab: "Rete");
         }
         else if (!message.StartsWith("Indica", StringComparison.Ordinal) && !message.StartsWith("Niente", StringComparison.Ordinal))
         {
-            Toast.Success("Analisi finita", message, tab: "Rete");
+            Toast.Success("Analisi finita", message, () => Navigate("network"), tab: "Rete");
         }
     }
 

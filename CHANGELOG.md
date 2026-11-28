@@ -2,6 +2,68 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.25] - 2026-11-28
+
+**The map drawn like Vantage, with the real ports and the VPN links; devices
+recognised for what they are, and notifications without buttons.**
+
+### Added
+
+- **VPN links show their service.** A VPN link can say what carries it —
+  Tailscale, NetBird, NordVPN Meshnet, ZeroTier, Cloudflare, WireGuard,
+  OpenVPN, IPsec — and is drawn in the main colour of that service's logo,
+  with the logo on the link by the device it reaches (red and dashed only
+  when an end is down). Its ends are interfaces (`wg0`, `tailscale0`) and
+  light no port; the legend gets one row per service, with its logo.
+- **Ports on every device.** Not only switches, routers and firewalls: PCs,
+  servers, NAS, access points, printers, cameras can have ports, chosen with
+  one click among the usual numbers of their kind or written, plus **SFP**
+  cages apart. On a device that counts from zero (Linux's `eth0`), `eth0` is
+  the first port.
+- **The card of a port.** Resting on a port of a front panel says its number
+  and name, state and speed, what is at the other end and its VLANs, with the
+  names of their zones.
+- **Verifica le porte degli host offline**, in **Impostazioni** (on by
+  default): a host that does not answer the ping is knocked on at the common
+  ports and at those it had open before being called down, and one that
+  accepts or refuses the connection is up. It applies to the analysis, to
+  every check and to the monitor.
+- **The card of a host says what it was recognised from** (**Riconosciuto
+  da**), its model when the device says it, and the services it announces over
+  mDNS.
+
+### Changed
+
+- **The map looks like Vantage, almost one to one.** Tabs astride the top edge,
+  the coloured top border (red when down), a dashed border without an address,
+  real front panels — RJ45 jacks with contacts and link LED, SFP cages, the
+  VLAN bars under every port (tall: untagged), port numbers and the name of
+  what is at the other end —, cables thick by speed with the speed written by
+  the end they reach, no more labels for ports and VLANs (they are on the
+  panel and in the colour of the cable). **Reti** and **Legenda** sit at the
+  top right; the zoom, **Adatta** and **Modifica mappa** at the bottom left;
+  the maps of the note are tabs at the top.
+- **Devices are recognised from many clues.** Time-to-live, the maker of the
+  network card (the whole IEEE registry is now built in, not two hundred
+  lines), ports only some systems open (62078 iPhone and iPad, 135 Windows,
+  5555 Android, 8008/8009 Google Cast, 8291 MikroTik, 8123 Home Assistant —
+  tried on every host), names, what the device announces over mDNS (the model
+  and macOS version of a Mac, Apple TV, HomePod, Chromecast, printers, HomeKit,
+  Avahi), SSH, HTTP, SNMP and UPnP banners, WMI. Linux, Android, iPhone, iPad,
+  Mac, Raspberry Pi, NAS, TV and console are told apart; with few clues the
+  card says only the family.
+- **Notifications have no buttons**: a click takes you to what they are about
+  (the host, the calendar item, the update), **×** closes them; the **Fatto**
+  and **Rimanda** of a reminder are in its right-click menu.
+
+### Fixed
+
+- **On the Mac every host looked like Windows.** .NET reports there the
+  time-to-live of the ping it sent (128), not the one of the answer; DuckNote
+  now reads the real one from the answer itself.
+- A Samba share (a NAS, a Mac, a Linux server) or `xrdp` no longer makes a
+  host *Host Windows*.
+
 ## [0.0.24] - 2026-11-27
 
 **A map you read at a glance, a Rete page built around what you do, and no

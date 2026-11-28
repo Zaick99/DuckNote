@@ -140,4 +140,38 @@ public static class NameProbe
 
         return reply is null ? string.Empty : DnsMessage.ReadAnswer(reply, DnsMessage.TypePtr);
     }
+    /// <summary>
+    /// I servizi che l'host annuncia con mDNS (DNS-SD), chiesti direttamente a lui: dicono che
+    /// cos'e' meglio di qualunque porta. Un Mac annuncia _device-info col modello
+    /// ("MacBookPro18,3"), un iPhone _companion-link e _apple-mobdev2, una Apple TV _airplay, un
+    /// Chromecast o una TV Android _googlecast ("md=Chromecast"), una stampante _ipp col modello
+    /// ("ty=HP LaserJet"), un Linux con Avahi _workstation. Torna i servizi trovati e i valori dei
+    /// TXT che servono a riconoscerlo.
+    /// </summary>
+    public static async Task<MdnsServices> ServicesAsync(
+        string address, TimeSpan timeout, CancellationToken cancellationToken = default)
+    {
+        byte[] query = DnsMessage.BuildMdnsQuery([.. MdnsServices.Types.Select(type => (type, DnsMessage.TypePtr))], UdpExchange.NewTransactionId());
+        byte[]? reply = await UdpExchange.AskAsync(address, MdnsPort, query, timeout, cancellationToken).ConfigureAwait(false);
+        if (reply is null)
+        {
+            return MdnsServices.Empty;
+        }
+
+        MdnsServices found = MdnsServices.Read(reply);
+
+        // i TXT di solito arrivano insieme (tra i record aggiuntivi); se mancano, si chiedono
+        string[] missing = [.. found.Instances.Where(instance => !found.HasTxt(instance)).Take(6)];
+        if (missing.Length > 0)
+        {
+            byte[] more = DnsMessage.BuildMdnsQuery([.. missing.Select(instance => (instance, DnsMessage.TypeTxt))], UdpExchange.NewTransactionId());
+            byte[]? second = await UdpExchange.AskAsync(address, MdnsPort, more, timeout, cancellationToken).ConfigureAwait(false);
+            if (second is not null)
+            {
+                found = found.With(MdnsServices.Read(second));
+            }
+        }
+
+        return found;
+    }
 }

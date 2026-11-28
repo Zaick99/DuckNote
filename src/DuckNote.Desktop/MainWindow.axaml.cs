@@ -407,23 +407,19 @@ public sealed partial class MainWindow : Window
 
         if (updates.IsReady)
         {
-            _notices.Toast("check", "Green", $"DuckNote {version} e' pronta", "Si installa quando chiudi DuckNote, oppure adesso.", "Riavvia e aggiorna", () =>
-            {
-                if (updates.InstallNow())
-                {
-                    Close();
-                }
-            }, tab: "Aggiornamento");
+            // un clic porta alle Impostazioni, dove "Riavvia e aggiorna" lo installa subito
+            _notices.Toast("check", "Green", $"DuckNote {version} e' pronta", "Si installa quando chiudi DuckNote; dalle Impostazioni anche adesso.",
+                () => Navigate("settings"), tab: "Aggiornamento");
             return;
         }
 
         if (updates.CanOpenDownloaded)
         {
-            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, "Apri l'aggiornamento", () => updates.OpenDownloaded(), tab: "Aggiornamento");
+            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, () => updates.OpenDownloaded(), tab: "Aggiornamento");
             return;
         }
 
-        _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, "Apri la pagina", () => _ = Launcher.LaunchUriAsync(release.Page), tab: "Aggiornamento");
+        _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Blocker ?? updates.Message, () => _ = Launcher.LaunchUriAsync(release.Page), tab: "Aggiornamento");
     }
 
     // ------------------------------------------------------------------ navigazione
@@ -936,7 +932,7 @@ public sealed partial class MainWindow : Window
             // dopo una pausa lunga (il Mac addormentato) ne arrivano tanti: uno che li racconta
             _notices.Toast("bell", "Orange", $"{alerts.Count} promemoria",
                 string.Join(", ", alerts.Take(3).Select(alert => AgendaText.Alert(alert, now).Title)) + " e altri.",
-                [new NoticeAction("Apri il calendario", () => Navigate("calendar"), Primary: true)], sticky: true);
+                () => Navigate("calendar"), sticky: true);
         }
         else
         {
@@ -952,17 +948,14 @@ public sealed partial class MainWindow : Window
                     _ => "Blue"
                 };
 
-                _notices.Toast("bell", tone, title, text,
+                // un clic apre la voce nel calendario; Fatto e Rimanda col tasto destro
+                _notices.Toast("bell", tone, title, text, () => ShowOccurrence(occurrence), sticky: true, more:
                 [
-                    new NoticeAction("Fatto", () => _ws.MarkDone(occurrence), Primary: true),
-                    new NoticeAction("Rimanda", null, Choices:
-                    [
-                        ("Fra 10 minuti", () => _ws.Snooze(occurrence, DateTime.Now.AddMinutes(10))),
-                        ("Fra un'ora", () => _ws.Snooze(occurrence, DateTime.Now.AddHours(1))),
-                        ("Domani alle 9", () => _ws.Snooze(occurrence, DateTime.Today.AddDays(1).AddHours(9)))
-                    ]),
-                    new NoticeAction("Apri", () => ShowOccurrence(occurrence))
-                ], sticky: true);
+                    new NoticeAction("Fatto", () => _ws.MarkDone(occurrence)),
+                    new NoticeAction("Rimanda di 10 minuti", () => _ws.Snooze(occurrence, DateTime.Now.AddMinutes(10))),
+                    new NoticeAction("Rimanda di un'ora", () => _ws.Snooze(occurrence, DateTime.Now.AddHours(1))),
+                    new NoticeAction("Rimanda a domani alle 9", () => _ws.Snooze(occurrence, DateTime.Today.AddDays(1).AddHours(9)))
+                ]);
             }
         }
 
@@ -994,7 +987,7 @@ public sealed partial class MainWindow : Window
             }
 
             _notices.Toast("calendar", tone, AgendaText.SummaryTitle(summary), AgendaText.SummaryText(summary, today),
-                [new NoticeAction("Apri il calendario", () => Navigate("calendar"), Primary: true)], sticky: false);
+                () => Navigate("calendar"));
             Attention.Request(this, insist: false);
         };
         later.Start();
@@ -1058,15 +1051,15 @@ public sealed partial class MainWindow : Window
     {
         if (message.StartsWith("Analisi interrotta", StringComparison.Ordinal))
         {
-            _notices.Toast("error", "Red", "Analisi non riuscita", message, tab: "Rete");
+            _notices.Toast("error", "Red", "Analisi non riuscita", message, () => Navigate("network"), tab: "Rete");
         }
         else if (message.StartsWith("Fermata", StringComparison.Ordinal))
         {
-            _notices.Toast("info", "Blue", "Analisi fermata", message, tab: "Rete");
+            _notices.Toast("info", "Blue", "Analisi fermata", message, () => Navigate("network"), tab: "Rete");
         }
         else if (!message.StartsWith("Indica", StringComparison.Ordinal) && !message.StartsWith("Niente", StringComparison.Ordinal))
         {
-            _notices.Toast("check", "Green", "Analisi finita", message, tab: "Rete");
+            _notices.Toast("check", "Green", "Analisi finita", message, () => Navigate("network"), tab: "Rete");
         }
     }
 }

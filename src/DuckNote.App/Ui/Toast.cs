@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Threading;
@@ -8,14 +9,14 @@ using DuckNote.App.Theme;
 namespace DuckNote.App.Ui;
 
 /// <summary>
-/// Un pulsante di un avviso: fa una cosa (e l'avviso se ne va), oppure apre un menu di scelte
-/// (Rimanda: fra 10 minuti, fra un'ora, domani).
+/// Una scelta del tasto destro su un avviso (Fatto, Rimanda di un promemoria): fa la sua cosa e
+/// l'avviso se ne va. Gli avvisi non hanno pulsanti: il clic porta all'evento.
 /// </summary>
-public sealed record ToastAction(string Label, Action? Run, bool Primary = false, IReadOnlyList<(string Label, Action Run)>? Choices = null);
+public sealed record ToastAction(string Label, Action Run);
 
 /// <summary>
 /// Notifiche non bloccanti in basso a destra (al posto dei popup di conferma per gli esiti
-/// positivi): entrano scivolando, restano 6 s (si fermano col mouse sopra), azione facoltativa.
+/// positivi): entrano scivolando, restano qualche secondo (si fermano col mouse sopra).
 /// </summary>
 public static class Toast
 {
@@ -23,20 +24,17 @@ public static class Toast
 
     public static void Attach(Panel host) => _host = host;
 
-    public static void Success(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipGreen", "Green", "\uE73E", title, text, action, onAction, tab);
-    public static void Info(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipBlue", "Blue", "\uE946", title, text, action, onAction, tab);
-    public static void Warning(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipOrange", "Orange", "\uE7BA", title, text, action, onAction, tab);
+    public static void Success(string title, string text, Action? open = null, string? tab = null) => Show("ChipGreen", "Green", "", title, text, open, tab: tab);
+    public static void Info(string title, string text, Action? open = null, string? tab = null) => Show("ChipBlue", "Blue", "", title, text, open, tab: tab);
+    public static void Warning(string title, string text, Action? open = null, string? tab = null) => Show("ChipOrange", "Orange", "", title, text, open, tab: tab);
 
-    public static void Error(string title, string text, string? action = null, Action? onAction = null, string? tab = null) => Show("ChipRed", "Red", "\uEA39", title, text, action, onAction, tab);
-
-    private static void Show(string chip, string fg, string glyph, string title, string text, string? action, Action? onAction, string? tab) =>
-        Show(chip, fg, glyph, title, text, action is null ? [] : [new ToastAction(action, onAction)], sticky: false, tab);
+    public static void Error(string title, string text, Action? open = null, string? tab = null) => Show("ChipRed", "Red", "", title, text, open, tab: tab);
 
     /// <summary>Il tipo di avviso scritto sulla linguetta, dall'icona (o dal tono).</summary>
     public static string Kind(string glyph, string fg) => glyph switch
     {
-        "\uEA8F" => "Promemoria",
-        "\uE787" => "Calendario",
+        "" => "Promemoria",
+        "" => "Calendario",
         _ => fg switch
         {
             "Green" => "Fatto",
@@ -47,12 +45,14 @@ public static class Toast
     };
 
     /// <summary>
-    /// Un avviso con piu' pulsanti; <paramref name="sticky"/>: resta finche' non si sceglie o non
-    /// lo si chiude (i promemoria del calendario). Ha la forma delle schede della mappa: una
-    /// linguetta col tipo (<paramref name="tab"/>, o quello dell'icona) e l'ora, e sotto il corpo
-    /// con la riga d'accento nel tono, la tessera dell'icona, il titolo e il testo.
+    /// Un avviso, nella forma delle schede della mappa: una linguetta col tipo (<paramref name="tab"/>,
+    /// o quello dell'icona) e l'ora, e sotto il corpo con la riga d'accento nel tono, la tessera
+    /// dell'icona, il titolo e il testo. Niente pulsanti: un clic sull'avviso porta all'evento
+    /// (<paramref name="open"/>) e lo chiude, la X lo chiude soltanto. <paramref name="more"/>: le
+    /// scelte del tasto destro (Fatto e Rimanda di un promemoria). <paramref name="sticky"/>: resta
+    /// finche' non lo si apre o lo si chiude.
     /// </summary>
-    public static void Show(string chip, string fg, string glyph, string title, string text, IReadOnlyList<ToastAction> actions, bool sticky, string? tab = null)
+    public static void Show(string chip, string fg, string glyph, string title, string text, Action? open = null, bool sticky = false, string? tab = null, IReadOnlyList<ToastAction>? more = null)
     {
         if (_host is null) return;
         var app = Application.Current;
@@ -66,7 +66,7 @@ public static class Toast
         body.Children.Add(new TextBlock { Text = title, Style = (Style)app.FindResource("TxtBody"), FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, MaxHeight = 40 });
         body.Children.Add(new TextBlock { Text = text, Style = (Style)app.FindResource("TxtCaption"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 0), MaxHeight = 90, TextTrimming = TextTrimming.CharacterEllipsis });
 
-        var close = new Button { Content = new TextBlock { Text = "\uE711", Style = (Style)app.FindResource("Icon"), FontSize = 9 }, Style = (Style)app.FindResource("Toolbtn"), Width = 22, Height = 22, MinWidth = 0, VerticalAlignment = VerticalAlignment.Top };
+        var close = new Button { Content = new TextBlock { Text = "", Style = (Style)app.FindResource("Icon"), FontSize = 9 }, Style = (Style)app.FindResource("Toolbtn"), Width = 22, Height = 22, MinWidth = 0, VerticalAlignment = VerticalAlignment.Top, ToolTip = "Chiudi" };
         var grid = new Grid { Margin = new Thickness(12, 12, 8, 12) };
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -76,35 +76,6 @@ public static class Toast
         grid.Children.Add(icon);
         grid.Children.Add(body);
         grid.Children.Add(close);
-        var buttons = new List<Button>();
-        if (actions.Count > 0)
-        {
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
-            foreach (var act in actions)
-            {
-                var btn = new Button { Content = act.Label, Style = (Style)app.FindResource(act.Primary ? "PrimaryBtn" : "SoftBtn"), Height = 26, Padding = new Thickness(10, 0, 10, 0), Margin = new Thickness(0, 0, 6, 0) };
-                if (act.Choices is { Count: > 0 } choices)
-                {
-                    var menu = new ContextMenu { PlacementTarget = btn, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-                    foreach (var (label, run) in choices)
-                    {
-                        var item = new MenuItem { Header = label };
-                        item.Click += (_, _) => { run(); btn.Tag = "done"; btn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
-                        menu.Items.Add(item);
-                    }
-                    btn.ContextMenu = menu;
-                    btn.Click += (_, _) => { if (btn.Tag is not "done") menu.IsOpen = true; };
-                }
-                else
-                {
-                    btn.Click += (_, _) => act.Run?.Invoke();
-                    btn.Tag = "done";
-                }
-                buttons.Add(btn);
-                row.Children.Add(btn);
-            }
-            body.Children.Add(row);
-        }
 
         // la linguetta: il tipo e l'ora (come il nome e UP/DOWN sulle schede della mappa)
         var kind = new TextBlock { Text = tab ?? Kind(glyph, fg), FontSize = 11.5, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
@@ -151,24 +122,66 @@ public static class Toast
         card.BeginAnimation(UIElement.OpacityProperty, Motion.Slide(0, 1, 240, Fx.Expo()));
         ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.XProperty, Motion.Slide(60, 0, 700, Fx.Spring(6)));
 
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(actions.Count == 0 ? 5 : 9) };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(open is null ? 5 : 8) };
+        var gone = false;
         void Dismiss()
         {
+            if (gone) return;
+            gone = true;
             timer.Stop();
             var fade = Motion.Slide(card.Opacity, 0, 180, Motion.Ease(mode: System.Windows.Media.Animation.EasingMode.EaseIn));
             fade.Completed += (_, _) => _host?.Children.Remove(card);
             card.BeginAnimation(UIElement.OpacityProperty, fade);
             ((TranslateTransform)card.RenderTransform).BeginAnimation(TranslateTransform.XProperty, Motion.Slide(0, 30, 180, null));
         }
+
+        // un clic sull'avviso porta all'evento (non sulla X, che chiude e basta)
+        if (open is not null)
+        {
+            card.Cursor = Cursors.Hand;
+            card.MouseLeftButtonUp += (_, e) =>
+            {
+                if (Inside(close, e.OriginalSource)) return;
+                e.Handled = true;
+                open();
+                Dismiss();
+            };
+        }
+
+        // le scelte in piu' (Fatto, Rimanda) col tasto destro: nessun pulsante sull'avviso
+        if (more is { Count: > 0 })
+        {
+            var menu = new ContextMenu();
+            foreach (var choice in more)
+            {
+                var item = new MenuItem { Header = choice.Label };
+                item.Click += (_, _) =>
+                {
+                    choice.Run();
+                    Dismiss();
+                };
+                menu.Items.Add(item);
+            }
+            card.ContextMenu = menu;
+        }
+
         timer.Tick += (_, _) => Dismiss();
         if (!sticky)
         {
             card.MouseEnter += (_, _) => timer.Stop();
-            card.MouseLeave += (_, _) => timer.Start();
+            card.MouseLeave += (_, _) => { if (!gone) timer.Start(); };
             timer.Start();
         }
         close.Click += (_, _) => Dismiss();
-        // un pulsante che ha fatto la sua cosa (o una scelta del suo menu) chiude l'avviso
-        foreach (var btn in buttons) btn.Click += (_, _) => { if (btn.Tag is "done") Dismiss(); };
+    }
+
+    private static bool Inside(DependencyObject part, object? source)
+    {
+        for (var at = source as DependencyObject; at is not null; at = at is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(at) : LogicalTreeHelper.GetParent(at))
+        {
+            if (ReferenceEquals(at, part)) return true;
+        }
+
+        return false;
     }
 }

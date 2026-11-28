@@ -3,57 +3,32 @@
 // doppia risoluzione) e gli inventari in CSV (li scrive la finestra, col punto e virgola).
 
 import { KIND, CABLE, boundsOf, zoneOf } from './model.js';
-import { measure } from '../common/dom.js';
 import {
-  FONT, MONO, CHIP_FONT, strokeOf, zoneHead, linkLayout, usedPorts, cardMarkup,
+  FONT, MONO, DEFS, widthOf, capOf, zoneHead, zoneHeadRect, linkLayout, usedPorts, cardMarkup, vlanTones, toneVar,
 } from './scene.js';
+import { badgeMarkup, vpnOf } from './vpn.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
-/** Il colore di un token del tema, com'e' adesso (#RRGGBB o rgba). */
-function colour(name, fallback = '#888888') {
-  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return value || fallback;
-}
-
-const STATE_COLOUR = { up: '--c-Green', down: '--c-Red', wait: '--c-Orange', unknown: '--c-LabelQuaternary' };
-
-/** I tratteggi dei cavi, come in map.css. */
-const DASH = { down: '6 4', net: '0.1 5.5', wifi: '5 5' };
-
-/** La pittura dell'esportazione: gli stessi pezzi della scheda dello schermo, coi colori scritti. */
-function exportPaint(c, kind, state) {
-  const tone = colour(`--c-${kind.tone}`);
-  const down = state === 'down';
-  const badge = { up: c.green, down: c.red, wait: c.orange }[state] ?? c.third;
-  return (part, info = {}) => {
-    switch (part) {
-      case 'ring': return 'fill="none" stroke="none"';
-      case 'tab':
-      case 'card': return `fill="${c.card}" stroke="${down ? c.redBorder : c.edge}"`;
-      case 'cloud': return `fill="${c.card}" stroke="${down ? c.red : colour(`--t-${kind.tone}-border`, tone)}" stroke-width="1.2"`;
-      case 'tabname': return `font-size="11.5" font-weight="600" fill="${c.label}"`;
-      case 'badge': return `font-size="9" font-weight="700" letter-spacing="0.36" fill="${badge}"`;
-      case 'accent': return `stroke="${tone}" stroke-width="2" stroke-linecap="round" opacity="0.6"`;
-      case 'tile': return `fill="${colour(`--t-${kind.tone}-soft`, '#eeeeee')}"`;
-      case 'icon': return `fill="none" stroke="${tone}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"`;
-      case 'title': return `font-size="13" font-weight="600" fill="${c.label}"`;
-      case 'ip': return `font-size="11" font-family="${esc(MONO)}" fill="${c.accent}"`;
-      case 'info': return `font-size="10.5" fill="${down ? c.red : state === 'up' ? c.second : c.third}"`;
-      case 'dot': return `fill="${colour(STATE_COLOUR[state] ?? STATE_COLOUR.unknown)}" stroke="${c.card}" stroke-width="2"`;
-      case 'bay': return `fill="${c.field}" stroke="${c.edge}" stroke-width="0.8"`;
-      case 'jack': {
-        const used = info.used;
-        if (!used) return `fill="${c.card}" stroke="${c.control}" stroke-width="0.8"`;
-        const fill = used.style === 'down' ? c.red : used.tone ? colour(`--c-${used.tone}`) : c.second;
-        return `fill="${fill}" stroke="${fill}"`;
-      }
-      default: return '';
-    }
+/**
+ * I colori del disegno sono variabili CSS (quelle della mappa, --vt-*): nel file esportato
+ * diventano i colori di adesso, cosi' lo leggono anche i programmi che non le capiscono.
+ */
+function resolveColours(markup) {
+  const source = document.querySelector('.dm-canvas') ?? document.documentElement;
+  const style = getComputedStyle(source);
+  const cache = new Map();
+  const value = (name) => {
+    if (!cache.has(name)) cache.set(name, style.getPropertyValue(`--${name}`).trim() || '#888888');
+    return cache.get(name);
   };
+  // una variabile puo' rimandare a un'altra: si risolve finche' ne restano
+  let out = markup;
+  for (let pass = 0; pass < 3 && out.includes('var(--'); pass++) out = out.replace(/var\(--([\w-]+)\)/g, (_, name) => value(name));
+  return out;
 }
 
-/** La mappa come SVG a se', col nome in testa. */
+/** La mappa come SVG a se', col nome in testa: lo stesso disegno dello schermo, coi colori per esteso. */
 export function mapSvg(map, store, { title = true } = {}) {
   const box = boundsOf(map) ?? { x: 0, y: 0, w: 400, h: 200 };
   const pad = 40;
@@ -62,81 +37,60 @@ export function mapSvg(map, store, { title = true } = {}) {
   const y0 = box.y - pad - head;
   const width = Math.ceil(box.w + pad * 2);
   const height = Math.ceil(box.h + pad * 2 + head);
-  const c = {
-    paper: colour('--c-BgContent', '#ffffff'),
-    card: colour('--c-BgContent', '#ffffff'),
-    edge: colour('--c-Separator', '#e2e2e4'),
-    label: colour('--c-Label', '#1f2328'),
-    second: colour('--c-LabelSecondary', '#6a737d'),
-    third: colour('--c-LabelTertiary', '#8d949c'),
-    red: colour('--c-Red', '#c0392b'),
-    redBorder: colour('--t-Red-border', '#c0392b59'),
-    green: colour('--c-Green', '#2e9e5b'),
-    orange: colour('--c-Orange', '#e8890c'),
-    accent: colour('--c-Accent', '#e8890c'),
-    field: colour('--c-BgFieldAlt', '#f3f3f5'),
-    control: colour('--c-BorderControl', '#c9c9ce'),
-  };
+  const stateOf = (node) => store.stateOf(node);
   const out = [];
   out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="${x0} ${y0} ${width} ${height}" font-family="${esc(FONT)}">`);
-  out.push(`<rect x="${x0}" y="${y0}" width="${width}" height="${height}" fill="${c.paper}"/>`);
+  out.push(DEFS);
+  out.push(`<rect x="${x0}" y="${y0}" width="${width}" height="${height}" fill="var(--vt-canvas)"/>`);
   if (title) {
     const date = new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' });
-    out.push(`<text x="${x0 + pad}" y="${y0 + 34}" font-size="17" font-weight="700" fill="${c.label}">${esc(map.name)}</text>`);
-    out.push(`<text x="${x0 + width - pad}" y="${y0 + 34}" font-size="11" text-anchor="end" fill="${c.third}">DuckNote · ${esc(date)}</text>`);
+    out.push(`<text x="${x0 + pad}" y="${y0 + 34}" font-size="17" font-weight="700" fill="var(--vt-ink)">${esc(map.name)}</text>`);
+    out.push(`<text x="${x0 + width - pad}" y="${y0 + 34}" font-size="11" text-anchor="end" fill="var(--vt-muted)">DuckNote · ${esc(date)}</text>`);
   }
 
   for (const zone of map.zones) {
-    const tone = colour(`--c-${zone.tone}`);
-    out.push(`<rect x="${zone.x}" y="${zone.y}" width="${zone.w}" height="${zone.h}" rx="16" fill="${colour(`--t-${zone.tone}-zone`, 'none')}" stroke="${colour(`--t-${zone.tone}-border`, tone)}"/>`);
+    const tone = toneVar(zone.tone);
+    out.push(`<g transform="translate(${zone.x} ${zone.y})">`
+      + `<rect width="${zone.w}" height="${zone.h}" rx="10" fill="${tone}" fill-opacity="0.07" stroke="${tone}" stroke-opacity="0.45"/>`
+      + `<path d="M1.5 11 Q1.5 1.5 11 1.5 H${zone.w - 11} Q${zone.w - 1.5} 1.5 ${zone.w - 1.5} 11" fill="none" stroke="${tone}" stroke-width="3"/>`
+      + '</g>');
   }
-  // le testate delle zone vanno sopra ai cavi (vedi sotto), come sullo schermo
-  const heads = map.zones.map((zone) => {
-    const tone = colour(`--c-${zone.tone}`);
-    const head = zoneHead(zone);
-    return `<g transform="translate(${zone.x} ${zone.y})">`
-      + `<rect x="12" y="10" width="${head.width}" height="24" rx="7" fill="${c.card}" stroke="${c.edge}"/>`
-      + `<circle cx="25" cy="22" r="3.5" fill="${tone}"/>`
-      + `<text x="34" y="26" font-size="12" font-weight="600" fill="${c.label}">${esc(head.name)}</text>`
-      + (head.sub ? `<text x="${34 + head.nameWidth + 10}" y="26" font-size="11" font-family="${esc(MONO)}" fill="${c.second}">${esc(head.sub)}</text>` : '')
-      + '</g>';
-  });
 
-  // prima tutte le linee, poi tutte le etichette: nessun cavo passa sopra a una scritta
-  const layout = linkLayout(map, false, (node) => store.stateOf(node));
-  const ports = usedPorts(layout);
-  const chips = [];
-  const chip = (label, spot, height, colourText) => {
-    if (!label || !spot) return;
-    const w = Math.ceil(measure(label, CHIP_FONT)) + 12;
-    const left = spot.at.x - w / 2;
-    const top = spot.at.y - height / 2;
-    const leader = spot.lead ? `<line x1="${(spot.anchor.x - left).toFixed(1)}" y1="${(spot.anchor.y - top).toFixed(1)}" x2="${(w / 2).toFixed(1)}" y2="${(height / 2).toFixed(1)}" stroke="${c.third}" stroke-width="0.8" stroke-dasharray="2 2"/>` : '';
-    chips.push(`<g transform="translate(${left.toFixed(1)} ${top.toFixed(1)})">${leader}<rect width="${w}" height="${height}" rx="${height > 17 ? 6 : 5}" fill="${c.card}" stroke="${c.edge}"/>`
-      + `<text x="6" y="${height > 17 ? 12.5 : 11.5}" font-size="10.5" font-family="${esc(MONO)}" fill="${colourText}">${esc(label)}</text></g>`);
-  };
-  for (const { link, points, wire, pa, pb, mid, spots } of layout) {
+  // prima tutti i cavi, poi le testate delle zone e le velocita': nessun cavo ci passa sopra
+  const layout = linkLayout(map, false, stateOf);
+  const ports = usedPorts(layout, stateOf, vlanTones(map));
+  const tags = [];
+  for (const { link, points, wire, speed, tag, badge, title: about } of layout) {
     if (!points) continue;
-    const stroke = wire.style === 'trunk' ? c.second : wire.tone ? colour(`--c-${wire.tone}`) : c.third;
-    const dash = DASH[wire.style] ? ` stroke-dasharray="${DASH[wire.style]}"` : '';
     const d = points.map((point, index) => `${index ? 'L' : 'M'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
-    const width = strokeOf(link) + (wire.style === 'trunk' ? 0.6 : 0);
-    out.push(`<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${width.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"${dash}${wire.style === 'down' ? ' opacity="0.85"' : ''}/>`);
-    chip(mid, spots?.mid, 18, c.second);
-    chip(pa, spots?.a, 16, c.third);
-    chip(pb, spots?.b, 16, c.third);
+    const width = widthOf(link, wire);
+    const dash = wire.dash ? ` stroke-dasharray="${wire.dash}"` : '';
+    out.push(`<g><title>${esc(about)}</title>`
+      + (wire.trunk && !wire.down ? `<path d="${d}" fill="none" stroke="var(--vt-muted)" stroke-opacity="0.5" stroke-width="${width + 3}" stroke-linejoin="round"${dash}/>` : '')
+      + `<path d="${d}" fill="none" stroke="${wire.color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="${capOf(wire)}"${dash}/></g>`);
+    if (badge) tags.push(`<g>${badgeMarkup(wire.brand, badge.x, badge.y, wire.down)}</g>`);
+    if (tag && speed) {
+      tags.push(`<text x="${tag.x.toFixed(1)}" y="${tag.y.toFixed(1)}" text-anchor="${tag.anchor}" font-size="11" fill="${wire.down ? 'var(--vt-crit-text)' : 'var(--vt-muted)'}" stroke="var(--vt-canvas)" stroke-width="3" paint-order="stroke" stroke-linejoin="round">${esc(speed)}</text>`);
+    }
   }
-  out.push(...heads, ...chips);
+  for (const zone of map.zones) {
+    const headText = zoneHead(zone);
+    const rect = zoneHeadRect(zone);
+    out.push(`<g transform="translate(${rect.x - 14} ${rect.y})">`
+      + `<path d="M14.5 ${22} V7 Q14.5 0.5 21.5 0.5 H${14 + headText.width - 7.5} Q${14 + headText.width - 0.5} 0.5 ${14 + headText.width - 0.5} 7 V${22} Z" fill="var(--vt-panel)"/>`
+      + `<path d="M14.5 16 V7 Q14.5 0.5 21.5 0.5 H${14 + headText.width - 7.5} Q${14 + headText.width - 0.5} 0.5 ${14 + headText.width - 0.5} 7 V16" fill="none" stroke="var(--vt-line)"/>`
+      + `<text x="24" y="15.5" font-size="13" font-weight="700" fill="var(--vt-ink)">${esc(headText.name)}</text>`
+      + (headText.sub ? `<text x="${24 + headText.nameWidth + 8}" y="15.5" font-size="11" font-family="${esc(MONO)}" fill="var(--vt-muted)">${esc(headText.sub)}</text>` : '')
+      + '</g>');
+  }
+  out.push(...tags);
 
   for (const node of map.nodes) {
-    const kind = KIND[node.kind] ?? KIND.other;
     const state = store.stateOf(node);
-    out.push(`<g transform="translate(${node.x} ${node.y})">`);
-    out.push(cardMarkup(node, state, store.hostOf(node), ports.get(node.id) ?? null, exportPaint(c, kind, state)));
-    out.push('</g>');
+    out.push(`<g transform="translate(${node.x} ${node.y})">${cardMarkup(node, state, store.hostOf(node), ports.get(node.id) ?? null, { titles: true })}</g>`);
   }
   out.push('</svg>');
-  return { svg: out.join(''), width, height };
+  return { svg: resolveColours(out.join('')), width, height };
 }
 
 /** Lo stesso disegno in PNG, base64 (fino a 16 milioni di pixel: le tele piu' grandi WebKit le rifiuta). */
@@ -186,7 +140,7 @@ export function linksTable(map) {
   const header = ['Da', 'Porta', 'A', 'Porta', 'Tipo', 'Velocità', 'VLAN', 'Note'];
   const nodes = new Map(map.nodes.map((n) => [n.id, n]));
   const rows = map.links
-    .map((link) => [nodes.get(link.a)?.name ?? '', link.pa, nodes.get(link.b)?.name ?? '', link.pb, CABLE[link.kind]?.label ?? '', link.speed, link.vlan, link.notes])
+    .map((link) => [nodes.get(link.a)?.name ?? '', link.pa, nodes.get(link.b)?.name ?? '', link.pb, [CABLE[link.kind]?.label ?? '', vpnOf(link)?.label].filter(Boolean).join(' · '), link.speed, link.vlan, link.notes])
     .sort((a, b) => a[0].localeCompare(b[0], 'it', { numeric: true }) || a[2].localeCompare(b[2], 'it', { numeric: true }));
   return { header, rows };
 }

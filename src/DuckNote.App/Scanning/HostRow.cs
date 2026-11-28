@@ -35,6 +35,12 @@ public sealed partial class HostRow : Observable
     public string Ttl { get; private set; } = string.Empty;
     public string Os { get; private set; } = string.Empty;
     public string DeviceType { get; private set; } = string.Empty;
+    /// <summary>Il modello, quando l'apparato lo dice (mDNS, WMI, la stampante).</summary>
+    public string Model { get; private set; } = string.Empty;
+    /// <summary>Da che cosa si e' riconosciuto sistema e tipo ("TTL 64 · porta 62078 · MAC Apple").</summary>
+    public string Evidence { get; private set; } = string.Empty;
+    /// <summary>I servizi annunciati con mDNS.</summary>
+    public string MdnsServices { get; private set; } = string.Empty;
     public string OpenPorts { get; private set; } = string.Empty;
     public int PortCount { get; private set; }
     public string Services { get; private set; } = string.Empty;
@@ -189,6 +195,9 @@ public sealed partial class HostRow : Observable
         Ttl = result.Ttl;
         Os = result.OperatingSystem;
         DeviceType = result.DeviceType;
+        Model = result.Model;
+        Evidence = result.Evidence;
+        MdnsServices = result.MdnsServices;
         OpenPorts = string.Join(", ", result.OpenPorts);
         PortCount = result.OpenPorts.Count;
         Services = result.Services;
@@ -267,7 +276,7 @@ public sealed partial class HostRow : Observable
         ["mac"] = Mac,
         ["porte"] = OpenPorts,
         ["os"] = string.Join(' ', Os, WmiOs),
-        ["tipo"] = DeviceType,
+        ["tipo"] = string.Join(' ', DeviceType, Model),
         ["produttore"] = Vendor,
         ["gruppo"] = string.Join(' ', Workgroup, Domain),
         ["web"] = string.Join(' ', HttpTitle, HttpServer, TlsSubject),
@@ -281,7 +290,8 @@ public sealed partial class HostRow : Observable
     [
         nameof(IP), nameof(NoteKey), nameof(Status), nameof(Rank), nameof(Hostname), nameof(NetBiosName),
         nameof(MdnsName), nameof(Workgroup), nameof(Domain), nameof(Mac), nameof(Vendor), nameof(RoundTrip),
-        nameof(Loss), nameof(Ttl), nameof(Os), nameof(DeviceType), nameof(OpenPorts), nameof(Services),
+        nameof(Loss), nameof(Ttl), nameof(Os), nameof(DeviceType), nameof(Model), nameof(Evidence), nameof(MdnsServices),
+        nameof(OpenPorts), nameof(Services),
         nameof(HttpTitle), nameof(HttpServer), nameof(TlsSubject), nameof(TlsIssuer), nameof(TlsExpiry),
         nameof(SshBanner), nameof(FtpBanner), nameof(SmtpBanner), nameof(RdpInfo), nameof(SnmpName),
         nameof(SnmpDescr), nameof(SnmpLocation), nameof(SnmpContact), nameof(SnmpUptime), nameof(UpnpDevice),

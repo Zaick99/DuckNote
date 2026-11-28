@@ -4,7 +4,7 @@
 // ordine, perche' non si incrocino appena usciti. Il gomito gira a meta' strada, o dove non
 // attraversa altre schede e non corre sopra a un altro cavo.
 
-import { rectOf, bodyOf, portCell, portNumber } from './model.js';
+import { rectOf, bodyOf, portCell, portOf, zeroBased, physical } from './model.js';
 
 /** Quanto stanno lontani dagli angoli i capi distribuiti su un lato. */
 const EDGE_PAD = 14;
@@ -17,7 +17,7 @@ const CLOSE = 5;
 /** Quanto costa, nella scelta del gomito, attraversare una scheda, incrociare un cavo, correre sopra a un altro. */
 const COST_BOX = 10;
 const COST_CROSS = 4;
-const COST_BUSY = 3;
+const COST_BUSY = 9;
 
 /** I lati da cui un cavo esce da a e entra in b; null se le due schede si toccano. */
 function sidesOf(ra, rb) {
@@ -160,6 +160,7 @@ export function cableRoutes(map, { tabEnd = () => 0, quick = false } = {}) {
   const routes = new Map();
   const pending = [];
   const buckets = new Map();
+  const zero = zeroBased(map);
 
   // i lati e, dove c'e' la porta giusta, il punto; gli altri capi aspettano il loro turno
   for (const link of map.links) {
@@ -179,10 +180,10 @@ export function cableRoutes(map, { tabEnd = () => 0, quick = false } = {}) {
     const entry = { link, a, b, ends: { a: { node: a, side: sides[0], point: null, port: null, anchored: false }, b: { node: b, side: sides[1], point: null, port: null, anchored: false } } };
     for (const [end, node, other, label] of [['a', a, b, link.pa], ['b', b, a, link.pb]]) {
       const info = entry.ends[end];
-      const number = portNumber(label);
-      const cell = number != null ? portCell(node, number) : null;
+      const named = physical(link) ? portOf(node, label, zero.get(node.id)) : null;
+      const cell = named ? portCell(node, named.n, named.kind) : null;
       // la porta si accende comunque sul pannello; il cavo ci si attacca se esce da sopra o da sotto
-      if (cell) info.port = { number, cell };
+      if (cell) info.port = { number: named.n, kind: named.kind, key: cell.key, cell };
       if (cell && vertical(info.side)) {
         info.point = onSide(bodies.get(node.id), info.side, node.x + cell.ax);
         info.anchored = true;

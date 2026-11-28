@@ -108,6 +108,7 @@ public partial class SettingsPage : UserControl, IDuckPage
         Ports.Text = S.Ports;
         PortsInfo.Text = $"{S.PortList().Count} porte. Separate da virgole o spazi.";
         DeadHosts.IsChecked = S.ScanDeadHosts;
+        OfflinePorts.IsChecked = S.CheckPortsWhenOffline;
 
         Dns.IsChecked = S.ResolveDns;
         DnsServer.Text = S.DnsServer;
@@ -207,6 +208,7 @@ public partial class SettingsPage : UserControl, IDuckPage
         S.AutosaveEnabled = Autosave.IsChecked == true;
         S.MonitorEnabled = Monitor.IsChecked == true;
         S.ScanDeadHosts = DeadHosts.IsChecked == true;
+        S.CheckPortsWhenOffline = OfflinePorts.IsChecked == true;
         S.ResolveDns = Dns.IsChecked == true;
         S.ProbeNetBios = NetBios.IsChecked == true;
         S.ProbeMdns = Mdns.IsChecked == true;

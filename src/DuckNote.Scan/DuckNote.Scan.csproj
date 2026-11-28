@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\oui-builtin.txt" />
+    <EmbeddedResource Include="Resources\oui-ieee.txt.gz" LogicalName="DuckNote.Scan.Resources.oui-ieee.txt.gz" />
   </ItemGroup>
 
   <ItemGroup>

@@ -45,6 +45,7 @@ public static class MapFeed
                 ["vendor"] = row.Vendor,
                 ["type"] = row.DeviceType,
                 ["os"] = row.Os,
+                ["model"] = row.Model,
                 ["state"] = row.IsUp ? "up" : row.IsDown ? "down" : row.IsChecked ? "wait" : "unknown",
                 ["rtt"] = row.IsUp ? row.RoundTripShort : string.Empty,
                 ["groups"] = member

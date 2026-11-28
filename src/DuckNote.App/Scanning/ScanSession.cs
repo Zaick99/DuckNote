@@ -455,7 +455,7 @@ public sealed class ScanSession : Observable
 
             try
             {
-                return await HostProbe.ConfirmAsync(doubt.Target, doubt.First.Address, KnownPorts(doubt.Row), patience, token).ConfigureAwait(false);
+                return await HostProbe.ConfirmAsync(doubt.Target, doubt.First.Address, KnownPorts(doubt.Row), patience, token, options.ProbePortsWhenSilent).ConfigureAwait(false);
             }
             finally
             {
@@ -513,6 +513,8 @@ public sealed class ScanSession : Observable
         PortTimeout = full.PortTimeout,
         Ports = [],
         ScanDeadHosts = false,
+        ProbePortsWhenSilent = full.ProbePortsWhenSilent,
+        IdentifyDevices = false,
         ResolveDns = false,
         ProbeNetBios = false,
         ProbeMdns = false,

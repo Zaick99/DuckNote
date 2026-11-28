@@ -13,7 +13,7 @@ For Windows and macOS. One file, nothing to install.
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![macOS](https://img.shields.io/badge/macOS-14%2B-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-293-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-321-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
@@ -30,7 +30,7 @@ For Windows and macOS. One file, nothing to install.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/map-dark.png">
-  <img src="assets/readme/map-light.png" alt="DuckNote with the Mappa page open to look at: an office network drawn from Internet down to access points, printers and cameras, every device a card with its state, cables at right angles coloured by VLAN, and on the left the panels Reti and Legenda" width="900">
+  <img src="assets/readme/map-light.png" alt="DuckNote with the Mappa page open to look at: an office network drawn from Internet down to access points, printers and cameras, every device a card with its state and its front panel of ports, cables at right angles coloured by VLAN and thick by speed, and on the right the panels Reti and Legenda" width="900">
 </picture>
 
 </div>
@@ -128,10 +128,13 @@ its cables behind them; the calendar day by day; the hosts of **Rete** in a
 cascade, and those a running scan finds slide in one by one. With *Reduce
 motion* on in the system, nothing moves.
 
-**Notifications look like the cards of the map.** A tab says what they are
-about — **Rete**, **Promemoria**, **Calendario**, **Aggiornamento**,
-**Errore** — and when, in the colour of the news; below, a coloured line, the
-icon on its tile, the title, the text and the buttons.
+**Notifications look like the cards of the map, and have no buttons.** A tab
+says what they are about — **Rete**, **Promemoria**, **Calendario**,
+**Aggiornamento**, **Errore** — and when, in the colour of the news; below, a
+coloured line, the icon on its tile, the title and the text. **A click on the
+notification takes you to what it is about** (the host in **Rete**, the item
+in the calendar, the update in the settings); **×** closes it. The extra
+actions of a reminder — **Fatto**, **Rimanda** — are in its right-click menu.
 
 While locked, the whole window is one colour and asks for the password in
 place; only the version and day/night stay on top.
@@ -198,10 +201,10 @@ later), copy it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/network-dark.png">
-  <img src="assets/readme/network-light.png" alt="The Rete page: the hosts table with state, address, name, response time, system and ports, and the card of the selected switch" width="900">
+  <img src="assets/readme/network-light.png" alt="The Rete page: the hosts table with state, address, name, response time, system and ports, an iPhone, an Android phone and a MacBook recognised as such, and the card of the MacBook with its model, macOS version, what it was recognised from and its mDNS services" width="900">
 </picture>
 
-*The hosts of the note and of the map, and the card of the selected one.*
+*The hosts of the note and of the map; the card says what a device is and how DuckNote knows.*
 
 </div>
 
@@ -220,9 +223,26 @@ later), copy it.
 Every row starts with a dot — **green online, orange to check, red offline** —
 then the IP and the name. Selecting a row fills the card on the right with
 everything the scan collected: names, MAC and vendor, response time, the
-operating system it looks like, the kind of device, open ports and services,
-HTTP/SSH/FTP/SMTP banners, TLS certificate, SNMP, UPnP, SMB shares, WMI
-inventory.
+operating system and the kind of device with **what they were recognised
+from**, the model when the device says it, open ports and services, the
+services it announces over mDNS, HTTP/SSH/FTP/SMTP banners, TLS certificate,
+SNMP, UPnP, SMB shares, WMI inventory.
+
+**Devices are recognised from many clues, not from one.** The time-to-live of
+the answer tells the family (64: Linux, macOS, iOS, Android; 128: Windows;
+255: network gear) but not which one; DuckNote weighs it together with the
+maker of the network card (the whole IEEE registry is built in), the ports
+only some systems open (62078 only iPhones and iPads, 135 only Windows, 5555 is
+Android's adb, 8008/8009 Google Cast, 8291 MikroTik's Winbox, 8123 Home
+Assistant — tried on every host besides the ones you chose), the names
+(`iPhone-di-Marta`, `DESKTOP-4F2K9QX`, `Galaxy-S23`, `raspberrypi`), what the
+device announces over mDNS (a Mac says its model and macOS version, an Apple
+TV or a HomePod theirs, a Chromecast its name, a printer its model; Linux with
+Avahi says so), the banners of SSH, HTTP, SNMP and UPnP, and WMI when it is
+there. A private, rotating MAC with a time-to-live of 64 is a phone. With few
+clues the card says only the family. On the Mac every host used to look like
+Windows: the time-to-live .NET reports there is the one sent, not the one
+received — DuckNote now reads the real one from the answer itself.
 
 **The card has the commands of its host.** **Ricontrolla** analyses it again,
 in full. **Apri** ▾ offers what its open ports allow: its web pages (`https`
@@ -240,9 +260,17 @@ pop up a notification; the ones you start do.
 
 **A host that was up is not called down on one lost ping.** When it does not
 answer, it keeps its state and its details until the end of the scan; then it
-is asked again, calmly, a few at a time — pings with more patience and, if it
-had open ports, a connection to them — and only if it is silent again it turns
-red. Pings go out in steps (the second one 300 ms after the first, not
+is asked again, calmly, a few at a time — pings with more patience and a
+knock on the ports it had open and on the common ones — and only if it is
+silent again it turns red.
+
+**Hosts that drop the ping are found on their ports.** With **Verifica le
+porte degli host offline** (in **Impostazioni**, on by default), a host that
+does not answer the ping is knocked on at the common ports of PCs, phones,
+printers and network gear, and at those it had open, before being called
+down: one that accepts *or refuses* the connection is up (a refusal is the
+host answering). It applies to the analysis, to every check and to the
+monitor. Pings go out in steps (the second one 300 ms after the first, not
 together), at most 256 at a time, and a ping that fails on this computer
 (resources over, say) leaves the host **to check**, not down.
 
@@ -289,16 +317,19 @@ wrong.
 for the network as it is cabled: devices, cables with their ports and VLANs,
 zones for the subnets. It is drawn by hand, or started from what the scan
 already found, and it is saved inside the note — encrypted with it when the
-vault is on. A note can hold several maps (an office, a home, a lab): the menu
-with the map's name switches between them, and creates, renames, duplicates
-and deletes them.
+vault is on. A note can hold several maps (an office, a home, a lab): in the
+view they are tabs at the top (right-click one for rename, duplicate,
+delete), while editing the menu with the map's name switches between them.
+The look follows [Vantage](https://github.com/levi-xy/vantage) (MIT) almost
+one to one.
 
 **A map opens to look at.** Clean, without the library and the tools, with
-two panels on the left: **Reti** — every zone with its VLAN and subnet, and the
-VLANs of cables outside every zone; a click lights up only that VLAN — and
-**Legenda**, with only the kinds of cable the map really uses. **Modifica
-mappa** (or `E`) opens the library, the tools and the editable card; **Fine**
-goes back to looking. An empty map opens ready to draw. In the view a click
+two panels at the top right: **Reti** — every zone with its VLAN and subnet,
+and the VLANs of cables outside every zone; a click lights up only that VLAN —
+and **Legenda**, with only what the map really uses: the speeds, the kinds of
+line, access and trunk ports, the VLAN bars of the ports, the VPN services.
+Bottom left, the zoom, **Adatta** and **Modifica mappa** (or `E`), which opens
+the library, the tools and the editable card; **Fine** goes back to looking. An empty map opens ready to draw. In the view a click
 on a device shows its card to read, with **Promemoria**, and dragging moves
 the view.
 
@@ -306,10 +337,10 @@ the view.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/map-switch-dark.png">
-  <img src="assets/readme/map-switch-light.png" alt="The map being edited, at 100%: the library on the left, the core switch selected with its ports lit by their cables, its card on the right with address, state, MAC, model, place and the panel of its 24 ports; cables at right angles labelled with speed and VLAN" width="900">
+  <img src="assets/readme/map-switch-light.png" alt="The map being edited: router, firewall and the core switch selected, with its 24 RJ45 jacks, 4 SFP cages and the VLAN bars under each used port; its card on the right with address, state, MAC, model, place, the quick choices for the number of ports and SFP cages, and the list of its ports" width="900">
 </picture>
 
-*Editing: the library, a switch with its ports lit by their cables, and its card.*
+*Editing: a switch with its jacks, SFP cages and VLAN bars, and its card with the number of ports one click away.*
 
 </div>
 
@@ -321,13 +352,25 @@ the view.
 | right | the card of what is selected: a device, a cable, a zone, or several of them |
 | bottom | how many devices, cables and zones, how many devices are down; the zoom |
 
-**Every device is a card.** On its tab, the name and the state — **UP**,
-**DOWN**, **?** to check —; on the card, the icon of its kind, the model, the
-address and what is known now: the response time and the system, *non
-risponde*, the place. Switches, routers and firewalls with their number of
-ports carry their front panel, and every port a cable names lights up in the
-colour of that cable (resting on it says port, device, speed and VLAN).
+**Every device is a card.** Its tab sits astride the top edge with the name
+and the state — **UP**, **DOWN**, **?** to check —; the top border takes the
+colour of its kind (red when it is down), and a device without an address has
+a dashed border. On the card, the icon, the model, the address and what is
+known now: the response time and the system, *non risponde*, the place.
 Internet is a cloud.
+
+**The ports are on the card, as on the real thing.** Every device but
+Internet can have ports — copper and, apart, **SFP** cages — chosen with one
+click among the usual numbers of its kind (5, 8, 16, 24, 48 for a switch; 1 or
+2 for a PC) or written. The front panel draws them: RJ45 jacks with their
+contacts and link LED (green up, red down), SFP cages, up to 8 in one row and
+then odd on top and even below; under each port the bars of its VLANs, in
+their colours (tall: untagged), and on a single row the number above and the
+name of what is at the other end below. A port is taken when a cable names it
+(`Gi1/0/12` is 12, `LAN2` is 2; on a device that counts from zero, like
+Linux's `eth0`, `eth0` is the first; `Te1/0/1`, `sfp-sfpplus1` are SFP).
+Resting on a port opens its card: number and name, state and speed, what is
+at the other end, its VLANs with the names of their zones.
 
 **Every device with an address is checked like an address in a sheet.** Green
 up, red down, grey never checked; a cable to a device that is down turns red
@@ -337,29 +380,36 @@ one click checks it now, another opens it in **Rete**, and **Promemoria** starts
 an item of the calendar tied to the device.
 
 **Cables carry what it takes to rebuild the network.** The type — copper,
-fibre, Wi-Fi, VPN, WAN — the speed, from 10M to 100G (faster cables are drawn
-thicker), the port at each end (`Gi1/0/12`, `eth0`) and the VLANs (`10`,
-`10,20,30-35`, `trunk`). They run **at right angles**, from side to side of
-the cards, around the other cards and without running over each other; a
-cable that names a port of a switch leaves from that port. **Green** when a
-device answers, **red and dashed** when one end is down, **in the colour of its
-VLAN** for an access port (the colour of the zone with that VLAN), **light and
-thicker** for a trunk, dotted for Internet and VPN, dashed for Wi-Fi, teal for
-fibre. Two cables between the same two devices run side by side, as an
-aggregate or a spare link does.
+fibre, Wi-Fi, VPN, WAN — the speed, from 10M to 100G, the port at each end
+(`Gi1/0/12`, `eth0`) and the VLANs (`10`, `10,20,30-35`, `trunk`). They run
+**at right angles**, around the other cards and without running over each
+other; a cable that names a port leaves from that jack. **Thicker the
+faster**, the speed written by the end it arrives at; **green** when a device
+answers, **red and dashed** when one end is down, **in the colour of its
+VLAN** for an access port (the colour of the zone with that VLAN), dark over a
+light second line for a trunk, dotted for Internet, dashed for Wi-Fi. Two
+cables between the same two devices run side by side, as an aggregate or a
+spare link does. The editable card of a device lists its ports with their
+cables, copper and SFP; a click on one selects that cable.
 
-**Labels never cover each other.** Ports sit near the ends of their cable (on
-a switch, the lit port says it already), speed and VLAN on the longest stretch. Each label takes the first free place along its
-cable, then beside it, keeping clear of devices, zone titles and other labels;
-when it has to stand aside, a dotted thread ties it to its cable. Short cables
-keep their labels too.
+**VPN links show their service.** A VPN link can say what carries it —
+**Tailscale**, **NetBird**, **NordVPN Meshnet**, **ZeroTier**, **Cloudflare**
+(tunnel, Zero Trust), **WireGuard**, **OpenVPN** or **IPsec** — and then it
+is drawn in the main colour of that service's logo, with the logo on the
+link by the device it reaches (red and dashed only when an end is down). The
+ends are interfaces (`wg0`, `tailscale0`), not jacks: they light no port. The
+legend gets one row per service, with its logo.
 
-**Switches show their front panel.** Give a switch, router or firewall its
-number of ports and both its card on the map and its editable card draw them:
-a port is taken when a cable names it (the number at the end of the name:
-`Gi1/0/12` is port 12; up to 8 ports in one row, then odd on top and even below
-like the real thing), a click on it in the card selects that cable, and the
-card says how many are free. Fibre uplinks (`Te`, `sfp`) are counted apart.
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/readme/map-vpn-dark.png">
+  <img src="assets/readme/map-vpn-light.png" alt="The Sedi e VPN map: a firewall linked to a NAS by Tailscale, a VPS by WireGuard, another office by IPsec, a laptop by NetBird, a Raspberry Pi by ZeroTier, a PC by NordVPN Meshnet, a wiki by Cloudflare and a technician by OpenVPN, each link in the colour of its service with its logo" width="900">
+</picture>
+
+*VPN links in the colour of their service, each with its logo.*
+
+</div>
 
 **Zones are subnets.** A coloured area with a name, a network
 (`192.168.10.0/24`, with its number of usable addresses) and a VLAN. Moving a
@@ -400,6 +450,11 @@ the device inventory and the cable list, that Excel opens as they are.
 
 **Not done**: the map is drawn, not discovered. DuckNote does not read LLDP,
 CDP or the MAC tables of switches; what is connected to what is up to you.
+
+The logos of the VPN services come from [Simple Icons](https://simpleicons.org)
+(CC0) and, for NetBird, from its repository (BSD-3-Clause); the trademarks
+belong to their owners and are used only to tell the services apart. See
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 
@@ -446,8 +501,9 @@ for the day). Each can:
   card of a device, start an item already linked.
 
 **Reminders while DuckNote is open.** When one comes due, a card stays in the
-corner until you answer it: **Fatto** (done), **Rimanda** (in 10 minutes, in an
-hour, tomorrow at 9) or **Apri** (open it in the calendar). If DuckNote is
+corner until you answer it: a click opens the item in the calendar, **×**
+closes the card, and its right-click menu has **Fatto** (done) and **Rimanda**
+(in 10 minutes, in an hour, tomorrow at 9). If DuckNote is
 behind other windows, its icon bounces in the Dock on the Mac, and its button
 flashes in the taskbar on Windows. No permission to grant and no system
 notification: when DuckNote is closed, nothing rings — when the note opens, a
@@ -620,7 +676,7 @@ repository, so building them needs no Node.js:
 
 After changing one, `npm ci && node build.mjs` rebuilds it and `npm test`
 tests it in Chromium with Playwright (mouse and keyboard as a person uses
-them: 36 scenarios for the map, 22 for the calendar, 19 for the editor).
+them: 38 scenarios for the map, 22 for the calendar, 19 for the editor).
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one
@@ -653,7 +709,8 @@ Windows and the disk images on a Mac, and publishes them together with
 
 ```
 src/DuckNote.Core    cryptography and the encrypted container
-src/DuckNote.Scan    the scan engine and the wire protocols
+src/DuckNote.Scan    the scan engine, the wire protocols and how a device is
+                     recognised (Resources/: the IEEE registry of card makers)
 src/DuckNote.Notes   what the note knows without a window: addresses in text,
                      code colouring, charts, the note file, the sheet tree,
                      the host filter and CSV, settings, updates
@@ -672,13 +729,14 @@ src/DuckNote.App     the Windows application (WPF), on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table and the map
   Views/               lock screen, dialogs
-tests/               271 tests, including the fixtures written by the
+tests/               321 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README pictures, and the scripts that
                      draw the avatars and the sheet icon
 packaging/           the Inno Setup script; macos/ builds the .app and the .dmg,
                      and draws their icon and the disk image window
 docs/release-notes/  the text of each release
+THIRD-PARTY-NOTICES.md  the notices of the works DuckNote uses
 .github/workflows/   the workflow that builds and publishes the releases
 ```
 
@@ -698,4 +756,5 @@ they can be unlawful.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). The works DuckNote uses and their notices are in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

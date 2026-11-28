@@ -65,6 +65,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
     private readonly TextBox _ports = new() { Height = 64, TextWrapping = TextWrapping.Wrap, AcceptsReturn = false, PlaceholderText = "22, 80, 443", Margin = new Thickness(0, 8, 0, 0), VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(10, 8) };
     private readonly TextBlock _portsInfo = Kit.Note(string.Empty);
     private readonly OnOff _deadHosts;
+    private readonly OnOff _offlinePorts;
     private readonly TextBox _threads = Kit.Number(90, "256");
     private readonly TextBox _sockets = Kit.Number(90, "900");
     private readonly TextBox _pingCount = Kit.Number(90, "2");
@@ -124,6 +125,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
         _autosave = Kit.Switch(false, _ => OnSwitch());
         _monitor = Kit.Switch(false, _ => OnSwitch());
         _deadHosts = Kit.Switch(false, _ => OnSwitch());
+        _offlinePorts = Kit.Switch(true, _ => OnSwitch());
         _dns = Kit.Switch(false, _ => OnSwitch());
         _netBios = Kit.Switch(false, _ => OnSwitch());
         _mdns = Kit.Switch(false, _ => OnSwitch());
@@ -196,7 +198,8 @@ public sealed class SettingsPage : UserControl, IDuckPage
                     Kit.Header("Porte"),
                     Kit.Group(
                         Kit.Block("Porte da provare su ogni host", null, _ports, Spaced(_portsInfo, 6)),
-                        Kit.Row("Analizza anche chi non risponde al ping", "Molti firewall scartano il ping ma rispondono sulle porte: piu' lento, piu' completo.", _deadHosts))),
+                        Kit.Row("Analizza anche chi non risponde al ping", "Molti firewall scartano il ping ma rispondono sulle porte: piu' lento, piu' completo.", _deadHosts),
+                        Kit.Row("Verifica le porte degli host offline", "Prima di segnare spento chi non risponde al ping, prova le porte comuni e quelle che aveva aperte: e' acceso anche chi rifiuta la connessione. Vale anche per il controllo e il monitoraggio.", _offlinePorts))),
                 Kit.Stack(
                     Kit.Header("Ritmo", first: true),
                     Kit.Group(
@@ -340,6 +343,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
         _ports.Text = S.Ports;
         _portsInfo.Text = $"{S.PortList().Count} porte. Separate da virgole o spazi.";
         _deadHosts.IsChecked = S.ScanDeadHosts;
+        _offlinePorts.IsChecked = S.CheckPortsWhenOffline;
 
         _dns.IsChecked = S.ResolveDns;
         _dnsServer.Text = S.DnsServer;
@@ -416,6 +420,7 @@ public sealed class SettingsPage : UserControl, IDuckPage
         S.AutosaveEnabled = _autosave.IsChecked == true;
         S.MonitorEnabled = _monitor.IsChecked == true;
         S.ScanDeadHosts = _deadHosts.IsChecked == true;
+        S.CheckPortsWhenOffline = _offlinePorts.IsChecked == true;
         S.ResolveDns = _dns.IsChecked == true;
         S.ProbeNetBios = _netBios.IsChecked == true;
         S.ProbeMdns = _mdns.IsChecked == true;

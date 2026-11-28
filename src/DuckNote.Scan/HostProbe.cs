@@ -61,7 +61,7 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             DeepFindings found = await GatherAsync(address, open, result, cancellationToken).ConfigureAwait(false);
             Apply(found, result);
 
-            Conclude(result, open);
+            Conclude(result, open, found.Services);
         }
         catch (Exception problem) when (problem is not OperationCanceledException)
         {
@@ -107,6 +107,15 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
                 result.Status = HostStatus.IcmpFiltered;
             }
         }
+
+        // il ping si perde o e' filtrato (il firewall di Windows, un iPhone che dorme): prima di
+        // dirlo spento si bussa alle porte, e risponde anche chi rifiuta la connessione
+        if (!result.IsAlive && !ping.Inconclusive && options.ProbePortsWhenSilent
+            && await PortProbe.AnswersAsync(address, ScanOptions.LivenessPorts, options.PortTimeout, sockets, cancellationToken).ConfigureAwait(false))
+        {
+            result.Status = HostStatus.IcmpFiltered;
+            result.Error = string.Empty;
+        }
     }
 
     private static void Reached(PingOutcome ping, HostScanResult result)
@@ -132,7 +141,8 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
     /// niente, altrimenti Unreachable.
     /// </summary>
     public static async Task<HostScanResult> ConfirmAsync(
-        string target, string address, IReadOnlyList<int> knownPorts, TimeSpan patience, CancellationToken cancellationToken = default)
+        string target, string address, IReadOnlyList<int> knownPorts, TimeSpan patience, CancellationToken cancellationToken = default,
+        bool probePorts = true)
     {
         HostScanResult result = new() { Address = address, Input = target, Status = HostStatus.Unreachable };
 
@@ -144,17 +154,13 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             return result;
         }
 
-        if (knownPorts.Count > 0)
+        // le porte che aveva aperte e, se si vuole, quelle comuni: chi accetta o rifiuta e' acceso
+        IReadOnlyList<int> ports = probePorts ? [.. knownPorts.Take(3), .. ScanOptions.LivenessPorts] : [.. knownPorts.Take(3)];
+        if (ports.Count > 0
+            && await PortProbe.AnswersAsync(address, ports, patience, null, cancellationToken).ConfigureAwait(false))
         {
-            IReadOnlyList<int> open = await PortProbe
-                .ScanAsync(address, [.. knownPorts.Take(3)], patience, null, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (open.Count > 0)
-            {
-                result.Status = HostStatus.IcmpFiltered;
-                return result;
-            }
+            result.Status = HostStatus.IcmpFiltered;
+            return result;
         }
 
         if (ping.Inconclusive)
@@ -169,9 +175,12 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
     private async Task<HashSet<int>> ScanPortsAsync(
         string address, HostScanResult result, CancellationToken cancellationToken)
     {
-        IReadOnlyList<int> open = options.Ports.Count == 0
+        IReadOnlyList<int> wanted = options.Ports.Count == 0
             ? []
-            : await PortProbe.ScanAsync(address, options.Ports, options.PortTimeout, sockets, cancellationToken)
+            : options.IdentifyDevices ? [.. options.Ports.Union(DeviceIdentity.IdentityPorts)] : options.Ports;
+        IReadOnlyList<int> open = wanted.Count == 0
+            ? []
+            : await PortProbe.ScanAsync(address, wanted, options.PortTimeout, sockets, cancellationToken)
                              .ConfigureAwait(false);
 
         result.OpenPorts = open;
@@ -202,6 +211,10 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             ? NameProbe.MdnsAsync(address, TimeSpan.FromMilliseconds(600), cancellationToken)
             : Task.FromResult(string.Empty);
 
+        Task<MdnsServices> services = options.ProbeMdns
+            ? NameProbe.ServicesAsync(address, TimeSpan.FromMilliseconds(700), cancellationToken)
+            : Task.FromResult(MdnsServices.Empty);
+
         Task<BannerFindings> banners = options.ProbeBanners
             ? ReadBannersAsync(address, open, cancellationToken)
             : Task.FromResult(BannerFindings.Empty);
@@ -222,10 +235,10 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             ? WmiProbe.ReadAsync(address, TimeSpan.FromSeconds(8), cancellationToken)
             : Task.FromResult(WindowsInventory.Empty);
 
-        await Task.WhenAll(hostname, netBios, mdns, banners, snmp, ssdp, shares, inventory).ConfigureAwait(false);
+        await Task.WhenAll(hostname, netBios, mdns, services, banners, snmp, ssdp, shares, inventory).ConfigureAwait(false);
 
         return new DeepFindings(
-            hostname.Result, netBios.Result, mdns.Result, banners.Result,
+            hostname.Result, netBios.Result, mdns.Result, services.Result, banners.Result,
             snmp.Result, ssdp.Result, shares.Result, inventory.Result);
     }
 
@@ -287,6 +300,7 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
         }
 
         result.MdnsName = found.Mdns;
+        result.MdnsServices = found.Services.Describe();
 
         result.SshBanner = found.Banners.Ssh;
         result.FtpBanner = found.Banners.Ftp;
@@ -353,7 +367,7 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
         }
     }
 
-    private static void Conclude(HostScanResult result, HashSet<int> open)
+    private static void Conclude(HostScanResult result, HashSet<int> open, MdnsServices services)
     {
         if (result.Vendor.Length == 0 || result.Vendor == "MAC locale / randomizzato")
         {
@@ -375,14 +389,11 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
             result.Domain = result.Workgroup;
         }
 
-        result.OperatingSystem = OperatingSystemGuess.Refine(
-            result.OperatingSystem, result.SnmpDescription, result.SshBanner);
-
-        result.DeviceType = DeviceTypes.Classify(
-            open, result.Vendor, result.SnmpDescription,
-            $"{result.UpnpServer} {result.UpnpDevice}",
-            $"{result.HttpServer} {result.HttpTitle}",
-            result.OperatingSystem);
+        DeviceIdentityResult identity = DeviceIdentity.Identify(DeviceSignals.From(result, open, services));
+        result.OperatingSystem = identity.OperatingSystem;
+        result.DeviceType = identity.DeviceType;
+        result.Model = identity.Model.Length > 0 ? identity.Model : result.WmiModel;
+        result.Evidence = identity.Evidence;
 
         result.Findings = SecurityFindings.Describe(open, result.TlsExpiry);
     }
@@ -409,6 +420,7 @@ public sealed class HostProbe(ScanOptions options, IVendorLookup vendors, Socket
         string Hostname,
         NetBiosMessage.NodeStatus NetBios,
         string Mdns,
+        MdnsServices Services,
         BannerFindings Banners,
         IReadOnlyDictionary<string, string> Snmp,
         SsdpFindings Ssdp,

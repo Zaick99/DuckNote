@@ -29,6 +29,13 @@ public sealed class AppSettings
     public int PortTimeoutMs { get; set; } = 500;
     public bool ScanDeadHosts { get; set; } = true;
 
+    /// <summary>
+    /// Prima di segnare spento un host che non risponde al ping, DuckNote bussa alle porte comuni
+    /// e a quelle che aveva aperte: chi risponde, anche solo rifiutando, e' acceso. Vale per
+    /// l'analisi, il controllo e il monitoraggio.
+    /// </summary>
+    public bool CheckPortsWhenOffline { get; set; } = true;
+
     public bool ResolveDns { get; set; } = true;
     public string DnsServer { get; set; } = string.Empty;
     public bool ProbeNetBios { get; set; } = true;
@@ -168,6 +175,7 @@ public sealed class AppSettings
         PortTimeout = TimeSpan.FromMilliseconds(PortTimeoutMs),
         Ports = PortList(),
         ScanDeadHosts = ScanDeadHosts,
+        ProbePortsWhenSilent = CheckPortsWhenOffline,
         ResolveDns = ResolveDns,
         DnsServer = DnsServer,
         ProbeNetBios = ProbeNetBios,

@@ -14,7 +14,10 @@ public sealed partial class OuiVendorLookup : IVendorLookup
     public OuiVendorLookup(string? ieeeRegistryPath = null)
     {
         _vendors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // prima l'elenco scritto a mano (nomi pensati per riconoscere gli apparati), poi tutto il
+        // registro IEEE per i prefissi che mancano, poi quello scaricato dalle Impostazioni
         LoadBuiltIn();
+        LoadRegistry();
 
         if (ieeeRegistryPath is not null && File.Exists(ieeeRegistryPath))
         {
@@ -79,6 +82,29 @@ public sealed partial class OuiVendorLookup : IVendorLookup
             foreach (string entry in line.Trim().Split(';', StringSplitOptions.RemoveEmptyEntries))
             {
                 Remember(entry, overwrite: false);
+            }
+        }
+    }
+
+    private const string RegistryResource = "DuckNote.Scan.Resources.oui-ieee.txt.gz";
+
+    /// <summary>Il registro IEEE completo, compresso dentro l'app (dal pacchetto oui-data, BSD-2-Clause).</summary>
+    private void LoadRegistry()
+    {
+        using Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(RegistryResource);
+        if (stream is null)
+        {
+            return;
+        }
+
+        using System.IO.Compression.GZipStream unzip = new(stream, System.IO.Compression.CompressionMode.Decompress);
+        using StreamReader reader = new(unzip);
+        while (reader.ReadLine() is { } line)
+        {
+            int equals = line.IndexOf('=');
+            if (equals is 6 or 7 or 9)
+            {
+                _vendors.TryAdd(line[..equals], line[(equals + 1)..]);
             }
         }
     }

@@ -13,6 +13,7 @@ import { kindPicker } from './picker.js';
 import { Library, segments, toolButton, textButton } from './panels.js';
 import { Inspector } from './inspector.js';
 import { Overview } from './overview.js';
+import { PortTip } from './porttip.js';
 import { arrange } from './layout.js';
 import { mapPng, mapSvg, devicesTable, linksTable, fileName } from './exporter.js';
 import { pressable, stop, pageAway, pageArrive } from '../common/motion.js';
@@ -31,6 +32,8 @@ stage.append(canvas);
 document.body.append(app, popupLayer, sink);
 
 const scene = new Scene(canvas, store);
+// il riquadro di una porta col mouse sopra (numero, stato, chi c'e' dall'altra parte, VLAN)
+new PortTip(scene, store);
 const popups = new Popups(popupLayer);
 
 let mode = 'move';
@@ -66,6 +69,8 @@ const pointer = new Pointer(scene, store, {
 // ------------------------------------------------------------------ barra in alto
 
 const libraryToggle = toolButton(uiIcons.library, 'Mostra o nascondi la libreria', () => setLibrary(app.classList.contains('no-library')));
+// in vista le mappe della nota sono schede, come in Vantage; in modifica il menu col nome
+const mapTabs = h('nav', { class: 'dm-map-tabs', 'aria-label': 'Le mappe della nota' });
 const mapButton = h('button', { class: 'dm-tool wide dm-map-button dm-press', type: 'button', title: 'Le mappe della nota' },
   icon(uiIcons.map, 15), h('span', { class: 'dm-map-name' }), icon(uiIcons.down, 12));
 mapButton.addEventListener('click', () => (popups.current?.anchor === mapButton ? popups.close() : mapMenu()));
@@ -93,8 +98,9 @@ const editOnly = (el) => {
   el.classList.add('dm-edit-only');
   return el;
 };
+mapButton.classList.add('dm-edit-only');
 toolbar.append(
-  editOnly(libraryToggle), mapButton, editOnly(h('span', { class: 'dm-sep' })),
+  editOnly(libraryToggle), mapTabs, mapButton, editOnly(h('span', { class: 'dm-sep' })),
   editOnly(modes.el), editOnly(zoneButton), editOnly(h('span', { class: 'dm-sep' })),
   editOnly(undoButton), editOnly(redoButton), readonlyChip,
   h('span', { class: 'dm-spacer' }),
@@ -132,8 +138,7 @@ const zoom = h('div', { class: 'dm-zoom' },
   toolButton(uiIcons.minus, `Riduci (${shortcut('-')})`, () => zoomBy(1 / 1.25)),
   zoomLabel,
   toolButton(uiIcons.add, `Ingrandisci (${shortcut('+')})`, () => zoomBy(1.25)),
-  h('span', { class: 'dm-sep' }),
-  toolButton(uiIcons.fit, `Adatta alla finestra (${shortcut('0')})`, () => fitAll()));
+  textButton(null, 'Adatta', `Adatta alla finestra (${shortcut('0')})`, () => fitAll(), { class: 'dm-tool wide dm-press dm-fit' }));
 
 const statusLine = h('div', { class: 'dm-statusline' });
 
@@ -148,8 +153,14 @@ const empty = h('div', { class: 'dm-empty', hidden: true },
 const overview = new Overview(store, {
   vlan: () => scene.filter.vlan,
   pickVlan: (id) => setVlan(id),
-  frameZone: (zone) => scene.frameRect(zone, { maxZoom: 1.15 }),
+  frameZone: (zone) => scene.frameRect(zone, { maxZoom: 1.15, right: covered() }),
+  stateOf: (node) => store.stateOf(node),
 });
+
+/** Quanto della tela coprono a destra i riquadri delle reti e della legenda (in vista). */
+function covered() {
+  return !editing && !overview.el.hidden && !app.classList.contains('inspecting') ? overview.el.getBoundingClientRect().width + 24 : 0;
+}
 
 stage.append(empty, overview.el, inspector.el, zoom, statusLine);
 app.append(toolbar, h('div', { class: 'dm-main' }, library.el, stage));
@@ -198,6 +209,8 @@ store.on((what) => {
   } else if (what === 'doc') {
     showChrome();
   }
+  // la scheda di un apparato si apre a destra, dove stanno i riquadri: per il tempo che serve li copre
+  app.classList.toggle('inspecting', store.sel.size > 0);
   inspector.refresh(what);
   if (what !== 'select') {
     library.renderHosts();
@@ -208,6 +221,7 @@ store.on((what) => {
 function showChrome() {
   const map = store.map;
   mapButton.querySelector('.dm-map-name').textContent = map.name;
+  showTabs();
   undoButton.disabled = !store.canUndo;
   redoButton.disabled = !store.canRedo;
   const vlans = vlanList();
@@ -225,6 +239,27 @@ function showChrome() {
   showStatus();
 }
 
+/** Le schede delle mappe (in vista): una per mappa, poi "Nuova mappa" e il menu delle altre azioni. */
+function showTabs() {
+  const maps = store.doc.maps;
+  const current = store.map.id;
+  fill(mapTabs,
+    ...maps.map((item) => h('button', {
+      class: `dm-map-tab${item.id === current ? ' on' : ''}`,
+      type: 'button',
+      title: item.id === current ? 'La mappa aperta' : `Apri «${item.name}»`,
+      onclick: () => {
+        if (item.id !== store.map.id) switchMap(item.id);
+      },
+      oncontextmenu: (event) => {
+        event.preventDefault();
+        if (item.id !== store.map.id) switchMap(item.id);
+        mapMenu(event.currentTarget);
+      },
+    }, item.name)),
+    damaged ? null : h('button', { class: 'dm-map-tab add', type: 'button', title: 'Una mappa nuova nella nota', onclick: () => editThen(newMap) }, '+ Nuova mappa'));
+}
+
 /** Vista o modifica: in vista niente si sposta e niente si scrive, la scheda mostra e basta. */
 function setEditing(on) {
   const next = !!on && !damaged;
@@ -237,6 +272,8 @@ function setEditing(on) {
     setMode('move');
   }
   app.classList.toggle('viewing', !editing);
+  if (editing) toolbar.append(editButton);
+  else zoom.append(editButton);
   showChrome();
   inspector.refresh('doc');
   overview.render();
@@ -283,24 +320,26 @@ function setLibrary(shown) {
   } catch { /* senza memoria del browser: si ricomincia con la libreria aperta */ }
 }
 
+// lo zoom dei pulsanti tiene fermo il centro della parte di tela che si vede: in vista, a destra
+// ci sono i riquadri delle reti e della legenda
 function zoomBy(factor) {
   const { left, top, w, h: height } = scene.size;
-  scene.zoomAt(left + w / 2, top + height / 2, factor);
+  scene.zoomAt(left + (w - covered()) / 2, top + height / 2, factor);
   viewChanged();
 }
 
 function zoomTo(k) {
-  const middle = scene.middle();
   const { w, h: height } = scene.size;
-  scene.animateTo(w / 2 - middle.x * k, height / 2 - middle.y * k, k);
+  const free = w - covered();
+  const middle = scene.toWorld(scene.size.left + free / 2, scene.size.top + height / 2);
+  scene.animateTo(free / 2 - middle.x * k, height / 2 - middle.y * k, k);
   viewChanged();
 }
 
 function fitAll(animate = true) {
   const box = boundsOf(store.map);
-  // in vista i riquadri delle reti e della legenda stanno a sinistra: la mappa si inquadra accanto
-  const covered = !editing && !overview.el.hidden ? overview.el.getBoundingClientRect().width + 12 : 0;
-  if (box) scene.frameRect(box, { animate, left: covered });
+  // in vista i riquadri delle reti e della legenda stanno a destra: la mappa si inquadra accanto
+  if (box) scene.frameRect(box, { animate, right: covered() });
   else {
     const { w, h: height } = scene.size;
     scene.setView(w / 2, height / 3, 1);
@@ -724,9 +763,9 @@ function vlanMenu() {
 
 // ------------------------------------------------------------------ menu
 
-function mapMenu() {
+function mapMenu(anchor = mapButton) {
   const map = store.map;
-  popups.menu(mapButton, [
+  popups.menu(anchor, [
     { header: 'Le mappe della nota' },
     ...store.doc.maps.map((item) => ({ label: item.name, hint: String(item.nodes.length), checked: item.id === map.id, action: () => switchMap(item.id) })),
     'sep',
@@ -752,7 +791,7 @@ function switchMap(id) {
 }
 
 async function newMap() {
-  const name = await popups.prompt(mapButton, { title: 'Nuova mappa', value: store.freeName('Mappa'), ok: 'Crea' });
+  const name = await popups.prompt(editing ? mapButton : mapTabs, { title: 'Nuova mappa', value: store.freeName('Mappa'), ok: 'Crea' });
   if (!name) return;
   rememberView();
   store.addMap(name);

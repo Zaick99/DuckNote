@@ -195,6 +195,15 @@
               </StackPanel>
               </CheckBox>
             </DockPanel>
+            <Rectangle Style="{StaticResource SetSep}"/>
+            <DockPanel Style="{StaticResource SetRow}">
+              <CheckBox x:Name="OfflinePorts" Style="{StaticResource Switch}" VerticalAlignment="Center" Click="OnSwitch">
+                <StackPanel Style="{StaticResource SetText}">
+                <TextBlock Style="{StaticResource SetLabel}" Text="Verifica le porte degli host offline"/>
+                <TextBlock Style="{StaticResource SetNote}" Text="Prima di segnare spento chi non risponde al ping, prova le porte comuni e quelle che aveva aperte: e' acceso anche chi rifiuta la connessione. Vale anche per il controllo e il monitoraggio."/>
+              </StackPanel>
+              </CheckBox>
+            </DockPanel>
           </StackPanel>
         </Border>
           </StackPanel>
