@@ -529,19 +529,66 @@ public sealed class Workspace
     /// <summary>I gruppi sono cambiati (creati, modificati, tolti, o un'altra nota).</summary>
     public event Action? GroupsChanged;
 
+    /// <summary>Il monitoraggio della Nota e della Ricerca, scritto nella nota coi gruppi.</summary>
+    public ScanGroupFlags GroupFlags => ScanGroups.ReadFlags(Book.Groups);
+
+    /// <summary>Il monitoraggio e' cambiato (un interruttore dei gruppi, o quello di tutto).</summary>
+    public event Action? MonitorChanged;
+
     /// <summary>I gruppi nuovi, nella nota (e quindi nella cassaforte): si salvano fra poco.</summary>
-    public void SaveGroups(IReadOnlyList<ScanGroup> groups)
+    public void SaveGroups(IReadOnlyList<ScanGroup> groups) => SaveGroups(groups, GroupFlags);
+
+    /// <summary>I gruppi e il monitoraggio di Nota e Ricerca, nella nota.</summary>
+    public void SaveGroups(IReadOnlyList<ScanGroup> groups, ScanGroupFlags flags)
     {
         if (IsLocked || IsDamaged)
         {
             return;
         }
 
-        Book.Groups = ScanGroups.Write(groups);
+        Book.Groups = ScanGroups.Write(groups, flags);
         _groupHosts = null;
         Touch();
         SyncHosts();
         GroupsChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// L'interruttore di un gruppo del pannello di Rete: Tutti accende o spegne il monitoraggio
+    /// intero (un'impostazione dell'app), Nota e Ricerca si scrivono nella nota, un gruppo proprio
+    /// cambia il suo "Monitora".
+    /// </summary>
+    public void SetMonitor(string id, bool on)
+    {
+        if (IsLocked || IsDamaged)
+        {
+            return;
+        }
+
+        switch (id)
+        {
+            case GroupViews.All:
+                Settings.MonitorEnabled = on;
+                Settings.Save();
+                StartTimers();
+                break;
+            case ScanGroups.Note:
+                SaveGroups([.. Groups.All], GroupFlags with { NoteMonitor = on });
+                break;
+            case GroupViews.Found:
+                SaveGroups([.. Groups.All], GroupFlags with { FoundMonitor = on });
+                break;
+            default:
+                if (Groups.Find(id) is null)
+                {
+                    return;
+                }
+
+                SaveGroups([.. Groups.All.Select(group => group.Id == id ? group with { Monitor = on } : group)]);
+                break;
+        }
+
+        MonitorChanged?.Invoke();
     }
 
     /// <summary>
@@ -559,8 +606,15 @@ public sealed class Workspace
     public IReadOnlyList<string> Monitored()
     {
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
-        return [.. Watched().Where(host => Session.Find(host) is not null)
+        ScanGroupFlags flags = GroupFlags;
+        IEnumerable<string> note = flags.NoteMonitor ? NoteHosts().Where(host => !Session.IsHidden(host)) : [];
+        IEnumerable<string> found = flags.FoundMonitor
+            ? Session.Rows.Where(row => !row.FromNote && !Groups.InAny(row) && row.Address.Length > 0 && !Session.IsHidden(row.Address)).Select(row => row.Address)
+            : [];
+        return [.. note.Concat(Groups.WatchedSingles().Where(host => !Session.IsHidden(host)))
+            .Where(host => Session.Find(host) is not null)
             .Concat(Groups.MonitoredRows(Session.Rows).Where(host => !Session.IsHidden(host)))
+            .Concat(found)
             .Where(seen.Add)];
     }
 

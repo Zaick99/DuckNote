@@ -513,6 +513,79 @@ await check('collegamenti VPN col logo e il colore del servizio', async () => {
   assert(rows.some((row) => row.includes('VPN · NetBird')) && rows.some((row) => row.includes('VPN · WireGuard')), JSON.stringify(rows));
 });
 
+await check('da porta a porta: il cavo occupa quelle due porte, una porta tiene un cavo solo', async () => {
+  const doc = {
+    v: 1,
+    current: 'mplug',
+    maps: [{
+      id: 'mplug',
+      name: 'Porte',
+      nodes: [
+        { id: 'nsw', kind: 'switch', name: 'Switch', x: 0, y: 0, ports: 8, sfp: 2 },
+        { id: 'npc1', kind: 'pc', name: 'PC uno', x: 0, y: 320, ports: 1 },
+        { id: 'npc2', kind: 'pc', name: 'PC due', x: 420, y: 320, ports: 1 },
+      ],
+      links: [],
+      zones: [],
+      view: { x: 140, y: 120, k: 1 },
+    }],
+  };
+  await reset(doc);
+  await frame();
+  const jack = async (node, port, kind = 'rj45') => center(`[data-id="${node}"] .dm-jack[data-kind="${kind}"][data-port="${port}"]`);
+  // tenere premuta la presa, poi tirare
+  const plug = async (from, to) => {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.waitForTimeout(480);
+    await page.mouse.move(to.x, to.y, { steps: 16 });
+    await page.mouse.up();
+  };
+
+  // porta 3 dello switch -> porta 1 del primo PC: un cavo con le due porte gia' scritte
+  await plug(await jack('nsw', 3), await jack('npc1', 1));
+  await frame();
+  let m = await map();
+  assert(m.links.length === 1, JSON.stringify(m.links));
+  let link = m.links[0];
+  assert(link.a === 'nsw' && link.pa === '3' && link.b === 'npc1' && link.pb === '1', JSON.stringify(link));
+  const lit = async (id) => page.$$eval(`[data-id="${id}"] .dm-jack.used`, (els) => els.map((el) => `${el.dataset.kind}:${el.dataset.port}`).sort().join(','));
+  assert((await lit('nsw')) === 'rj45:3' && (await lit('npc1')) === 'rj45:1', `${await lit('nsw')} / ${await lit('npc1')}`);
+
+  // la porta 1 del primo PC e' occupata: un altro cavo li' non entra
+  await plug(await jack('nsw', 5), await jack('npc1', 1));
+  await frame();
+  assert((await map()).links.length === 1, 'una porta occupata ha preso un secondo cavo');
+  assert((await page.textContent('.dm-statusline')).includes('occupata'), 'nessun avviso della porta occupata');
+
+  // tirando il cavo dalla porta 3 dello switch alla 6, il cavo si sposta (stesso apparato)
+  await plug(await jack('nsw', 3), await jack('nsw', 6));
+  await frame();
+  link = (await map()).links[0];
+  assert(link.a === 'nsw' && link.pa === '6' && link.pb === '1', JSON.stringify(link));
+  assert((await lit('nsw')) === 'rj45:6', await lit('nsw'));
+
+  // una SFP verso il secondo PC lasciata sul corpo: prende la prima porta libera (la scheda del
+  // cavo spostato si chiude prima: a destra copre le SFP)
+  await page.keyboard.press('Escape');
+  await frame();
+  await plug(await jack('nsw', 1, 'cage'), await body('npc2'));
+  await frame();
+  m = await map();
+  const fibre = m.links.find((one) => one.b === 'npc2');
+  assert(fibre && fibre.pa === 'sfp1' && fibre.pb === '1', JSON.stringify(m.links));
+
+  // un clic su una porta occupata sceglie il suo cavo; trascinata subito, la presa sposta l'apparato
+  const at = await jack('nsw', 6);
+  await page.mouse.click(at.x, at.y);
+  assert((await page.evaluate(() => [...dm.store.sel].join(','))) === link.id, 'il clic sulla porta non sceglie il cavo');
+  const before = (await map()).nodes.find((n) => n.id === 'nsw');
+  await drag(await jack('nsw', 2), { x: at.x + 80, y: at.y + 40 }, { steps: 10 });
+  const after = (await map()).nodes.find((n) => n.id === 'nsw');
+  assert(after.x !== before.x || after.y !== before.y, 'trascinare una presa non sposta piu\' l apparato');
+  assert((await map()).links.length === 2, 'trascinare subito una presa ha tirato un cavo');
+});
+
 await check('togliere un dato dalla scheda lo toglie anche dalla mappa', async () => {
   const visible = (selector) => page.$eval(selector, (el) => getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0);
   const far = two.maps[0].nodes.map((n) => (n.id === 'nswitch' ? { ...n, y: 320, ports: 8 } : { ...n }));

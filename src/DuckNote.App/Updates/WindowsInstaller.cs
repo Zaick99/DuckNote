@@ -49,8 +49,8 @@ internal sealed class WindowsInstaller : IUpdateInstaller
     /// <summary>Se non si installa da sola: l'installer si apre (guidato), il nuovo eseguibile si mostra in Esplora file.</summary>
     public string? OpenHint => Target switch
     {
-        UpdateTarget.WindowsInstaller => "apri l'aggiornamento: l'installazione e' guidata",
-        UpdateTarget.WindowsPortable => "apri l'aggiornamento: e' il nuovo DuckNote.exe, da mettere al posto di quello in uso",
+        UpdateTarget.WindowsInstaller => "apri l'aggiornamento: l'installazione e' guidata (DuckNote si chiude da solo, salvando)",
+        UpdateTarget.WindowsPortable => "apri l'aggiornamento: e' il nuovo DuckNote.exe, da mettere al posto di quello in uso (DuckNote si chiude da solo, salvando)",
         _ => null
     };
 

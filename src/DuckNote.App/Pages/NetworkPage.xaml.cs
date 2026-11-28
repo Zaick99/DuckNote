@@ -30,8 +30,14 @@ public partial class NetworkPage : UserControl, IDuckPage
         ["Indirizzo", "Stato", "Nome", "NetBIOS", "mDNS", "MAC", "Produttore", "Risposta", "TTL", "Sistema", "Tipo", "Porte aperte", "Servizi", "Titolo web", "Ultima verifica"];
 
     /// <summary>Il filtro per gruppo: tutti gli host, o quelli fuori dalla nota e dai gruppi.</summary>
-    private const string AllGroups = "*";
-    private const string NoGroup = "-";
+    private const string AllGroups = GroupViews.All;
+    private const string NoGroup = GroupViews.Found;
+
+    // il filtro di stato scelto: lo tiene questo campo (vedi OnState)
+    private HostState _state = HostState.All;
+
+    // la scheda dell'host: accanto alla tabella se c'e' posto, altrimenti sopra, a destra
+    private bool _docked = true;
 
     private readonly Workspace _ws;
     private string _group = AllGroups;
@@ -155,27 +161,9 @@ public partial class NetworkPage : UserControl, IDuckPage
         Show(row);
     }
 
-    private bool Wanted(HostRow row)
-    {
-        bool state = ShowUp?.IsChecked == true ? row.IsUp
-            : ShowDown?.IsChecked == true ? row.IsDown
-            : ShowWait?.IsChecked != true || row.NeedsCheck;
+    private bool Wanted(HostRow row) => GroupViews.Matches(_state, row) && InGroup(row) && _query.Matches(row.Facts());
 
-        return state && InGroup(row) && _query.Matches(row.Facts());
-    }
-
-    private bool InGroup(HostRow row)
-    {
-        GroupHosts groups = _ws.Groups;
-
-        return _group switch
-        {
-            AllGroups => true,
-            ScanGroups.Note => row.FromNote,
-            NoGroup => !row.FromNote && !groups.InAny(row),
-            _ => groups.Find(_group) is { } group && groups.Contains(group, row)
-        };
-    }
+    private bool InGroup(HostRow row) => GroupViews.InGroup(_group, row, _ws.Groups);
 
     /// <summary>
     /// Allinea le righe mostrate ai filtri toccando solo quelle che cambiano, in un passaggio
@@ -248,10 +236,12 @@ public partial class NetworkPage : UserControl, IDuckPage
 
         ScanSession session = _ws.Session;
 
-        CountAll.Text = session.Rows.Count.ToString(CultureInfo.CurrentCulture);
-        CountUp.Text = session.UpCount.ToString(CultureInfo.CurrentCulture);
-        CountDown.Text = session.DownCount.ToString(CultureInfo.CurrentCulture);
-        CountWait.Text = session.WaitingCount.ToString(CultureInfo.CurrentCulture);
+        // i numeri dei filtri contano dentro il gruppo scelto e la ricerca: sono le righe che mostrano
+        (int all, int up, int down, int wait) = GroupViews.Count(session.Rows.Where(row => InGroup(row) && _query.Matches(row.Facts())));
+        CountAll.Text = all.ToString(CultureInfo.CurrentCulture);
+        CountUp.Text = up.ToString(CultureInfo.CurrentCulture);
+        CountDown.Text = down.ToString(CultureInfo.CurrentCulture);
+        CountWait.Text = wait.ToString(CultureInfo.CurrentCulture);
         HiddenText.Text = session.Hidden.Count == 0
             ? "Messi da parte"
             : string.Create(CultureInfo.CurrentCulture, $"Messi da parte ({session.Hidden.Count})");
@@ -271,6 +261,7 @@ public partial class NetworkPage : UserControl, IDuckPage
         Progress.Value = session.Progress;
 
         Fill();
+        FillGroups();
 
         int shown = _visible.Count;
         Empty.Visibility = shown == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -344,6 +335,8 @@ public partial class NetworkPage : UserControl, IDuckPage
         _shown = row;
         CardEmpty.Visibility = row is null ? Visibility.Visible : Visibility.Collapsed;
         Card.Visibility = row is null ? Visibility.Collapsed : Visibility.Visible;
+        // sopra la tabella la scheda c'e' solo con un host scelto
+        HostCard.Visibility = _docked || row is not null ? Visibility.Visible : Visibility.Collapsed;
 
         if (row is not null)
         {
@@ -762,97 +755,11 @@ public partial class NetworkPage : UserControl, IDuckPage
             _group = AllGroups;
         }
 
-        GroupText.Text = _group switch
-        {
-            AllGroups => "Tutti i gruppi",
-            ScanGroups.Note => "Nota",
-            NoGroup => "Ricerca",
-            _ => group!.Name
-        };
-
-        BtnGroupEdit.Visibility = group is not null && !_ws.IsLocked ? Visibility.Visible : Visibility.Collapsed;
         NoteIcon.Text = group is null ? "\uE73E" : "\uE81E";
         NoteText.Text = group is null ? "Controlla la nota" : $"Controlla «{Short(group.Name, 22)}»";
         BtnNote.ToolTip = group is null
             ? "Solo gli indirizzi scritti nelle pagine della nota"
             : group.Targets.Count == 0 ? "Il gruppo e' vuoto: aggiungi reti o indirizzi con Modifica" : $"Analizza {Short(string.Join(", ", group.Targets), 120)}";
-    }
-
-    private void OnGroupMenu(object sender, RoutedEventArgs e)
-    {
-        GroupHosts groups = _ws.Groups;
-        IReadOnlyList<HostRow> rows = _ws.Session.Rows;
-
-        GroupMenu.Items.Clear();
-        GroupMenu.Items.Add(GroupEntry(AllGroups, "Tutti i gruppi", rows.Count, "Gli host della nota, dei gruppi e della ricerca"));
-        GroupMenu.Items.Add(GroupEntry(ScanGroups.Note, "Nota", rows.Count(row => row.FromNote), "Gli indirizzi scritti nei fogli e sulla mappa"));
-
-        if (groups.All.Count > 0)
-        {
-            GroupMenu.Items.Add(new Separator());
-        }
-
-        foreach (ScanGroup group in groups.All)
-        {
-            GroupMenu.Items.Add(GroupEntry(group.Id, group.Name, groups.Count(group, rows),
-                group.Targets.Count == 0 ? "Vuoto" : Short(string.Join(", ", group.Targets), 120), group.Monitor));
-        }
-
-        GroupMenu.Items.Add(new Separator());
-        GroupMenu.Items.Add(GroupEntry(NoGroup, "Ricerca", rows.Count(row => !row.FromNote && !groups.InAny(row)), "Trovati per intervallo, fuori dalla nota e dai gruppi"));
-        GroupMenu.Items.Add(new Separator());
-        GroupMenu.Items.Add(Command("Nuovo gruppo...", "\uE710", "Accent", () => EditGroup(null)));
-
-        if (groups.All.Count > 0)
-        {
-            // ogni gruppo si apre direttamente: non serve sceglierlo prima nel filtro
-            MenuItem edit = new() { Header = "Modifica un gruppo", Icon = Glyph("\uE70F", null), IsEnabled = !_ws.IsLocked };
-
-            foreach (ScanGroup group in groups.All)
-            {
-                ScanGroup chosen = group;
-                edit.Items.Add(Command(Short(group.Name, 40), group.Monitor ? "\uE9D9" : "\uE81E", group.Monitor ? "Green" : null, () => EditGroup(chosen)));
-            }
-
-            GroupMenu.Items.Add(edit);
-        }
-
-        GroupMenu.PlacementTarget = BtnGroup;
-        GroupMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-        GroupMenu.IsOpen = true;
-    }
-
-    private MenuItem GroupEntry(string id, string name, int count, string tip, bool monitored = false)
-    {
-        StackPanel title = new() { Orientation = Orientation.Horizontal };
-        title.Children.Add(new TextBlock { Text = name, MaxWidth = 220, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center });
-
-        if (monitored)
-        {
-            TextBlock pulse = Glyph("\uE9D9", "Green");
-            pulse.Margin = new Thickness(7, 0, 0, 0);
-            pulse.ToolTip = "Monitorato: i suoi host si controllano da soli";
-            title.Children.Add(pulse);
-        }
-
-        TextBlock number = new() { Text = count.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        number.SetResourceReference(TextBlock.ForegroundProperty, "LabelTertiary");
-        Grid.SetColumn(number, 1);
-
-        Grid header = new() { MinWidth = 210 };
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        header.Children.Add(title);
-        header.Children.Add(number);
-
-        MenuItem item = new() { Header = header, ToolTip = tip, Icon = id == _group ? Glyph("\uE73E", "Accent") : null };
-        item.Click += (_, _) =>
-        {
-            _group = id;
-            ShowGroup();
-            ShowSession();
-        };
-        return item;
     }
 
     private static MenuItem Command(string header, string icon, string? tone, Action run)
@@ -873,15 +780,6 @@ public partial class NetworkPage : UserControl, IDuckPage
         }
 
         return glyph;
-    }
-
-    /// <summary>Crea (con <paramref name="group"/> null) o modifica un gruppo; il nuovo diventa quello scelto.</summary>
-    private void OnGroupEdit(object sender, RoutedEventArgs e)
-    {
-        if (_ws.Groups.Find(_group) is { } chosen)
-        {
-            EditGroup(chosen);
-        }
     }
 
     /// <summary>

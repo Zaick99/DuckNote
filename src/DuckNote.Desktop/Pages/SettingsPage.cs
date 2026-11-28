@@ -542,7 +542,12 @@ public sealed class SettingsPage : UserControl, IDuckPage
 
         if (updates.CanOpenDownloaded)
         {
-            updates.OpenDownloaded();
+            // aperto il disco, DuckNote si chiude (salvando): l'app si puo' trascinare al posto di quella vecchia
+            if (updates.OpenDownloaded() && TopLevel.GetTopLevel(this) is Window window)
+            {
+                window.Close();
+            }
+
             return;
         }
 

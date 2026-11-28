@@ -13,7 +13,7 @@ For Windows and macOS. One file, nothing to install.
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011%20x64-0078d4?style=flat-square)
 ![macOS](https://img.shields.io/badge/macOS-14%2B-0078d4?style=flat-square)
 ![.NET](https://img.shields.io/badge/.NET-10-512bd4?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-321-2ea043?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-322-2ea043?style=flat-square)
 [![License](https://img.shields.io/badge/license-MIT-57606a?style=flat-square)](LICENSE)
 
 [**Download**](https://github.com/Zaick99/DuckNote/releases/latest) ·
@@ -73,7 +73,8 @@ It checks again every six hours, so a DuckNote left open for days updates too.
 If the new version cannot replace the old one by itself, DuckNote says why and
 opens what it downloaded (**Apri l'aggiornamento**): on the Mac the disk image —
 drag DuckNote to Applications — on Windows the installer, or the new
-`DuckNote.exe` in Explorer. A copy opened from the disk image or kept in a
+`DuckNote.exe` in Explorer; then DuckNote closes by itself, after saving, so
+the new version can take its place. A copy opened from the disk image or kept in a
 read-only folder shows the release page instead. Automatic updates start from
 0.0.18; on the Mac they are reliable from 0.0.20.
 
@@ -214,14 +215,15 @@ later), copy it.
 | **Controlla la nota** | keep in the list only the hosts of the note (sheets and map), and check them now |
 | **Controlla «gruppo»** | with a group chosen, the same button scans all of it: its networks, ranges and addresses |
 | **Esporta** ▾ | what is shown, into the sheet as a table (**Tabella nella nota**) or to a CSV file that Excel opens as is |
-| **Tutti · Attivi · Spenti · Da controllare** | all, up, down, to check |
-| **Tutti i gruppi** ▾ | which hosts to show: all, those of the note (**Nota**), those of a scan group, or those found by a range scan outside every group (**Ricerca**); from the same menu **Nuovo gruppo…** and **Modifica un gruppo** ▸ |
-| ✎ | with a group chosen, the pencil next to it edits it |
-| search box | free text, or by field: `ip:` `nome:` `mac:` `porta:` `os:` `tipo:` `produttore:` `gruppo:` `web:` `nota:` `stato:` |
+| **Gruppi** (left) | **Tutti**, **Nota**, your scan groups, **Ricerca** (found by a range scan outside every group): a click chooses the group the table shows; the arrow opens it, with its hosts and its commands; the switch is its **Ping**; **+** makes a new one |
+| **Tutti · Attivi · Spenti · Da controllare** | all, up, down, to check — counted and filtered inside the chosen group |
+| search box | free text, or by field: `ip:` `nome:` `mac:` `porta:` `os:` `tipo:` `produttore:` `gruppo:` `web:` `nota:` `stato:` — inside the chosen group too |
 | **Messi da parte** | hosts set aside, one click (or a right-click on the table) to take them back |
 
 Every row starts with a dot — **green online, orange to check, red offline** —
-then the IP and the name. Selecting a row fills the card on the right with
+then the IP and the name. Selecting a row opens the card of the host on the right
+(beside the table when the window is wide enough, over it otherwise, like the
+card of a device on the map; **×** or `Esc` closes it), with
 everything the scan collected: names, MAC and vendor, response time, the
 operating system and the kind of device with **what they were recognised
 from**, the model when the device says it, open ports and services, the
@@ -284,25 +286,37 @@ the map. Next to it, any number of groups: **Server**, **Telecamere**,
 says how many addresses a group covers and points at the first line written
 wrong.
 
+**The groups are a list on the left, like the items of the sidebar.** One row
+per group — **Tutti** first, then **Nota**, your groups and **Ricerca** — with
+its coloured tile, its name, the red pill of the hosts down and the green one
+of the hosts up, and its **Ping** switch. A click chooses the group: the table
+shows its hosts, and **Tutti · Attivi · Spenti · Da controllare** and the
+search count and filter inside it. The arrow opens a group in place: its hosts
+under it, indented like the headings under a sheet (a click opens one), and
+**Analizza** and **Modifica**.
+
 <div align="center">
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="assets/readme/groups-dark.png">
-  <img src="assets/readme/groups-light.png" alt="The Rete page with the group menu open: all groups, Nota, the groups Server, Telecamere and Laboratorio with their host counts and the pulse of the monitored ones, Ricerca, and Nuovo gruppo" width="900">
+  <img src="assets/readme/groups-light.png" alt="The Rete page: on the left the groups Tutti, Nota, Server, Telecamere, Laboratorio and Ricerca as sidebar rows with their tiles, red and green pills and Ping switches; Server chosen, so the table shows its two hosts and the filters count inside it; Laboratorio opened, with its hosts and the commands Analizza and Modifica" width="900">
 </picture>
 
-*The group menu: every group with its hosts; the pulse marks the monitored ones.*
+*The groups on the left: Server chosen, Laboratorio opened.*
 
 </div>
 
-- **groups are edited in one click**: the pencil next to the chosen group,
-  **Modifica un gruppo** ▸ in the menu for any of them, and from a host —
-  right-click, or **⋯** in its card — **Gruppi** ▸ adds it to a group, takes
-  it out of one that lists it, or starts **Nuovo gruppo con questo host…**;
-- **Monitora**, group by group: on, the hosts of the group are checked by the
-  monitor like those of the note — single addresses at once, the hosts of its
-  networks after their first scan; off, the group is scanned only when you
-  press **Controlla «gruppo»**.
+- **Ping, group by group**: the switch of **Tutti** turns the whole monitor on
+  or off; the one of **Nota** decides whether the addresses of the sheets and
+  the map are checked by themselves; the one of a group, whether its hosts are
+  (single addresses at once, the hosts of its networks after their first
+  scan); the one of **Ricerca**, whether the hosts found by range scans outside
+  every group are too. The choices of **Nota** and **Ricerca** are saved in the
+  note, with the groups;
+- **groups are edited in one click**: **Modifica** in an opened group, **+**
+  for a new one, and from a host — right-click, or **⋯** in its card —
+  **Gruppi** ▸ adds it to a group, takes it out of one that lists it, or starts
+  **Nuovo gruppo con questo host…**;
 - a scan of a range no longer drops the hosts of the groups, and a host found
   by a range scan shows up in its group by itself;
 - the hosts of a monitored group do not get the pencil of the note: the pencil
@@ -437,6 +451,13 @@ are arranged. One `Ctrl+Z` undoes it.
 - a cable is pulled from the dot on the edge of a device (in **Collega**, from
   anywhere on it); dropped on the empty canvas it offers a new device, already
   connected;
+- **from port to port**: hold a jack of a front panel pressed for a moment,
+  then pull — the cable leaves from that port and, dropped on a jack of another
+  device, takes that port too, named like the device's other ports
+  (`Gi1/0/5`, `ether5`, `eth4`, `sfp1`); dropped on the body it takes the first
+  free port. **A port holds one cable**: a jack already taken lights red and
+  refuses it. Held on a taken jack, the pull moves that cable to another port
+  (even of the same device); a click on a taken jack selects its cable;
 - a double click on the canvas adds a device right there; on a device, it
   renames it;
 - copy, cut, paste and duplicate work on devices together with their cables;
@@ -676,7 +697,7 @@ repository, so building them needs no Node.js:
 
 After changing one, `npm ci && node build.mjs` rebuilds it and `npm test`
 tests it in Chromium with Playwright (mouse and keyboard as a person uses
-them: 38 scenarios for the map, 22 for the calendar, 19 for the editor).
+them: 39 scenarios for the map, 22 for the calendar, 19 for the editor).
 
 On Linux the solution builds and the tests run with
 `-p:EnableWindowsTargeting=true`; the WPF window needs Windows, the Avalonia one
@@ -729,7 +750,7 @@ src/DuckNote.App     the Windows application (WPF), on the Duck design kit
   Editor/              the rich-text editor: looks, commands, painters, frames
   Scanning/            the scan session behind the Rete table and the map
   Views/               lock screen, dialogs
-tests/               321 tests, including the fixtures written by the
+tests/               322 tests, including the fixtures written by the
                      original PowerShell version
 assets/              logo and icon, the README pictures, and the scripts that
                      draw the avatars and the sheet icon

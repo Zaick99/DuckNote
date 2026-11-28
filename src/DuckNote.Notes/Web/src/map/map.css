@@ -227,6 +227,15 @@ body.dm-dragging-out, body.dm-dragging-out * { cursor: grabbing !important; }
 .dm-node text, .dm-node-tile, .dm-node-icon, .dm-node-bar, .dm-node-tab-edge, .dm-panel, .dm-jack text, .dm-jack g, .dm-zone-name, .dm-zone-sub { pointer-events: none; }
 .dm-jack:hover > g > rect:first-child { stroke: var(--vt-in); }
 .dm-jack { cursor: default; }
+/* in modifica una presa si prende e si tira fino a un'altra: il cavo occupa proprio quelle porte */
+.dm-app:not(.viewing) .dm-jack { cursor: crosshair; }
+.plugging, .plugging * { cursor: crosshair !important; }
+.dm-jack.plug-from > g > rect:first-child { stroke: var(--vt-in); stroke-width: 2.4; }
+.dm-jack.plug-ok > g > rect:first-child { stroke: var(--vt-ok); stroke-width: 2.4; }
+.dm-jack.plug-busy > g > rect:first-child { stroke: var(--vt-crit); stroke-width: 2.4; }
+.dm-status-pass { font-weight: 600; }
+.dm-status-pass.ok { color: var(--vt-ok-text); }
+.dm-status-pass.crit { color: var(--vt-crit-text); }
 /* il riquadro della porta col mouse sopra (come l'HoverCard di Vantage) */
 .dm-port-tip { position: absolute; left: 0; top: 0; z-index: 30; width: 224px; box-sizing: border-box; padding: 9px 10px; border: 1px solid var(--vt-line); border-radius: 8px; background: var(--vt-panel); color: var(--vt-ink); font: 12px/17px var(--font-text); box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(15, 23, 42, 0.08); pointer-events: none; }
 .dm-port-tip[hidden] { display: none; }

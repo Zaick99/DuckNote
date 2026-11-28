@@ -19,8 +19,19 @@ public sealed record ScanGroup(string Id, string Name, IReadOnlyList<string> Tar
 }
 
 /// <summary>
+/// Il monitoraggio dei gruppi che non si scrivono: la Nota (gli indirizzi dei fogli e della
+/// mappa, controllati di serie) e la Ricerca (gli host trovati per intervallo fuori da tutti i
+/// gruppi, di serie no).
+/// </summary>
+public sealed record ScanGroupFlags(bool NoteMonitor = true, bool FoundMonitor = false)
+{
+    public static readonly ScanGroupFlags Default = new();
+}
+
+/// <summary>
 /// I gruppi di scansione di una nota, come stanno nel file della nota (gruppi.json, cifrato con
-/// lei): { "v": 1, "groups": [ { "id", "name", "targets": [...], "monitor" } ] }.
+/// lei): { "v": 1, "groups": [ { "id", "name", "targets": [...], "monitor" } ], "note": {
+/// "monitor" }, "found": { "monitor" } }.
 /// </summary>
 public static class ScanGroups
 {
@@ -78,8 +89,42 @@ public static class ScanGroups
         }
     }
 
+    /// <summary>Il monitoraggio della Nota e della Ricerca; di serie se il file non lo dice.</summary>
+    public static ScanGroupFlags ReadFlags(byte[]? json)
+    {
+        if (json is not { Length: > 0 })
+        {
+            return ScanGroupFlags.Default;
+        }
+
+        try
+        {
+            if (JsonNode.Parse(json) is not JsonObject root)
+            {
+                return ScanGroupFlags.Default;
+            }
+
+            static bool? Flag(JsonNode? node) =>
+                node is JsonObject part && part["monitor"] is JsonValue value && value.TryGetValue(out bool on) ? on : null;
+
+            return new ScanGroupFlags(
+                Flag(root["note"]) ?? ScanGroupFlags.Default.NoteMonitor,
+                Flag(root["found"]) ?? ScanGroupFlags.Default.FoundMonitor);
+        }
+        catch (JsonException)
+        {
+            return ScanGroupFlags.Default;
+        }
+    }
+
     /// <summary>I gruppi per il file della nota; null se non ce n'e' nessuno (la nota resta com'era).</summary>
-    public static byte[]? Write(IEnumerable<ScanGroup> groups)
+    public static byte[]? Write(IEnumerable<ScanGroup> groups) => Write(groups, ScanGroupFlags.Default);
+
+    /// <summary>
+    /// I gruppi e il monitoraggio di Nota e Ricerca per il file della nota; null se non c'e'
+    /// nessun gruppo e il monitoraggio e' quello di serie (la nota resta com'era).
+    /// </summary>
+    public static byte[]? Write(IEnumerable<ScanGroup> groups, ScanGroupFlags flags)
     {
         JsonArray list = [];
 
@@ -94,7 +139,20 @@ public static class ScanGroups
             });
         }
 
-        return list.Count == 0 ? null : JsonSerializer.SerializeToUtf8Bytes(new JsonObject { ["v"] = 1, ["groups"] = list });
+        if (list.Count == 0 && flags == ScanGroupFlags.Default)
+        {
+            return null;
+        }
+
+        JsonObject root = new() { ["v"] = 1, ["groups"] = list };
+
+        if (flags != ScanGroupFlags.Default)
+        {
+            root["note"] = new JsonObject { ["monitor"] = flags.NoteMonitor };
+            root["found"] = new JsonObject { ["monitor"] = flags.FoundMonitor };
+        }
+
+        return JsonSerializer.SerializeToUtf8Bytes(root);
     }
 
     /// <summary>I bersagli scritti come capita: uno per riga, o separati da virgole, punti e virgola, spazi.</summary>

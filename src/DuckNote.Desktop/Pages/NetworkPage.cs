@@ -29,14 +29,14 @@ namespace DuckNote.Desktop.Pages;
 /// tabella a sinistra e la scheda dell'host scelto a destra. Scorrono solo la tabella e la
 /// scheda, ognuna nella sua card.
 /// </summary>
-public sealed class NetworkPage : UserControl, IDuckPage
+public sealed partial class NetworkPage : UserControl, IDuckPage
 {
     private static readonly string[] CsvHeader =
         ["Indirizzo", "Stato", "Nome", "NetBIOS", "mDNS", "MAC", "Produttore", "Risposta", "TTL", "Sistema", "Tipo", "Porte aperte", "Servizi", "Titolo web", "Ultima verifica"];
 
     /// <summary>Il filtro per gruppo: tutti gli host, o quelli fuori dalla nota e dai gruppi.</summary>
-    private const string AllGroups = "*";
-    private const string NoGroup = "-";
+    private const string AllGroups = GroupViews.All;
+    private const string NoGroup = GroupViews.Found;
 
     private readonly Workspace _ws;
 
@@ -72,11 +72,15 @@ public sealed class NetworkPage : UserControl, IDuckPage
     private readonly Run _countUp = new("0") { FontWeight = FontWeight.Bold };
     private readonly Run _countDown = new("0") { FontWeight = FontWeight.Bold };
     private readonly Run _countWait = new("0") { FontWeight = FontWeight.Bold };
-    private readonly Button _groupButton;
-    // la matita accanto al gruppo scelto: lo modifica con un clic
-    private readonly Button _groupEdit;
-    private readonly TextBlock _groupText = new() { VerticalAlignment = VerticalAlignment.Center, MaxWidth = 180, TextTrimming = TextTrimming.CharacterEllipsis };
+    // il filtro di stato scelto: lo tiene questo campo, non i pulsanti (vedi StateSegment)
+    private HostState _state = HostState.All;
     private string _group = AllGroups;
+
+    // la scheda dell'host: accanto alla tabella se c'e' posto, altrimenti sopra, a destra, come
+    // la scheda di un apparato sulla mappa (e allora c'e' solo quando un host e' scelto)
+    private Grid _pageGrid = null!;
+    private Border _hostCard = null!;
+    private bool _docked = true;
     private readonly TextBox _filter;
     private readonly Button _hidden;
     private readonly TextBlock _hiddenText = new() { Text = "Messi da parte" };
@@ -177,48 +181,10 @@ public sealed class NetworkPage : UserControl, IDuckPage
         }, 4));
 
         // ------------------------------------------------------------ filtri
-        _all = Segment("state", Counted("Tutti ", _countAll), true);
-        _up = Segment("state", Counted("Attivi ", _countUp));
-        _down = Segment("state", Counted("Spenti ", _countDown));
-        _wait = Segment("state", Counted("Da controllare ", _countWait));
-        // il gruppo: un menu, non un altro segmentato, perche' i gruppi li fa chi usa la nota
-        _groupButton = new Button
-        {
-            Theme = Themes.Of("Quiet"),
-            Height = 26,
-            Padding = new Thickness(10, 0),
-            Background = Brushes.Transparent,
-            BorderBrush = Brushes.Transparent,
-            FontSize = 12,
-            Content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Children = { Icon("group", 11), _groupText, Icon("down", 9) } }
-        };
-        ToolTip.SetTip(_groupButton, "Quali host mostrare: tutti, quelli della nota o di un gruppo. Da qui si creano e si modificano i gruppi");
-        _groupButton.Click += (_, _) => OnGroupMenu();
-        _groupEdit = new Button
-        {
-            Theme = Themes.Of("Tool"),
-            Width = 26,
-            Height = 26,
-            MinWidth = 26,
-            IsVisible = false,
-            Content = Icon("edit", 11)
-        };
-        ToolTip.SetTip(_groupEdit, "Modifica il gruppo: nome, reti e indirizzi, monitoraggio");
-        _groupEdit.Click += async (_, _) =>
-        {
-            if (_ws.Groups.Find(_group) is { } chosen)
-            {
-                await EditGroup(chosen);
-            }
-        };
-        Border groupWell = new()
-        {
-            Padding = new Thickness(3),
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2, Children = { _groupButton, _groupEdit } }
-        };
-        groupWell.Classes.Add("well");
-
+        _all = StateSegment(HostState.All, Counted("Tutti ", _countAll), true);
+        _up = StateSegment(HostState.Up, Counted("Attivi ", _countUp));
+        _down = StateSegment(HostState.Down, Counted("Spenti ", _countDown));
+        _wait = StateSegment(HostState.Wait, Counted("Da controllare ", _countWait));
         _filter = new TextBox
         {
             Height = 32,
@@ -240,11 +206,15 @@ public sealed class NetworkPage : UserControl, IDuckPage
         ToolTip.SetTip(_hidden, "Gli host che non entrano in nessuna scansione");
         _hidden.Click += (_, _) => OnHiddenMenu();
 
-        Grid filters = new() { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto,Auto"), Margin = new Thickness(0, 0, 0, 12) };
+        // la ricerca si stringe quando la pagina e' stretta: i filtri e "Messi da parte" restano interi
+        _filter.Width = double.NaN;
+        _filter.MaxWidth = 280;
+        _filter.MinWidth = 120;
+        _filter.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid filters = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), Margin = new Thickness(0, 0, 0, 12) };
         filters.Children.Add(Well(_all, _up, _down, _wait));
-        filters.Children.Add(Cell(groupWell, 1, new Thickness(10, 0, 0, 0)));
-        filters.Children.Add(Cell(_filter, 3));
-        filters.Children.Add(Cell(_hidden, 4));
+        filters.Children.Add(Cell(_filter, 1, new Thickness(10, 0, 0, 0)));
+        filters.Children.Add(Cell(_hidden, 2));
 
         // ------------------------------------------------------------ tabella
         _table = HostTable();
@@ -311,9 +281,14 @@ public sealed class NetworkPage : UserControl, IDuckPage
         Border dotWell = new() { Width = 44, Height = 44, CornerRadius = new CornerRadius(22), VerticalAlignment = VerticalAlignment.Center, Child = _cardDot };
         dotWell.Bind(Border.BackgroundProperty, dotWell.GetResourceObservable("BgFieldAlt"));
 
-        Grid head = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*") };
+        Button close = new() { Theme = Themes.Of("Tool"), Width = 26, Height = 26, MinWidth = 26, Content = Icon("close", 11), VerticalAlignment = VerticalAlignment.Top };
+        ToolTip.SetTip(close, "Chiudi la scheda (Esc)");
+        close.Click += (_, _) => CloseCard();
+
+        Grid head = new() { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
         head.Children.Add(dotWell);
         head.Children.Add(Cell(new StackPanel { Margin = new Thickness(12, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Children = { _cardTitle, _cardSub, _cardChip } }, 1));
+        head.Children.Add(Cell(close, 2));
 
         _cardCheck = CardButton("refresh", "Ricontrolla", "Analizza di nuovo questo host, per intero");
         _cardCheck.Click += async (_, _) =>
@@ -349,23 +324,35 @@ public sealed class NetworkPage : UserControl, IDuckPage
         _card.Children.Add(headBar);
         _card.Children.Add(Row(new ScrollViewer { Content = _cardBody, VerticalScrollBarVisibility = ScrollBarVisibility.Auto }, 1));
 
-        Border hostCard = new() { Child = new Grid { Children = { _cardEmpty, _card } }, ClipToBounds = true };
-        hostCard.Classes.Add("card");
+        _hostCard = new Border { Child = new Grid { Children = { _cardEmpty, _card } }, ClipToBounds = true };
+        _hostCard.Classes.Add("card");
 
         // ------------------------------------------------------------ pagina
+        // a sinistra i gruppi, al centro la tabella, a destra la scheda dell'host
         Grid page = new()
         {
             Margin = new Thickness(20, 14, 20, 14),
             RowDefinitions = new RowDefinitions("Auto,Auto,*"),
-            ColumnDefinitions = new ColumnDefinitions("*,14,340")
+            ColumnDefinitions = new ColumnDefinitions("250,14,*,14,340")
         };
+        _pageGrid = page;
         page.Children.Add(Span(commands, 0));
-        page.Children.Add(Span(filters, 1));
-        page.Children.Add(Row(tableCard, 2));
-        Grid.SetRow(hostCard, 2);
-        Grid.SetColumn(hostCard, 2);
-        page.Children.Add(hostCard);
+        Control groupsPanel = GroupsPanel();
+        Grid.SetRow(groupsPanel, 1);
+        Grid.SetRowSpan(groupsPanel, 2);
+        page.Children.Add(groupsPanel);
+        Grid.SetRow(filters, 1);
+        Grid.SetColumn(filters, 2);
+        Grid.SetColumnSpan(filters, 3);
+        page.Children.Add(filters);
+        Grid.SetRow(tableCard, 2);
+        Grid.SetColumn(tableCard, 2);
+        page.Children.Add(tableCard);
+        Grid.SetRow(_hostCard, 2);
+        Grid.SetColumn(_hostCard, 4);
+        page.Children.Add(_hostCard);
         Content = page;
+        page.SizeChanged += (_, e) => Dock(e.NewSize.Width);
 
         // durante una scansione arrivano decine di esiti al secondo: la tabella si rinfresca a
         // passo d'uomo, non a ogni risultato
@@ -458,27 +445,9 @@ public sealed class NetworkPage : UserControl, IDuckPage
         Show(row);
     }
 
-    private bool Wanted(HostRow row)
-    {
-        bool state = _up.IsChecked == true ? row.IsUp
-            : _down.IsChecked == true ? row.IsDown
-            : _wait.IsChecked != true || row.NeedsCheck;
+    private bool Wanted(HostRow row) => GroupViews.Matches(_state, row) && InGroup(row) && _query.Matches(row.Facts());
 
-        return state && InGroup(row) && _query.Matches(row.Facts());
-    }
-
-    private bool InGroup(HostRow row)
-    {
-        GroupHosts groups = _ws.Groups;
-
-        return _group switch
-        {
-            AllGroups => true,
-            ScanGroups.Note => row.FromNote,
-            NoGroup => !row.FromNote && !groups.InAny(row),
-            _ => groups.Find(_group) is { } group && groups.Contains(group, row)
-        };
-    }
+    private bool InGroup(HostRow row) => GroupViews.InGroup(_group, row, _ws.Groups);
 
     /// <summary>
     /// Allinea le righe mostrate ai filtri toccando solo quelle che cambiano: via chi non c'entra
@@ -552,10 +521,12 @@ public sealed class NetworkPage : UserControl, IDuckPage
         ScanSession session = _ws.Session;
         CultureInfo culture = CultureInfo.CurrentCulture;
 
-        _countAll.Text = session.Rows.Count.ToString(culture);
-        _countUp.Text = session.UpCount.ToString(culture);
-        _countDown.Text = session.DownCount.ToString(culture);
-        _countWait.Text = session.WaitingCount.ToString(culture);
+        // i numeri dei filtri contano dentro il gruppo scelto e la ricerca: sono le righe che mostrano
+        (int all, int up, int down, int wait) = GroupViews.Count(session.Rows.Where(row => InGroup(row) && _query.Matches(row.Facts())));
+        _countAll.Text = all.ToString(culture);
+        _countUp.Text = up.ToString(culture);
+        _countDown.Text = down.ToString(culture);
+        _countWait.Text = wait.ToString(culture);
         _hiddenText.Text = session.Hidden.Count == 0 ? "Messi da parte" : string.Create(culture, $"Messi da parte ({session.Hidden.Count})");
 
         int fromNote = session.Rows.Count(row => row.FromNote);
@@ -574,6 +545,7 @@ public sealed class NetworkPage : UserControl, IDuckPage
         _progress.Value = session.Progress;
 
         Fill();
+        FillGroups();
 
         int shown = _visible.Count;
         _empty.IsVisible = shown == 0;
@@ -633,6 +605,8 @@ public sealed class NetworkPage : UserControl, IDuckPage
         _shown = row;
         _cardEmpty.IsVisible = row is null;
         _card.IsVisible = row is not null;
+        // sopra la tabella la scheda c'e' solo con un host scelto
+        _hostCard.IsVisible = _docked || row is not null;
 
         if (row is not null)
         {
@@ -1084,9 +1058,41 @@ public sealed class NetworkPage : UserControl, IDuckPage
         return seed;
     }
 
+    // ------------------------------------------------------------------ la scheda dell'host
+
+    /// <summary>
+    /// Accanto alla tabella se resta posto per lei (almeno 560 punti), altrimenti sopra, a destra,
+    /// come la scheda di un apparato sulla mappa.
+    /// </summary>
+    private void Dock(double width)
+    {
+        bool docked = width - 250 - 14 - 14 - 340 >= 560;
+        if (docked == _docked)
+        {
+            return;
+        }
+
+        _docked = docked;
+        _pageGrid.ColumnDefinitions[3].Width = new GridLength(docked ? 14 : 0);
+        _pageGrid.ColumnDefinitions[4].Width = new GridLength(docked ? 340 : 0);
+        Grid.SetColumn(_hostCard, docked ? 4 : 2);
+        _hostCard.Width = docked ? double.NaN : 340;
+        _hostCard.HorizontalAlignment = docked ? HorizontalAlignment.Stretch : HorizontalAlignment.Right;
+        _hostCard.Margin = docked ? default : new Thickness(0, 8, 8, 44);
+        _hostCard.ZIndex = docked ? 0 : 5;
+        _hostCard.BoxShadow = docked ? default : BoxShadows.Parse("0 10 30 0 #33000000");
+        _hostCard.IsVisible = docked || _shown is not null;
+    }
+
+    private void CloseCard()
+    {
+        _table.SelectedItem = null;
+        Show(null);
+    }
+
     // ------------------------------------------------------------------ gruppi
 
-    /// <summary>Il nome del gruppo scelto sul pulsante, e il secondo comando che analizza lui (o la nota).</summary>
+    /// <summary>Il secondo comando analizza il gruppo scelto (o la nota); le schede dei gruppi si ridisegnano.</summary>
     private void ShowGroup()
     {
         ScanGroup? group = _ws.Groups.Find(_group);
@@ -1096,92 +1102,11 @@ public sealed class NetworkPage : UserControl, IDuckPage
             _group = AllGroups;
         }
 
-        _groupText.Text = _group switch
-        {
-            AllGroups => "Tutti i gruppi",
-            ScanGroups.Note => "Nota",
-            NoGroup => "Ricerca",
-            _ => group!.Name
-        };
-
-        _groupEdit.IsVisible = group is not null && !_ws.IsLocked;
         _noteIcon.Kind = group is null ? "check" : "group";
         _noteText.Text = group is null ? "Controlla la nota" : $"Controlla «{Short(group.Name, 22)}»";
         ToolTip.SetTip(_note, group is null
             ? "Solo gli indirizzi scritti nelle pagine della nota"
             : group.Targets.Count == 0 ? "Il gruppo e' vuoto: aggiungi reti o indirizzi con Modifica" : $"Analizza {Short(string.Join(", ", group.Targets), 120)}");
-    }
-
-    private void OnGroupMenu()
-    {
-        GroupHosts groups = _ws.Groups;
-        IReadOnlyList<HostRow> rows = _ws.Session.Rows;
-
-        ContextMenu menu = new() { Placement = PlacementMode.BottomEdgeAlignedLeft, PlacementTarget = _groupButton };
-        menu.Items.Add(GroupEntry(AllGroups, "Tutti i gruppi", rows.Count, "Gli host della nota, dei gruppi e della ricerca"));
-        menu.Items.Add(GroupEntry(ScanGroups.Note, "Nota", rows.Count(row => row.FromNote), "Gli indirizzi scritti nei fogli e sulla mappa"));
-
-        if (groups.All.Count > 0)
-        {
-            menu.Items.Add(new Separator());
-        }
-
-        foreach (ScanGroup group in groups.All)
-        {
-            menu.Items.Add(GroupEntry(group.Id, group.Name, groups.Count(group, rows),
-                group.Targets.Count == 0 ? "Vuoto" : Short(string.Join(", ", group.Targets), 120), group.Monitor));
-        }
-
-        menu.Items.Add(new Separator());
-        menu.Items.Add(GroupEntry(NoGroup, "Ricerca", rows.Count(row => !row.FromNote && !groups.InAny(row)), "Trovati per intervallo, fuori dalla nota e dai gruppi"));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(MenuEntry("Nuovo gruppo…", "add", "Accent", !_ws.IsLocked, () => EditGroup(null)));
-
-        if (groups.All.Count > 0)
-        {
-            // ogni gruppo si apre direttamente: non serve sceglierlo prima nel filtro
-            MenuItem edit = new() { Header = "Modifica un gruppo", Icon = MenuIcon("edit", null), IsEnabled = !_ws.IsLocked };
-
-            foreach (ScanGroup group in groups.All)
-            {
-                edit.Items.Add(MenuEntry(Short(group.Name, 40), group.Monitor ? "pulse" : "group", group.Monitor ? "Green" : null, true, () => EditGroup(group)));
-            }
-
-            menu.Items.Add(edit);
-        }
-
-        menu.Open(_groupButton);
-    }
-
-    private MenuItem GroupEntry(string id, string name, int count, string tip, bool monitored = false)
-    {
-        StackPanel title = new()
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 6,
-            Children = { new TextBlock { Text = name, MaxWidth = 220, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center } }
-        };
-
-        if (monitored)
-        {
-            Glyph pulse = MenuIcon("pulse", "Green");
-            ToolTip.SetTip(pulse, "Monitorato: i suoi host si controllano da soli");
-            title.Children.Add(pulse);
-        }
-
-        TextBlock number = new() { Text = count.ToString(CultureInfo.CurrentCulture), Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        number.Classes.Add("caption");
-
-        Grid header = new() { ColumnDefinitions = new ColumnDefinitions("*,Auto"), MinWidth = 210, Children = { title, Cell(number, 1) } };
-        MenuItem item = new() { Header = header, Icon = id == _group ? MenuIcon("check", "Accent") : null };
-        ToolTip.SetTip(item, tip);
-        item.Click += (_, _) =>
-        {
-            _group = id;
-            ShowGroup();
-            ShowSession();
-        };
-        return item;
     }
 
     /// <summary>
@@ -1425,19 +1350,20 @@ public sealed class NetworkPage : UserControl, IDuckPage
         return text;
     }
 
-    private RadioButton Segment(string group, object content, bool chosen = false, string? tip = null)
+    /// <summary>
+    /// Un pulsante dei filtri di stato. Il filtro scelto lo tiene <see cref="_state"/>: quando un
+    /// pulsante si accende, quello di prima e' ancora acceso (Avalonia spegne gli altri del gruppo
+    /// dopo aver avvisato), e chiedere ai pulsanti quale e' acceso dava il filtro vecchio.
+    /// </summary>
+    private RadioButton StateSegment(HostState state, object content, bool chosen = false)
     {
-        RadioButton button = new() { Theme = Themes.Of("Segment"), GroupName = group, Content = content, IsChecked = chosen };
-
-        if (tip is not null)
-        {
-            ToolTip.SetTip(button, tip);
-        }
+        RadioButton button = new() { Theme = Themes.Of("Segment"), GroupName = "state", Content = content, IsChecked = chosen };
 
         button.IsCheckedChanged += (_, _) =>
         {
-            if (button.IsChecked == true)
+            if (button.IsChecked == true && _state != state)
             {
+                _state = state;
                 ShowSession();
             }
         };

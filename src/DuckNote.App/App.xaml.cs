@@ -121,7 +121,14 @@ public partial class App : Application
 
         if (updates.CanOpenDownloaded)
         {
-            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, () => updates.OpenDownloaded(), tab: "Aggiornamento");
+            // aperto l'aggiornamento, DuckNote si chiude (salvando): si puo' sostituire
+            Ui.Toast.Info($"E' uscita DuckNote {version}", updates.Message, () =>
+            {
+                if (updates.OpenDownloaded())
+                {
+                    Current.MainWindow?.Close();
+                }
+            }, tab: "Aggiornamento");
             return;
         }
 

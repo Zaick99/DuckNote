@@ -88,7 +88,7 @@ internal sealed class MacInstaller : IUpdateInstaller
     public string? Failure { get; private set; }
 
     /// <summary>Se l'app non si sostituisce da sola, l'immagine disco scaricata (e verificata) si apre: un trascinamento e basta.</summary>
-    public string? OpenHint => _bundle is null ? null : "apri l'aggiornamento e trascina DuckNote in Applicazioni";
+    public string? OpenHint => _bundle is null ? null : "apri l'aggiornamento e trascina DuckNote in Applicazioni (DuckNote si chiude da solo, salvando)";
 
     public bool OpenDownloaded(string downloaded)
     {

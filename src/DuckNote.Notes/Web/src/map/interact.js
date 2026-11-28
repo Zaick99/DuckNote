@@ -2,20 +2,22 @@
 // un cavo, allargare una zona, selezionare col rettangolo, scorrere la vista. Sul vuoto si
 // trascina la vista; con Maiuscole si seleziona col rettangolo.
 
-import { GRID, centerOf, rectOf, sizeOf, membersOf, inside } from './model.js';
+import { GRID, centerOf, rectOf, sizeOf, membersOf, inside, portCell, linkAtPort, freePort, portLabel } from './model.js';
 import { intersects, normalizeRect } from './geometry.js';
 import { isMac, modKey } from '../common/dom.js';
 import { stop } from '../common/motion.js';
 
 const SNAP_GUIDE = 6;
 const CLICK = 3;
+/** Quanto si tiene premuta una presa perche' il gesto diventi "collega da questa porta". */
+const HOLD = 380;
 
 const snap = (value) => Math.round(value / GRID) * GRID;
 
 export class Pointer {
   /**
    * ui: { mode(): 'move'|'connect', focusSink(), closePopups(), kindPicker(x, y, choose),
-   *       contextMenu(x, y, hit), inspect(field), changedView() }
+   *       contextMenu(x, y, hit), inspect(field), changedView(), hint(text, tone) }
    */
   constructor(scene, store, ui) {
     this.scene = scene;
@@ -112,6 +114,12 @@ export class Pointer {
       return;
     }
 
+    // una presa del pannello: tenuta premuta, il gesto diventa "collega da questa porta" (o, se la
+    // porta ha gia' il suo cavo, "sposta quel cavo"); trascinata subito, l'apparato si sposta
+    const jackEl = hit.type === 'node' && !this.store.readonly && this.ui.mode() !== 'connect' ? event.target.closest?.('.dm-jack') : null;
+    const jack = jackEl ? { port: { kind: jackEl.dataset.kind, n: Number(jackEl.dataset.port) } } : null;
+    if (jack) jack.existing = linkAtPort(this.store.map, hit.id, jack.port.kind, jack.port.n);
+
     if (hit.type === 'node' && (hit.part === 'handle' || this.ui.mode() === 'connect')) {
       if (this.store.readonly) return;
       this.start(event, { type: 'connect', from: hit.id, at: world, moved: false });
@@ -139,7 +147,22 @@ export class Pointer {
       this.start(event, { type: 'none' });
       return;
     }
-    this.start(event, { type: 'move', from: world, items: this.moving(), primary: hit.id, moved: false, collapse: wasSelected && !additive });
+    this.start(event, { type: 'move', from: world, items: this.moving(), primary: hit.id, moved: false, collapse: wasSelected && !additive, jack, node: hit.id });
+    if (jack && !additive) this.hold(event.pointerId);
+  }
+
+  /** La presa tenuta premuta senza muoversi: da spostare l'apparato si passa a tirare un cavo da lei. */
+  hold(pointer) {
+    clearTimeout(this.holdTimer);
+    this.holdTimer = setTimeout(() => {
+      const drag = this.drag;
+      if (!drag || drag.type !== 'move' || drag.moved || drag.pointer !== pointer || !drag.jack) return;
+      this.drag = { type: 'plug', from: drag.node, port: drag.jack.port, existing: drag.jack.existing, at: drag.from, moved: false, held: true, pointer };
+      this.scene.host.classList.add('plugging');
+      this.store.select([drag.node]);
+      this.mark(null);
+      this.jackEl(drag.node, drag.jack.port)?.classList.add('plug-from');
+    }, HOLD);
   }
 
   start(event, drag) {
@@ -170,6 +193,7 @@ export class Pointer {
         let dy = world.y - drag.from.y;
         if (!drag.moved && Math.hypot(dx, dy) * k < CLICK) return;
         if (!drag.moved) {
+          clearTimeout(this.holdTimer);
           drag.moved = true;
           this.store.begin();
           this.scene.host.classList.add('dragging');
@@ -200,6 +224,17 @@ export class Pointer {
         this.scene.setTarget(target);
         const end = target ? centerOf(this.store.node(target)) : world;
         this.scene.wire(edgeToward(source, end), end);
+        break;
+      }
+      case 'plug': {
+        if (!drag.moved && Math.hypot(world.x - drag.at.x, world.y - drag.at.y) * k < CLICK) return;
+        drag.moved = true;
+        const aim = this.aim(drag, event.clientX, event.clientY);
+        this.scene.setTarget(aim.node);
+        this.mark(aim.jack, aim.busy ? 'plug-busy' : 'plug-ok');
+        const start = this.jackPoint(drag.from, drag.port) ?? centerOf(this.store.node(drag.from));
+        const end = aim.port ? this.jackPoint(aim.node, aim.port) : aim.node ? centerOf(this.store.node(aim.node)) : world;
+        this.scene.wire(start, end);
         break;
       }
       case 'marquee': {
@@ -276,6 +311,97 @@ export class Pointer {
     return { dx, dy, guides };
   }
 
+  /** La presa di un apparato sulla tela (l'elemento), per illuminarla durante il gesto. */
+  jackEl(nodeId, port) {
+    return this.scene.host.querySelector(`[data-type="node"][data-id="${nodeId}"] .dm-jack[data-kind="${port.kind}"][data-port="${port.n}"]`);
+  }
+
+  /** Il centro di una presa in coordinate della mappa. */
+  jackPoint(nodeId, port) {
+    const node = this.store.node(nodeId);
+    const cell = node ? portCell(node, port.n, port.kind) : null;
+    return cell ? { x: node.x + cell.cx, y: node.y + cell.cy } : null;
+  }
+
+  /** Una sola presa illuminata per volta per ogni ruolo (partenza, arrivo libero, arrivo occupato). */
+  mark(el, role) {
+    for (const old of this.scene.host.querySelectorAll('.plug-ok, .plug-busy')) {
+      if (old !== el || !old.classList.contains(role)) old.classList.remove('plug-ok', 'plug-busy');
+    }
+    if (el) el.classList.add(role);
+  }
+
+  /**
+   * Dove andrebbe il cavo se si lasciasse qui: l'apparato sotto il puntatore (non quello di
+   * partenza), la sua presa se si e' sopra una presa, e se quella presa e' gia' occupata da un
+   * altro cavo.
+   */
+  aim(drag, clientX, clientY) {
+    const under = document.elementFromPoint(clientX, clientY);
+    const nodeEl = under?.closest?.('[data-type="node"]');
+    const node = nodeEl && this.scene.host.contains(nodeEl) ? nodeEl.dataset.id : null;
+    const other = drag.existing ? drag.existing.link[drag.existing.end === 'a' ? 'b' : 'a'] : null;
+    // un cavo nuovo va verso un altro apparato; uno gia' collegato puo' cambiare porta anche sullo stesso
+    if (!node || (node === drag.from && !drag.existing) || node === other) return { node: null, jack: null, port: null, busy: false };
+    const jack = under.closest('.dm-jack');
+    if (!jack || !nodeEl.contains(jack)) return { node, jack: null, port: null, busy: false };
+    const port = { kind: jack.dataset.kind, n: Number(jack.dataset.port) };
+    const taken = linkAtPort(this.store.map, node, port.kind, port.n);
+    return { node, jack, port, busy: !!taken && taken.link.id !== drag.existing?.link.id };
+  }
+
+  /** Lasciato il cavo tirato da una presa: collega, ricollega o dice perche' no. */
+  plug(drag, event) {
+    const map = this.store.map;
+    const source = this.store.node(drag.from);
+    const portName = (port) => `${port.kind === 'cage' ? 'la SFP' : 'la porta'} ${port.n}`;
+    const aim = this.aim(drag, event.clientX, event.clientY);
+
+    if (!aim.node) {
+      if (drag.existing) return; // un cavo gia' collegato lasciato nel vuoto resta dov'era
+      // una porta libera tirata nel vuoto: un apparato nuovo, collegato a quella porta
+      const at = this.scene.toWorld(event.clientX, event.clientY);
+      const label = portLabel(map, source, drag.port.kind, drag.port.n);
+      this.ui.kindPicker(event.clientX, event.clientY, (kind) => {
+        const node = this.store.addNode(kind, at.x - sizeOf({ kind }).w / 2, at.y - sizeOf({ kind }).h / 2);
+        if (!node) return null;
+        this.scene.pulse.add(node.id);
+        this.store.cut();
+        const link = this.store.addLink(drag.from, node.id, { pa: label });
+        this.store.select([node.id]);
+        return link;
+      }, 'Collega un apparato nuovo');
+      return;
+    }
+
+    const target = this.store.node(aim.node);
+    if (aim.busy) {
+      this.ui.hint(`${portName(aim.port)[0].toUpperCase()}${portName(aim.port).slice(1)} di ${target.name || 'quell\'apparato'} e' gia' occupata: ogni porta tiene un cavo.`, 'crit');
+      return;
+    }
+
+    // la porta d'arrivo: quella su cui si e' lasciato, o la prima libera dell'apparato
+    const port = aim.port ?? freePort(map, target, drag.port.kind);
+    const there = port ? portLabel(map, target, port.kind, port.n) : '';
+
+    if (drag.existing) {
+      // il cavo si stacca da questa porta e va nell'altra (anche dello stesso apparato)
+      const { link, end } = drag.existing;
+      if (aim.node === drag.from && (!port || (port.kind === drag.port.kind && port.n === drag.port.n))) return;
+      this.store.update(link.id, end === 'a' ? { a: aim.node, pa: there } : { b: aim.node, pb: there });
+      this.store.select([link.id]);
+      this.ui.hint(`Cavo spostato su ${port ? `${portName(port)} di ` : ''}${target.name || 'un altro apparato'}.`, 'ok');
+      return;
+    }
+
+    const here = portLabel(map, source, drag.port.kind, drag.port.n);
+    const link = this.store.addLink(drag.from, aim.node, { pa: here, pb: there });
+    if (link) {
+      this.store.select([link.id]);
+      this.ui.hint(`Collegati: ${portName(drag.port)} di ${source.name || 'un apparato'} e ${port ? `${portName(port)} di ` : ''}${target.name || 'un apparato'}.`, 'ok');
+    }
+  }
+
   nodeAt(clientX, clientY) {
     const el = document.elementFromPoint(clientX, clientY)?.closest?.('[data-type="node"]');
     return el && this.scene.host.contains(el) ? el.dataset.id : null;
@@ -294,8 +420,11 @@ export class Pointer {
         else if (drag.clear) this.store.deselect();
         break;
       case 'move':
+        clearTimeout(this.holdTimer);
         this.scene.guides(null);
         if (drag.moved) this.store.cut();
+        // un clic su una porta occupata sceglie il suo cavo
+        else if (drag.jack?.existing) this.store.select([drag.jack.existing.link.id]);
         else if (drag.collapse) this.store.select([drag.primary]);
         break;
       case 'connect': {
@@ -322,6 +451,14 @@ export class Pointer {
         }
         break;
       }
+      case 'plug':
+        this.scene.host.classList.remove('plugging');
+        this.mark(null);
+        for (const el of this.scene.host.querySelectorAll('.plug-from')) el.classList.remove('plug-from');
+        this.scene.wire(null);
+        this.scene.setTarget(null);
+        if (drag.moved) this.plug(drag, event);
+        break;
       case 'marquee':
         this.scene.marquee(null);
         break;
@@ -341,11 +478,14 @@ export class Pointer {
   }
 
   cancel(clear = true) {
+    clearTimeout(this.holdTimer);
     if (!this.drag) return;
     const drag = this.drag;
     this.drag = null;
-    this.scene.host.classList.remove('panning', 'dragging');
+    this.scene.host.classList.remove('panning', 'dragging', 'plugging');
     this.settle();
+    this.mark(null);
+    for (const el of this.scene.host.querySelectorAll('.plug-from')) el.classList.remove('plug-from');
     this.scene.wire(null);
     this.scene.setTarget(null);
     this.scene.marquee(null);

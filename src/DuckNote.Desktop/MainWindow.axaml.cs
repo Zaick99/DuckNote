@@ -237,6 +237,8 @@ public sealed partial class MainWindow : Window
     private void Wire()
     {
         _settings.Changed += ShowMonitor;
+        // un interruttore dei gruppi in Rete cambia quello che il monitoraggio controlla
+        _ws.MonitorChanged += ShowMonitor;
         _ws.Status += message => Dispatcher.UIThread.Post(() => _notices.Status(message));
         _ws.Locked += () => Dispatcher.UIThread.Post(ShowLock);
         _ws.VaultChanged += () => Dispatcher.UIThread.Post(() =>
@@ -415,7 +417,14 @@ public sealed partial class MainWindow : Window
 
         if (updates.CanOpenDownloaded)
         {
-            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, () => updates.OpenDownloaded(), tab: "Aggiornamento");
+            // aperto il disco, DuckNote si chiude (salvando): l'app si puo' trascinare al posto di quella vecchia
+            _notices.Toast("info", "Blue", $"E' uscita DuckNote {version}", updates.Message, () =>
+            {
+                if (updates.OpenDownloaded())
+                {
+                    Close();
+                }
+            }, tab: "Aggiornamento");
             return;
         }
 
@@ -1024,13 +1033,12 @@ public sealed partial class MainWindow : Window
             return;
         }
 
-        // con un gruppo monitorato si contano anche i suoi host; senza, quelli scritti nella nota
-        bool groups = _ws.Groups.All.Any(group => group.Monitor);
-        int hosts = groups ? _ws.MonitoredCount : _ws.NoteHostCount;
+        // gli host che il monitoraggio controlla davvero: quelli dei gruppi col loro interruttore acceso
+        int hosts = _ws.MonitoredCount;
         Card(
             "Monitoraggio",
             _ws.Settings.MonitorEnabled
-                ? string.Create(CultureInfo.CurrentCulture, $"{hosts} host {(groups ? "fra nota e gruppi" : "della nota")}, ogni {_ws.Settings.MonitorIntervalSec} s. {session.UpCount} attivi, {session.DownCount} spenti.")
+                ? string.Create(CultureInfo.CurrentCulture, $"{hosts} host controllati, ogni {_ws.Settings.MonitorIntervalSec} s. {session.UpCount} attivi, {session.DownCount} spenti.")
                 : "Spento: gli host si controllano solo a mano.",
             null,
             _ws.Settings.MonitorEnabled ? (session.DownCount > 0 ? "Orange" : "Green") : "Gray",

@@ -301,7 +301,12 @@ public partial class SettingsPage : UserControl, IDuckPage
 
         if (updates.CanOpenDownloaded)
         {
-            updates.OpenDownloaded();
+            // aperto l'aggiornamento, DuckNote si chiude (salvando): si puo' sostituire
+            if (updates.OpenDownloaded())
+            {
+                Window.GetWindow(this)?.Close();
+            }
+
             return;
         }
 

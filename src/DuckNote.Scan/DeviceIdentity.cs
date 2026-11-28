@@ -880,7 +880,7 @@ public static partial class DeviceIdentity
         (Make("pi-hole"), LinuxHost, Os.Linux, "Pi-hole", 60),
         (Make("esxi|vmware"), Hypervisor, Os.Embedded, "VMware ESXi", 80),
         (Make("idrac"), Generic, Os.Embedded, "iDRAC", 40),
-        (Make("integrated lights-out|\\bilo\\b"), Generic, Os.Embedded, "iLO", 40),
+        (Make("integrated lights-out|(?<![a-z])ilo(?![a-z])"), Generic, Os.Embedded, "iLO", 40),
         (Make("plex"), MediaServer, Os.Linux, "Plex", 60),
     ];
 

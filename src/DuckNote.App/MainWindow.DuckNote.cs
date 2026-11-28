@@ -47,6 +47,8 @@ public partial class MainWindow
             ShowMapCount();
         };
         _ws.Unsaved += () => Dispatcher.BeginInvoke(ShowMapCount);
+        // un interruttore dei gruppi in Rete cambia quello che il monitoraggio controlla
+        _ws.MonitorChanged += ShowMonitor;
         _ws.NoteReplaced += () => Dispatcher.BeginInvoke(() =>
         {
             ShowMapCount();
@@ -537,14 +539,13 @@ public partial class MainWindow
             return;
         }
 
-        // con un gruppo monitorato si contano anche i suoi host; senza, quelli scritti nella nota
-        bool groups = _ws.Groups.All.Any(group => group.Monitor);
-        int hosts = groups ? _ws.MonitoredCount : _ws.NoteHostCount;
+        // gli host che il monitoraggio controlla davvero: quelli dei gruppi col loro interruttore acceso
+        int hosts = _ws.MonitoredCount;
 
         SetStatusCard(
             "Monitoraggio",
             _ws.Settings.MonitorEnabled
-                ? string.Create(CultureInfo.CurrentCulture, $"{hosts} host {(groups ? "fra nota e gruppi" : "della nota")}, ogni {_ws.Settings.MonitorIntervalSec} s. {session.UpCount} attivi, {session.DownCount} spenti.")
+                ? string.Create(CultureInfo.CurrentCulture, $"{hosts} host controllati, ogni {_ws.Settings.MonitorIntervalSec} s. {session.UpCount} attivi, {session.DownCount} spenti.")
                 : "Spento: gli host si controllano solo a mano.",
             null,
             _ws.Settings.MonitorEnabled ? (session.DownCount > 0 ? "Orange" : "Green") : "Gray",

@@ -2,6 +2,47 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.0.26] - 2026-11-28
+
+**Groups on the left of Rete like the sidebar, with their Ping switch; filters
+that show the right hosts; cables pulled from port to port.**
+
+### Added
+
+- **The groups of Rete are a list on the left**, like the items of the
+  sidebar: **Tutti**, **Nota**, your groups and **Ricerca**, each with its
+  coloured tile, the red pill of the hosts down, the green one of the hosts up
+  and its **Ping** switch. A click chooses the group: the table shows its
+  hosts, and the filters and the search count and work inside it. The arrow
+  opens a group in place, with its hosts (a click opens one) and **Analizza**
+  and **Modifica**; **+** makes a new one.
+- **Ping, group by group**: **Tutti** turns the whole monitor on or off,
+  **Nota** the addresses of the sheets and the map, a group its own hosts,
+  **Ricerca** the hosts found by range scans outside every group. Nota and
+  Ricerca are saved in the note.
+- **Cables from port to port on the map.** Hold a jack of a front panel, then
+  pull: the cable leaves from that port and takes the jack it is dropped on,
+  named like the device's other ports (`Gi1/0/5`, `ether5`, `eth4`, `sfp1`);
+  on the body of a device it takes the first free port. A port holds one
+  cable: a taken jack lights red and refuses it. Held on a taken jack, the
+  pull moves that cable; a click on it selects the cable.
+
+### Changed
+
+- **The card of a host** opens beside the table when the window is wide
+  enough, over it otherwise (like the card of a device on the map), and closes
+  with **×**.
+- **Opening a downloaded update closes DuckNote**, after saving: on the Mac the
+  disk image opens and the app can be dragged over the old one; on Windows the
+  installer or the new `DuckNote.exe` can take its place.
+
+### Fixed
+
+- **Tutti, Attivi, Spenti and Da controllare showed the wrong hosts** on the
+  Mac when switching from one to another: the table was refilled while the
+  previous button still looked pressed. The filter is now kept apart from the
+  buttons.
+
 ## [0.0.25] - 2026-11-28
 
 **The map drawn like Vantage, with the real ports and the VPN links; devices

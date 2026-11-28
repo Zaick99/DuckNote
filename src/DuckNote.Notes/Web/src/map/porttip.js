@@ -35,7 +35,7 @@ export class PortTip {
     if (event.pointerType === 'touch') return;
     const jack = event.target.closest?.('.dm-jack');
     if (!jack || jack === this.jack) return;
-    if (this.scene.host.classList.contains('dragging') || this.scene.host.classList.contains('panning')) return;
+    if (['dragging', 'panning', 'plugging'].some((name) => this.scene.host.classList.contains(name))) return;
     const node = this.store.find(jack.closest('[data-id]')?.dataset.id);
     if (!node) return;
     this.jack = jack;

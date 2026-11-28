@@ -111,4 +111,25 @@ public class ScanGroupsTests
         Assert.Equal(["10.0.0.5", "nas01.example.local"], matcher.Singles);
         Assert.Equal(256 + 11, matcher.Addresses);
     }
+    [Fact]
+    public void Note_and_search_monitoring_are_kept_in_the_groups_file()
+    {
+        ScanGroup server = new("gserver", "Server", ["192.168.40.0/24"], Monitor: true);
+
+        // di serie: la Nota si controlla, la Ricerca no, e il file resta come prima
+        Assert.Equal(ScanGroupFlags.Default, ScanGroups.ReadFlags(ScanGroups.Write([server])));
+        Assert.Null(ScanGroups.Write([], ScanGroupFlags.Default));
+
+        byte[]? written = ScanGroups.Write([server], new ScanGroupFlags(NoteMonitor: false, FoundMonitor: true));
+        Assert.Equal(new ScanGroupFlags(false, true), ScanGroups.ReadFlags(written));
+        Assert.Equal("Server", Assert.Single(ScanGroups.Read(written)).Name);
+
+        // anche senza gruppi il monitoraggio cambiato si scrive
+        byte[]? alone = ScanGroups.Write([], new ScanGroupFlags(NoteMonitor: false));
+        Assert.NotNull(alone);
+        Assert.Empty(ScanGroups.Read(alone));
+        Assert.False(ScanGroups.ReadFlags(alone).NoteMonitor);
+
+        Assert.Equal(ScanGroupFlags.Default, ScanGroups.ReadFlags("non e' json"u8.ToArray()));
+    }
 }

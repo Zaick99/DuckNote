@@ -64,6 +64,7 @@ const pointer = new Pointer(scene, store, {
   contextMenu: (x, y, hit, world) => contextMenu(x, y, hit, world),
   inspect: (field) => inspector.focus(field),
   changedView: () => viewChanged(),
+  hint: (text, tone) => hint(text, tone),
 });
 
 // ------------------------------------------------------------------ barra in alto
@@ -289,6 +290,19 @@ function showEmpty() {
   empty.hidden = !blank;
 }
 
+// un avviso che passa, in fondo a destra (una porta gia' occupata, un cavo spostato)
+let passing = null;
+let passingTimer = 0;
+function hint(text, tone = 'ok') {
+  passing = { text, tone };
+  clearTimeout(passingTimer);
+  passingTimer = setTimeout(() => {
+    passing = null;
+    showStatus();
+  }, 3600);
+  showStatus();
+}
+
 function showStatus() {
   const map = store.map;
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
@@ -300,7 +314,8 @@ function showStatus() {
     h('span', {}, parts.join(' · ')),
     down ? h('span', { class: 'dm-status-down' }, h('span', { class: 'dm-dot st-down' }), plural(down, 'spento', 'spenti')) : null,
     sel > 1 ? h('span', {}, `${sel} selezionati`) : null,
-    mode === 'connect' ? h('span', { class: 'dm-status-hint' }, 'Trascina da un apparato all\'altro per collegarli. Esc per tornare a Sposta.') : null);
+    mode === 'connect' ? h('span', { class: 'dm-status-hint' }, 'Trascina da un apparato all\'altro per collegarli. Esc per tornare a Sposta.') : null,
+    passing ? h('span', { class: `dm-status-pass ${passing.tone}` }, passing.text) : null);
 }
 
 // ------------------------------------------------------------------ modi, libreria, zoom

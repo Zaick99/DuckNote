@@ -388,6 +388,54 @@ export function portOf(node, label, zero = null) {
   return n >= 1 && n <= (node?.sfp ?? 0) ? { kind: 'cage', n } : null;
 }
 
+/**
+ * Il cavo che occupa una presa di un apparato, e da che capo: null se la presa e' libera. Contano
+ * solo i cavi veri (non le VPN e il Wi-Fi), coi nomi delle porte letti come sul pannello.
+ */
+export function linkAtPort(map, nodeId, kind, n) {
+  const node = map.nodes.find((one) => one.id === nodeId);
+  if (!node) return null;
+  const zero = zeroBased(map).get(nodeId);
+  for (const link of map.links) {
+    if (!physical(link)) continue;
+    for (const end of ['a', 'b']) {
+      if (link[end] !== nodeId) continue;
+      const port = portOf(node, end === 'a' ? link.pa : link.pb, zero);
+      if (port && port.kind === kind && port.n === n) return { link, end };
+    }
+  }
+  return null;
+}
+
+/** La prima presa libera di un apparato, del tipo chiesto (poi dell'altro); null se sono tutte occupate o non ne ha. */
+export function freePort(map, node, kind = 'rj45') {
+  for (const which of kind === 'cage' ? ['cage', 'rj45'] : ['rj45', 'cage']) {
+    const count = which === 'cage' ? node.sfp ?? 0 : node.ports ?? 0;
+    for (let n = 1; n <= count; n++) if (!linkAtPort(map, node.id, which, n)) return { kind: which, n };
+  }
+  return null;
+}
+
+/**
+ * Il nome da dare alla presa n di un apparato, nello stile delle sue altre porte: se un cavo
+ * nomina gia' "Gi1/0/3", la 5 e' "Gi1/0/5"; "ether2" fa "ether5"; dove si conta da zero (eth0)
+ * la 5 e' "eth4". Senza esempi, il numero (le SFP "sfp1").
+ */
+export function portLabel(map, node, kind, n) {
+  const zero = zeroBased(map).get(node.id);
+  const index = n - (zero?.has(kind) ? 1 : 0);
+  const read = kind === 'cage' ? sfpNumber : portNumber;
+  for (const link of map.links) {
+    if (!physical(link)) continue;
+    for (const [end, label] of [['a', link.pa], ['b', link.pb]]) {
+      if (link[end] !== node.id || read(label) == null) continue;
+      const match = /^(.*?)(\d{1,3})\s*$/.exec(String(label).trim());
+      if (match) return `${match[1]}${index}`;
+    }
+  }
+  return kind === 'cage' ? `sfp${index}` : String(index);
+}
+
 export const centerOf = (node) => {
   const size = sizeOf(node);
   return { x: node.x + size.w / 2, y: node.y + size.h / 2 };
